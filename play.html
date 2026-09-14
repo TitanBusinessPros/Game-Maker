@@ -309,7 +309,7 @@ async function main() {
       attack: def.attack, range: def.range, speed: effectiveStat(fac, def.speed, 'speed'),
       img: unitImages[defIndex], x, y, alive: true, selected: false,
       orderType: null, moveTarget: null, target: null, attackCooldown: Math.random() * ATTACK_INTERVAL,
-      lockedUntilTurn: 0,
+      lockedUntilTurn: 0, facingAngle: 0,
     };
     units.push(u);
     return u;
@@ -319,7 +319,7 @@ async function main() {
       id: nextUnitId++, factionId, defIndex: -1, isMiner: true,
       hp: 40, maxHp: 40, attack: 0, range: 0, speed: 1.6,
       img: miningImg, x, y, alive: true, selected: false,
-      orderType: null, moveTarget: null, target: null, attackCooldown: 0, lockedUntilTurn: 0,
+      orderType: null, moveTarget: null, target: null, attackCooldown: 0, lockedUntilTurn: 0, facingAngle: 0,
     };
     units.push(u);
     return u;
@@ -351,10 +351,19 @@ async function main() {
     beams.push({ x1: u.x, y1: u.y, x2: t.x, y2: t.y, color: LASER_COLORS[Math.max(0, u.defIndex) % LASER_COLORS.length], ttl: 0.18 });
   }
 
+  // Same convention the real After Earth engine uses to point a sprite at
+  // a destination (see its own Math.atan2(dy,dx) + Math.PI/2 call sites) -
+  // its art faces "up" by default, so a plain atan2 (which treats 0 as
+  // pointing right) needs that quarter-turn correction to line up.
+  function facingToward(u, tx, ty) {
+    return Math.atan2(ty - u.y, tx - u.x) + Math.PI / 2;
+  }
+
   function combatTick(u, dt) {
     const t = u.target;
     if (!t || t.hp <= 0 || t.alive === false) { u.target = null; return; }
     const dist = Math.hypot(t.x - u.x, t.y - u.y);
+    u.facingAngle = facingToward(u, t.x, t.y);
     if (dist > u.range) {
       if (turnNumber >= u.lockedUntilTurn) {
         const sp = u.speed * MOVE_PX_PER_SPEED;
@@ -454,7 +463,10 @@ async function main() {
           const dx = u.moveTarget.x - u.x, dy = u.moveTarget.y - u.y;
           const dist = Math.hypot(dx, dy);
           if (dist < 4) { u.orderType = null; u.moveTarget = null; }
-          else { const sp = u.speed * MOVE_PX_PER_SPEED; u.x += dx / dist * sp * dt; u.y += dy / dist * sp * dt; }
+          else {
+            u.facingAngle = facingToward(u, u.moveTarget.x, u.moveTarget.y);
+            const sp = u.speed * MOVE_PX_PER_SPEED; u.x += dx / dist * sp * dt; u.y += dy / dist * sp * dt;
+          }
         }
       }
     }
@@ -496,8 +508,16 @@ async function main() {
     const p = toScreen(u.x, u.y);
     if (p.x < -60 || p.x > canvas.width + 60 || p.y < -60 || p.y > canvas.height + 60) return;
     if (u.selected) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p.x, p.y, UNIT_SIZE / 2 + 5, 0, 7); ctx.stroke(); }
-    if (u.img) ctx.drawImage(u.img, p.x - UNIT_SIZE / 2, p.y - UNIT_SIZE / 2, UNIT_SIZE, UNIT_SIZE);
-    else { ctx.fillStyle = factionOf(u.factionId).color; ctx.beginPath(); ctx.arc(p.x, p.y, UNIT_SIZE / 2, 0, 7); ctx.fill(); }
+    // Only the sprite itself rotates to face where the unit is headed
+    // (same as After Earth's own Unit.draw()) - the HP bar/lock icon below
+    // stay screen-aligned, same as the real game keeps them too.
+    if (u.img) {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(u.facingAngle || 0);
+      ctx.drawImage(u.img, -UNIT_SIZE / 2, -UNIT_SIZE / 2, UNIT_SIZE, UNIT_SIZE);
+      ctx.restore();
+    } else { ctx.fillStyle = factionOf(u.factionId).color; ctx.beginPath(); ctx.arc(p.x, p.y, UNIT_SIZE / 2, 0, 7); ctx.fill(); }
     const pct = Math.max(0, u.hp / u.maxHp);
     ctx.fillStyle = '#2a3550'; ctx.fillRect(p.x - UNIT_SIZE / 2, p.y - UNIT_SIZE / 2 - 7, UNIT_SIZE, 3);
     ctx.fillStyle = factionOf(u.factionId).color; ctx.fillRect(p.x - UNIT_SIZE / 2, p.y - UNIT_SIZE / 2 - 7, UNIT_SIZE * pct, 3);
@@ -781,26 +801,54 @@ async function main() {
 
   // ---------------------------------------------------------------------
   // Team select screen - runs before the match actually starts.
+  //
+  // With only one computer player there's nothing to pick - allying with
+  // your only possible opponent would leave no one to fight, so that case
+  // skips this screen entirely and goes straight to a 1v1. With more than
+  // one, the screen requires at least one computer player to stay
+  // unchecked (opposing) before Start Match will actually start - picking
+  // *everyone* onto your team used to silently end the match in an
+  // instant, meaningless "win" the moment it began (found by testing the
+  // exact case a real map - one computer player, the default - hits).
   // ---------------------------------------------------------------------
+  const teamScreenEl = document.getElementById('teamSelectScreen');
   const allyListEl = document.getElementById('allyList');
-  computerCfgs.forEach((c, i) => {
-    const fac = factions[i + 1];
-    const row = document.createElement('label');
-    row.className = 'allyRow';
-    row.innerHTML = `<input type="checkbox" class="ally-check" data-fid="${fac.id}"><span class="swatch" style="background:${fac.color}"></span><span>${c.name}</span>`;
-    allyListEl.appendChild(row);
-  });
-  document.getElementById('teamSelectScreen').classList.add('show');
-  document.getElementById('startMatchBtn').addEventListener('click', () => {
+  const startMatchBtn = document.getElementById('startMatchBtn');
+
+  function beginMatch(allyFactionIds) {
     player.team = 'A';
-    document.querySelectorAll('.ally-check').forEach((cb) => {
-      const fid = Number(cb.dataset.fid);
-      factions[fid].team = cb.checked ? 'A' : 'B';
+    factions.forEach((f, i) => {
+      if (i === 0) return;
+      f.team = allyFactionIds.includes(f.id) ? 'A' : 'B';
     });
-    factions.forEach((f) => { if (f.team === null) f.team = 'B'; });
-    document.getElementById('teamSelectScreen').classList.remove('show');
+    teamScreenEl.classList.remove('show');
     matchStarted = true;
-  });
+  }
+
+  if (computerCfgs.length <= 1) {
+    beginMatch([]); // straight 1v1 (or a 0-opponent map, which just means no team screen either way)
+  } else {
+    computerCfgs.forEach((c, i) => {
+      const fac = factions[i + 1];
+      const row = document.createElement('label');
+      row.className = 'allyRow';
+      row.innerHTML = `<input type="checkbox" class="ally-check" data-fid="${fac.id}"><span class="swatch" style="background:${fac.color}"></span><span>${c.name}</span>`;
+      allyListEl.appendChild(row);
+    });
+    const teamErrorEl = document.createElement('div');
+    teamErrorEl.style.cssText = 'color:var(--bad); font-size:12px; margin-top:8px; display:none;';
+    teamErrorEl.textContent = 'Leave at least one computer player unchecked - otherwise there’s no one left to fight.';
+    startMatchBtn.insertAdjacentElement('beforebegin', teamErrorEl);
+    teamScreenEl.classList.add('show');
+    startMatchBtn.addEventListener('click', () => {
+      const checked = Array.from(document.querySelectorAll('.ally-check')).filter((cb) => cb.checked);
+      if (checked.length === computerCfgs.length) {
+        teamErrorEl.style.display = 'block';
+        return;
+      }
+      beginMatch(checked.map((cb) => Number(cb.dataset.fid)));
+    });
+  }
 
   // ---------------------------------------------------------------------
   // Boot
