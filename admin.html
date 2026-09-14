@@ -82,21 +82,23 @@
       <p style="color:var(--text-dim); font-size:12px; margin-top:-8px;">Pick a category and select one or more files (you can multi-select a whole folder). Each file's name becomes its display name.</p>
       <div class="row">
         <div class="field">
-          <label for="categorySelect">Category</label>
-          <select id="categorySelect">
-            <option value="ships">Ships / units</option>
-            <option value="planets">Planets</option>
-            <option value="structures">Structures / buildings</option>
-            <option value="maps">Map backgrounds</option>
-            <option value="cannons">Cannons / defenses</option>
-            <option value="enemies">Enemy factions</option>
+          <label for="topCategorySelect">Category</label>
+          <select id="topCategorySelect">
+            <option value="maps">Maps</option>
+            <option value="characters">Characters</option>
+            <option value="worlds">Worlds</option>
+            <option value="bases">Bases</option>
             <option value="sounds">Sounds (mp3)</option>
-            <option value="custom">Custom category&hellip;</option>
           </select>
         </div>
-        <div class="field" id="customCategoryField" style="display:none;">
-          <label for="customCategory">Custom category name</label>
-          <input type="text" id="customCategory" placeholder="e.g. tanks">
+        <div class="field" id="subCategoryField">
+          <label for="subCategorySelect">Character type</label>
+          <select id="subCategorySelect">
+            <option value="characters/space_ships">Space Ships</option>
+            <option value="characters/navy_ships">Navy Ships</option>
+            <option value="characters/jets">Jets</option>
+            <option value="characters/army_men">Army Men</option>
+          </select>
         </div>
       </div>
       <div class="field" style="margin-bottom:14px;">
@@ -209,20 +211,41 @@ onAuthStateChanged(auth, (user) => {
 });
 
 // ---------------------------------------------------------------------
-// Category select + custom category field
+// Category select: Maps / Characters (with a Space Ships / Navy Ships /
+// Jets / Army Men sub-picker) / Worlds / Bases / Sounds. Character items
+// are stored under a "characters/<type>" category id so the map
+// creator's library picker (which just groups by whatever category
+// string it sees) naturally shows them as their own sub-groups too.
 // ---------------------------------------------------------------------
-const categorySelect = document.getElementById('categorySelect');
-const customCategoryField = document.getElementById('customCategoryField');
-categorySelect.addEventListener('change', () => {
-  customCategoryField.style.display = categorySelect.value === 'custom' ? 'block' : 'none';
+const topCategorySelect = document.getElementById('topCategorySelect');
+const subCategoryField = document.getElementById('subCategoryField');
+const subCategorySelect = document.getElementById('subCategorySelect');
+topCategorySelect.addEventListener('change', () => {
+  subCategoryField.style.display = topCategorySelect.value === 'characters' ? 'block' : 'none';
 });
+subCategoryField.style.display = topCategorySelect.value === 'characters' ? 'block' : 'none';
 
 function currentCategory() {
-  if (categorySelect.value === 'custom') {
-    return document.getElementById('customCategory').value.trim().toLowerCase() || 'custom';
-  }
-  return categorySelect.value;
+  return topCategorySelect.value === 'characters' ? subCategorySelect.value : topCategorySelect.value;
 }
+
+// Category tree + display labels, shared by the "Current library" grouping
+// below so headings read as "Characters > Space Ships" instead of the raw
+// "characters/space_ships" id, and legacy items from before this
+// restructuring (old flat categories like "ships" or "planets") still show
+// up under "Other" instead of silently vanishing.
+const CATEGORY_TREE = [
+  { id: 'maps', label: 'Maps' },
+  { id: 'characters', label: 'Characters', children: [
+    { id: 'characters/space_ships', label: 'Space Ships' },
+    { id: 'characters/navy_ships', label: 'Navy Ships' },
+    { id: 'characters/jets', label: 'Jets' },
+    { id: 'characters/army_men', label: 'Army Men' },
+  ] },
+  { id: 'worlds', label: 'Worlds' },
+  { id: 'bases', label: 'Bases' },
+  { id: 'sounds', label: 'Sounds' },
+];
 
 // ---------------------------------------------------------------------
 // Upload: same 5-at-a-time pattern proven in the main map creator, plus a
@@ -318,51 +341,110 @@ uploadBtn.addEventListener('click', async () => {
 // ---------------------------------------------------------------------
 // Current library listing + delete
 // ---------------------------------------------------------------------
-async function refreshLibrary() {
-  const container = document.getElementById('currentLibrary');
-  const snap = await getDocs(collection(db, 'libraryItems'));
-  if (snap.empty) {
+function renderItemGrid(container, items) {
+  const grid = document.createElement('div');
+  grid.className = 'item-list';
+  items.forEach((item) => {
+    const card = document.createElement('div');
+    card.className = 'item-card';
+    card.innerHTML = item.type === 'image'
+      ? `<img src="${item.url}" loading="lazy" alt="${item.name}">`
+      : `<div class="audio-icon">🎵</div>`;
+    const nameEl = document.createElement('div');
+    nameEl.className = 'name';
+    nameEl.textContent = item.name;
+    card.appendChild(nameEl);
+    const delBtn = document.createElement('button');
+    delBtn.className = 'btn-danger';
+    delBtn.textContent = 'Delete';
+    delBtn.addEventListener('click', async () => {
+      if (!confirm(`Remove "${item.name}" from the library? Maps already using it keep their own copy.`)) return;
+      await deleteDoc(doc(db, 'libraryItems', item.id));
+      if (item.path) { try { await deleteObject(storageRef(storage, item.path)); } catch (e) {} }
+      refreshLibrary();
+    });
+    card.appendChild(delBtn);
+    grid.appendChild(card);
+  });
+  container.appendChild(grid);
+}
+
+// Pure rendering step, split out from the Firestore fetch above it so the
+// hierarchical grouping (the actual thing being changed here) can be
+// exercised directly with fabricated items - no live Firestore round-trip
+// needed to verify it groups/labels/orders correctly.
+function renderLibraryInto(container, items) {
+  if (!items.length) {
     container.innerHTML = '<p style="color:var(--text-dim); font-size:12px;">Nothing in the library yet.</p>';
     return;
   }
   const byCategory = {};
-  snap.forEach((d) => {
-    const item = { id: d.id, ...d.data() };
-    (byCategory[item.category] ||= []).push(item);
-  });
+  items.forEach((item) => { (byCategory[item.category] ||= []).push(item); });
   container.innerHTML = '';
-  for (const [category, items] of Object.entries(byCategory)) {
+  const seen = new Set();
+  for (const top of CATEGORY_TREE) {
+    if (top.children) {
+      // "Characters" itself never holds items directly (only its four
+      // sub-types do) - only show the parent heading, and only the child
+      // sections that actually have something in them.
+      const childSections = top.children.filter((c) => byCategory[c.id]?.length);
+      if (!childSections.length) continue;
+      const heading = document.createElement('div');
+      heading.className = 'category-heading';
+      heading.style.fontSize = '15px';
+      heading.style.color = 'var(--text)';
+      heading.textContent = top.label;
+      container.appendChild(heading);
+      childSections.forEach((c) => {
+        seen.add(c.id);
+        const subHeading = document.createElement('div');
+        subHeading.className = 'category-heading';
+        subHeading.style.marginLeft = '10px';
+        subHeading.textContent = `${c.label} (${byCategory[c.id].length})`;
+        container.appendChild(subHeading);
+        renderItemGrid(container, byCategory[c.id]);
+      });
+    } else {
+      seen.add(top.id);
+      if (!byCategory[top.id]?.length) continue;
+      const heading = document.createElement('div');
+      heading.className = 'category-heading';
+      heading.textContent = `${top.label} (${byCategory[top.id].length})`;
+      container.appendChild(heading);
+      renderItemGrid(container, byCategory[top.id]);
+    }
+  }
+  // Anything uploaded before this restructuring (old flat categories like
+  // "ships" or "planets") still needs to be visible and deletable, not
+  // silently dropped from the page.
+  const leftover = Object.keys(byCategory).filter((c) => !seen.has(c));
+  if (leftover.length) {
     const heading = document.createElement('div');
     heading.className = 'category-heading';
-    heading.textContent = `${category} (${items.length})`;
+    heading.textContent = 'Other (from before this category update)';
     container.appendChild(heading);
-    const grid = document.createElement('div');
-    grid.className = 'item-list';
-    items.forEach((item) => {
-      const card = document.createElement('div');
-      card.className = 'item-card';
-      card.innerHTML = item.type === 'image'
-        ? `<img src="${item.url}" loading="lazy" alt="${item.name}">`
-        : `<div class="audio-icon">🎵</div>`;
-      const nameEl = document.createElement('div');
-      nameEl.className = 'name';
-      nameEl.textContent = item.name;
-      card.appendChild(nameEl);
-      const delBtn = document.createElement('button');
-      delBtn.className = 'btn-danger';
-      delBtn.textContent = 'Delete';
-      delBtn.addEventListener('click', async () => {
-        if (!confirm(`Remove "${item.name}" from the library? Maps already using it keep their own copy.`)) return;
-        await deleteDoc(doc(db, 'libraryItems', item.id));
-        if (item.path) { try { await deleteObject(storageRef(storage, item.path)); } catch (e) {} }
-        refreshLibrary();
-      });
-      card.appendChild(delBtn);
-      grid.appendChild(card);
+    leftover.forEach((cat) => {
+      const subHeading = document.createElement('div');
+      subHeading.className = 'category-heading';
+      subHeading.style.marginLeft = '10px';
+      subHeading.textContent = `${cat} (${byCategory[cat].length})`;
+      container.appendChild(subHeading);
+      renderItemGrid(container, byCategory[cat]);
     });
-    container.appendChild(grid);
   }
 }
+
+async function refreshLibrary() {
+  const snap = await getDocs(collection(db, 'libraryItems'));
+  const items = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  renderLibraryInto(document.getElementById('currentLibrary'), items);
+}
+
+// Read-only hook mirroring play.html's __GM_DEBUG pattern, so the
+// hierarchical grouping/labeling can be verified against fabricated data
+// (e.g. by an automated check) without needing a real Google sign-in or
+// live Firestore data.
+window.__ADMIN_DEBUG = { CATEGORY_TREE, renderLibraryInto, currentCategory };
 </script>
 </body>
 </html>

@@ -597,6 +597,22 @@ document.querySelectorAll('.upload-slot').forEach(wireUploadSlot);
 // storage.rules). Picking one of these needs no upload at all, so it's
 // the fast path compared to uploading your own file.
 // ---------------------------------------------------------------------
+// Matches admin.html's CATEGORY_TREE, so tabs read "Space Ships" instead of
+// the raw "characters/space_ships" id and appear in a sensible order; any
+// category id not listed here (old data from before this restructuring, or
+// a future addition) still shows up, just alphabetized after these.
+const CATEGORY_LABELS = {
+  maps: 'Maps',
+  'characters/space_ships': 'Space Ships',
+  'characters/navy_ships': 'Navy Ships',
+  'characters/jets': 'Jets',
+  'characters/army_men': 'Army Men',
+  worlds: 'Worlds',
+  bases: 'Bases',
+  sounds: 'Sounds',
+};
+const CATEGORY_ORDER = ['maps', 'characters/space_ships', 'characters/navy_ships', 'characters/jets', 'characters/army_men', 'worlds', 'bases', 'sounds'];
+
 let libraryManifest = [];
 async function loadLibraryManifest() {
   try {
@@ -625,7 +641,14 @@ function openLibraryPicker(slotKey, mediaType) {
     libraryList.innerHTML = '<p style="color:var(--text-dim); font-size:13px;">Nothing in the library yet for this type. The admin can add some at <code>admin.html</code> — or just close this and upload your own file below.</p>';
     return;
   }
-  const categories = [...new Set(items.map((it) => it.category))];
+  const categories = [...new Set(items.map((it) => it.category))]
+    .sort((a, b) => {
+      const ia = CATEGORY_ORDER.indexOf(a), ib = CATEGORY_ORDER.indexOf(b);
+      if (ia === -1 && ib === -1) return a.localeCompare(b);
+      if (ia === -1) return 1;
+      if (ib === -1) return -1;
+      return ia - ib;
+    });
   let activeCategory = categories[0];
   function renderCategory(cat) {
     activeCategory = cat;
@@ -659,7 +682,7 @@ function openLibraryPicker(slotKey, mediaType) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.dataset.cat = cat;
-    btn.textContent = cat;
+    btn.textContent = CATEGORY_LABELS[cat] || cat;
     btn.addEventListener('click', () => renderCategory(cat));
     libraryCategoryTabs.appendChild(btn);
   });
