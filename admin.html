@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Game Maker Admin</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
   :root {
     --bg: #0b0e14; --panel: #131926; --panel-2: #1a2233; --border: #2a3550;
@@ -56,13 +57,13 @@
 
   <div id="signedOutView" class="section">
     <p style="color:var(--text-dim); font-size:13px;">Sign in with the admin Google account to manage the library.</p>
-    <button type="button" class="btn-primary" id="signInBtn">Sign in with Google</button>
+    <div id="signInBtn"></div>
     <div id="status"></div>
   </div>
 
   <div id="deniedView" class="section">
     <p id="deniedMessage">Signed in, but this account isn't authorized to manage the library.</p>
-    <button type="button" class="btn-primary" id="signInGoogleFromDenied">Sign in with Google</button>
+    <div id="signInGoogleFromDenied"></div>
     <button type="button" class="btn-secondary" id="signOutBtnDenied">Sign out</button>
   </div>
 
@@ -116,7 +117,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
 import {
-  getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged
+  getAuth, GoogleAuthProvider, signInWithCredential, signOut, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
 import {
   getFirestore, collection, doc, setDoc, getDocs, deleteDoc, serverTimestamp
@@ -152,44 +153,35 @@ function setStatus(text, cls) {
   statusEl.className = cls || '';
 }
 
-// Popups turned out to fail silently in a real browser (reported directly:
-// clicking Sign In did nothing at all - no error, no popup, no visible
-// reaction) even though automated testing here couldn't reproduce that.
-// Rather than keep guessing at popup-specific failure codes, this skips
-// the popup entirely and always does a full-page redirect to Google -
-// less slick (you leave the page and come back) but far more reliable
-// across real browsers, since it doesn't depend on popups/third-party
-// storage access working at all.
-document.getElementById('signInBtn').addEventListener('click', async () => {
-  setStatus('Redirecting to Google…');
+// Both signInWithPopup() and signInWithRedirect() were reported broken
+// the same way (popup: silently did nothing; redirect: landed back on
+// "not signed in yet") - both bounce through game-maker-ed014.firebaseapp.com
+// as a middleman before returning to the real site, and that cross-domain
+// handoff is a known Firebase Auth weak point under modern browser
+// storage-partitioning. Google Identity Services (accounts.google.com/gsi)
+// hands a credential straight to this page via a JS callback instead -
+// no redirect away, no firebaseapp.com middleman.
+const GOOGLE_CLIENT_ID = '865333148999-8af54j492sano5befnjl5e3n1evkrmhq.apps.googleusercontent.com';
+
+async function handleGoogleCredential(response) {
+  setStatus('Signing in…');
   try {
-    await signInWithRedirect(auth, new GoogleAuthProvider());
+    const credential = GoogleAuthProvider.credential(response.credential);
+    await signInWithCredential(auth, credential);
   } catch (err) {
     setStatus(`Sign-in failed: ${err.code || ''} ${err.message}`, 'bad');
   }
-});
+}
+function initGoogleButtons() {
+  if (!window.google || !window.google.accounts) { setTimeout(initGoogleButtons, 200); return; }
+  google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleGoogleCredential });
+  google.accounts.id.renderButton(document.getElementById('signInBtn'), { theme: 'filled_blue', size: 'large', text: 'signin_with', shape: 'pill' });
+  google.accounts.id.renderButton(document.getElementById('signInGoogleFromDenied'), { theme: 'filled_blue', size: 'large', text: 'signin_with', shape: 'pill' });
+}
+initGoogleButtons();
 
-// Catches the result when the page reloads after signInWithRedirect()
-// above (the popup path resolves signInWithPopup()'s own promise instead
-// and never hits this).
-getRedirectResult(auth).catch((err) => {
-  setStatus(`Sign-in failed: ${err.code || ''} ${err.message}`, 'bad');
-});
 document.getElementById('signOutBtn').addEventListener('click', () => signOut(auth));
 document.getElementById('signOutBtnDenied').addEventListener('click', () => signOut(auth));
-// One click instead of "sign out, notice you're signed out, click sign in
-// again" - most people landing here are in exactly this state because an
-// anonymous session from the map creator (index.html) got restored
-// automatically before they ever clicked anything on this page at all,
-// not because they tried and failed to sign in with Google.
-document.getElementById('signInGoogleFromDenied').addEventListener('click', async () => {
-  try {
-    await signOut(auth);
-    await signInWithRedirect(auth, new GoogleAuthProvider());
-  } catch (err) {
-    setStatus(`Sign-in failed: ${err.code || ''} ${err.message}`, 'bad');
-  }
-});
 
 onAuthStateChanged(auth, (user) => {
   signedOutView.style.display = 'none';
