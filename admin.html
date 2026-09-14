@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Game Maker Admin</title>
+<style>
+  :root {
+    --bg: #0b0e14; --panel: #131926; --panel-2: #1a2233; --border: #2a3550;
+    --text: #e8ecf5; --text-dim: #93a0bd; --accent: #4fa8ff;
+    --ok: #2fbf71; --warn: #e8b93a; --bad: #ff5f6d;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; padding: 20px 16px 60px; }
+  main { max-width: 760px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  p.sub { color: var(--text-dim); font-size: 13px; margin: 0 0 20px; }
+  .section { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 18px; margin-bottom: 16px; }
+  .row { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; align-items: flex-end; }
+  .field { flex: 1 1 180px; min-width: 0; }
+  label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 4px; }
+  select, input[type=text] {
+    width: 100%; background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+    border-radius: 6px; padding: 8px 10px; font-size: 14px;
+  }
+  input[type=file] { width: 100%; font-size: 12px; color: var(--text-dim); }
+  button {
+    cursor: pointer; border: none; border-radius: 6px; padding: 10px 18px; font-size: 13px; font-weight: 600;
+  }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-primary { background: var(--accent); color: #06121f; }
+  .btn-secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
+  .btn-danger { background: transparent; color: var(--bad); border: 1px solid var(--bad); font-size: 11px; padding: 5px 10px; }
+  #status { font-size: 13px; margin-top: 10px; color: var(--text-dim); }
+  #status.ok { color: var(--ok); }
+  #status.warn { color: var(--warn); }
+  #status.bad { color: var(--bad); }
+  #signedOutView, #deniedView, #adminView { display: none; }
+  #deniedView p { color: var(--bad); }
+  .item-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+  .item-card {
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px; text-align: center; font-size: 11px;
+  }
+  .item-card img { width: 100%; height: 70px; object-fit: contain; background: #06121f; border-radius: 4px; margin-bottom: 6px; }
+  .item-card .audio-icon { width: 100%; height: 70px; display: flex; align-items: center; justify-content: center; background: #06121f; border-radius: 4px; margin-bottom: 6px; font-size: 24px; }
+  .item-card .name { word-break: break-word; margin-bottom: 6px; }
+  .category-heading { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .04em; margin: 18px 0 8px; }
+  .category-heading:first-child { margin-top: 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Game Maker Admin</h1>
+  <p class="sub">Add art and sound to the shared library that every map creator can pick from.</p>
+
+  <div id="signedOutView" class="section">
+    <p style="color:var(--text-dim); font-size:13px;">Sign in with the admin Google account to manage the library.</p>
+    <button type="button" class="btn-primary" id="signInBtn">Sign in with Google</button>
+    <div id="status"></div>
+  </div>
+
+  <div id="deniedView" class="section">
+    <p>Signed in, but this account isn't authorized to manage the library.</p>
+    <button type="button" class="btn-secondary" id="signOutBtnDenied">Sign out</button>
+  </div>
+
+  <div id="adminView">
+    <div class="section">
+      <div class="row">
+        <div class="field" style="flex:none;">
+          <span style="font-size:12px; color:var(--text-dim);">Signed in as <strong id="adminEmail"></strong></span>
+        </div>
+        <button type="button" class="btn-secondary" id="signOutBtn" style="margin-left:auto;">Sign out</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3 style="margin-top:0;">Add to library</h3>
+      <p style="color:var(--text-dim); font-size:12px; margin-top:-8px;">Pick a category and select one or more files (you can multi-select a whole folder). Each file's name becomes its display name.</p>
+      <div class="row">
+        <div class="field">
+          <label for="categorySelect">Category</label>
+          <select id="categorySelect">
+            <option value="ships">Ships / units</option>
+            <option value="planets">Planets</option>
+            <option value="structures">Structures / buildings</option>
+            <option value="maps">Map backgrounds</option>
+            <option value="cannons">Cannons / defenses</option>
+            <option value="enemies">Enemy factions</option>
+            <option value="sounds">Sounds (mp3)</option>
+            <option value="custom">Custom category&hellip;</option>
+          </select>
+        </div>
+        <div class="field" id="customCategoryField" style="display:none;">
+          <label for="customCategory">Custom category name</label>
+          <input type="text" id="customCategory" placeholder="e.g. tanks">
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:14px;">
+        <label for="filesInput">Files</label>
+        <input type="file" id="filesInput" multiple accept="image/*,audio/*">
+      </div>
+      <button type="button" class="btn-primary" id="uploadBtn">Add to Library</button>
+      <div id="uploadStatus" style="font-size:12px; color:var(--text-dim); margin-top:10px;"></div>
+    </div>
+
+    <div class="section">
+      <h3 style="margin-top:0;">Current library</h3>
+      <div id="currentLibrary"><p style="color:var(--text-dim); font-size:12px;">Loading&hellip;</p></div>
+    </div>
+  </div>
+</main>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
+import {
+  getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
+import {
+  getFirestore, collection, doc, setDoc, getDocs, deleteDoc, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+import {
+  getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject
+} from "https://www.gstatic.com/firebasejs/10.13.2/firebase-storage.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAJ-zJW3Z25mGucMA-hnO67yn-7Q5VgF1c",
+  authDomain: "game-maker-ed014.firebaseapp.com",
+  projectId: "game-maker-ed014",
+  storageBucket: "game-maker-ed014.firebasestorage.app",
+  messagingSenderId: "865333148999",
+  appId: "1:865333148999:web:689d470ba6a99e62806062",
+  measurementId: "G-R4ZE981Z5B",
+};
+
+const ADMIN_EMAIL = 'adonai4you@gmail.com';
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const storage = getStorage(app);
+
+const signedOutView = document.getElementById('signedOutView');
+const deniedView = document.getElementById('deniedView');
+const adminView = document.getElementById('adminView');
+const statusEl = document.getElementById('status');
+
+function setStatus(text, cls) {
+  statusEl.textContent = text;
+  statusEl.className = cls || '';
+}
+
+document.getElementById('signInBtn').addEventListener('click', async () => {
+  setStatus('Opening Google sign-in…');
+  try {
+    await signInWithPopup(auth, new GoogleAuthProvider());
+  } catch (err) {
+    setStatus('Sign-in failed: ' + err.message, 'bad');
+  }
+});
+document.getElementById('signOutBtn').addEventListener('click', () => signOut(auth));
+document.getElementById('signOutBtnDenied').addEventListener('click', () => signOut(auth));
+
+onAuthStateChanged(auth, (user) => {
+  signedOutView.style.display = 'none';
+  deniedView.style.display = 'none';
+  adminView.style.display = 'none';
+  if (!user) {
+    signedOutView.style.display = 'block';
+    return;
+  }
+  const isAdmin = user.email === ADMIN_EMAIL && user.emailVerified;
+  if (!isAdmin) {
+    deniedView.style.display = 'block';
+    return;
+  }
+  adminView.style.display = 'block';
+  document.getElementById('adminEmail').textContent = user.email;
+  refreshLibrary();
+});
+
+// ---------------------------------------------------------------------
+// Category select + custom category field
+// ---------------------------------------------------------------------
+const categorySelect = document.getElementById('categorySelect');
+const customCategoryField = document.getElementById('customCategoryField');
+categorySelect.addEventListener('change', () => {
+  customCategoryField.style.display = categorySelect.value === 'custom' ? 'block' : 'none';
+});
+
+function currentCategory() {
+  if (categorySelect.value === 'custom') {
+    return document.getElementById('customCategory').value.trim().toLowerCase() || 'custom';
+  }
+  return categorySelect.value;
+}
+
+// ---------------------------------------------------------------------
+// Upload: same 5-at-a-time pattern proven in the main map creator, plus a
+// per-file timeout so a dead connection fails loudly instead of hanging.
+// ---------------------------------------------------------------------
+const MAX_CONCURRENT = 5;
+const UPLOAD_TIMEOUT_MS = 90000;
+const uploadStatusEl = document.getElementById('uploadStatus');
+const uploadBtn = document.getElementById('uploadBtn');
+
+function niceName(filename) {
+  return filename.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim();
+}
+
+async function uploadOneFile(file, category) {
+  const type = file.type.startsWith('audio') ? 'audio' : 'image';
+  const path = `library/${category}/${Date.now()}_${file.name}`;
+  const ref = storageRef(storage, path);
+  const url = await Promise.race([
+    (async () => { await uploadBytes(ref, file); return getDownloadURL(ref); })(),
+    new Promise((_, reject) => setTimeout(
+      () => reject(new Error(`"${file.name}" timed out after ${UPLOAD_TIMEOUT_MS / 1000}s`)),
+      UPLOAD_TIMEOUT_MS
+    )),
+  ]);
+  const docRef = doc(collection(db, 'libraryItems'));
+  await setDoc(docRef, { category, name: niceName(file.name), type, url, path, createdAt: serverTimestamp() });
+}
+
+uploadBtn.addEventListener('click', async () => {
+  const files = Array.from(document.getElementById('filesInput').files);
+  if (files.length === 0) { uploadStatusEl.textContent = 'Choose at least one file first.'; return; }
+  const category = currentCategory();
+  uploadBtn.disabled = true;
+  let done = 0;
+  uploadStatusEl.textContent = `Uploading (5 at a time)… 0/${files.length} done. Keep this tab open.`;
+  let nextIndex = 0;
+  const errors = [];
+  async function worker() {
+    while (nextIndex < files.length) {
+      const file = files[nextIndex++];
+      try {
+        await uploadOneFile(file, category);
+        done++;
+      } catch (err) {
+        errors.push(`${file.name}: ${err.message}`);
+      }
+      uploadStatusEl.textContent = `Uploading (5 at a time)… ${done}/${files.length} done. Keep this tab open.`;
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(MAX_CONCURRENT, files.length) }, worker));
+  uploadBtn.disabled = false;
+  document.getElementById('filesInput').value = '';
+  uploadStatusEl.textContent = errors.length
+    ? `Done with errors: ${done}/${files.length} added. ${errors.join(' | ')}`
+    : `✓ Added ${done}/${files.length} file(s) to the library.`;
+  refreshLibrary();
+});
+
+// ---------------------------------------------------------------------
+// Current library listing + delete
+// ---------------------------------------------------------------------
+async function refreshLibrary() {
+  const container = document.getElementById('currentLibrary');
+  const snap = await getDocs(collection(db, 'libraryItems'));
+  if (snap.empty) {
+    container.innerHTML = '<p style="color:var(--text-dim); font-size:12px;">Nothing in the library yet.</p>';
+    return;
+  }
+  const byCategory = {};
+  snap.forEach((d) => {
+    const item = { id: d.id, ...d.data() };
+    (byCategory[item.category] ||= []).push(item);
+  });
+  container.innerHTML = '';
+  for (const [category, items] of Object.entries(byCategory)) {
+    const heading = document.createElement('div');
+    heading.className = 'category-heading';
+    heading.textContent = `${category} (${items.length})`;
+    container.appendChild(heading);
+    const grid = document.createElement('div');
+    grid.className = 'item-list';
+    items.forEach((item) => {
+      const card = document.createElement('div');
+      card.className = 'item-card';
+      card.innerHTML = item.type === 'image'
+        ? `<img src="${item.url}" loading="lazy" alt="${item.name}">`
+        : `<div class="audio-icon">🎵</div>`;
+      const nameEl = document.createElement('div');
+      nameEl.className = 'name';
+      nameEl.textContent = item.name;
+      card.appendChild(nameEl);
+      const delBtn = document.createElement('button');
+      delBtn.className = 'btn-danger';
+      delBtn.textContent = 'Delete';
+      delBtn.addEventListener('click', async () => {
+        if (!confirm(`Remove "${item.name}" from the library? Maps already using it keep their own copy.`)) return;
+        await deleteDoc(doc(db, 'libraryItems', item.id));
+        if (item.path) { try { await deleteObject(storageRef(storage, item.path)); } catch (e) {} }
+        refreshLibrary();
+      });
+      card.appendChild(delBtn);
+      grid.appendChild(card);
+    });
+    container.appendChild(grid);
+  }
+}
+</script>
+</body>
+</html>

@@ -109,6 +109,51 @@
   .upload-slot .meta { flex: 1; min-width: 0; }
   .upload-slot .meta .name { font-size: 13px; }
   .upload-slot .meta .status { font-size: 11px; color: var(--text-dim); }
+  .btn-library {
+    background: var(--panel); color: var(--accent); border: 1px solid var(--accent);
+    font-size: 11px; padding: 6px 10px; white-space: nowrap;
+  }
+
+  #libraryModal {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+    z-index: 100; display: flex; align-items: center; justify-content: center;
+    padding: 16px;
+  }
+  #libraryModal[hidden] { display: none; }
+  #libraryModalPanel {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    width: 100%; max-width: 640px; max-height: 85vh;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  #libraryModalHeader {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px; border-bottom: 1px solid var(--border);
+  }
+  #libraryModalHeader h3 { margin: 0; font-size: 15px; }
+  #libraryCategoryTabs { display: flex; gap: 6px; flex-wrap: wrap; padding: 10px 16px; border-bottom: 1px solid var(--border); }
+  #libraryCategoryTabs button {
+    background: var(--panel-2); color: var(--text-dim); border: 1px solid var(--border);
+    font-size: 11px; padding: 5px 10px;
+  }
+  #libraryCategoryTabs button.active { background: var(--accent); color: #06121f; border-color: var(--accent); }
+  #libraryGrid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 10px; padding: 16px; overflow-y: auto;
+  }
+  #libraryList { padding: 8px 16px 16px; overflow-y: auto; }
+  .library-item {
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
+    cursor: pointer; overflow: hidden; text-align: center; padding-bottom: 6px;
+  }
+  .library-item:hover { border-color: var(--accent); }
+  .library-item img { width: 100%; height: 80px; object-fit: contain; background: #06121f; display: block; }
+  .library-item .lname { font-size: 11px; padding: 6px 4px 0; word-break: break-word; }
+  .library-audio-item {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 12px; margin-bottom: 8px; cursor: pointer; font-size: 13px;
+  }
+  .library-audio-item:hover { border-color: var(--accent); }
 
   .team-block { border-radius: 8px; padding: 12px; margin-bottom: 10px; }
   .team-block.good { background: rgba(79,220,143,0.08); border: 1px solid rgba(79,220,143,0.3); }
@@ -349,6 +394,18 @@
 
 </main>
 
+<div id="libraryModal" hidden>
+  <div id="libraryModalPanel">
+    <div id="libraryModalHeader">
+      <h3>Choose from the library</h3>
+      <button type="button" class="btn-secondary" id="libraryCloseBtn">Close</button>
+    </div>
+    <div id="libraryCategoryTabs"></div>
+    <div id="libraryGrid"></div>
+    <div id="libraryList" hidden></div>
+  </div>
+</div>
+
 <div id="saveBar">
   <div id="saveWarning">&#9201;&#65039; Saving uploads your files 5 at a time &mdash; the more images/sounds on this map, the longer it takes. Keep this tab open until it says done.</div>
   <div id="saveStatus">Not saved yet.</div>
@@ -428,7 +485,11 @@ function setMapIdInUrl(id) {
 // ---------------------------------------------------------------------
 const existingAssetUrls = {};
 
-document.querySelectorAll('.upload-slot').forEach((slot) => {
+// Shared setup for every upload slot, fixed ones present at page load and
+// unit rows added later: wires the file input's own preview behavior and
+// adds a "Browse library" button so picking an existing asset is always
+// an option next to uploading a new one.
+function wireUploadSlot(slot) {
   const input = slot.querySelector('input[type=file]');
   const nameEl = slot.querySelector('.name');
   const thumb = slot.querySelector('.thumb');
@@ -445,7 +506,113 @@ document.querySelectorAll('.upload-slot').forEach((slot) => {
       thumb.textContent = 'audio';
     }
   });
-});
+
+  const mediaType = input.accept.startsWith('audio') ? 'audio' : 'image';
+  const libraryBtn = document.createElement('button');
+  libraryBtn.type = 'button';
+  libraryBtn.className = 'btn-library';
+  libraryBtn.textContent = '📚 Library';
+  libraryBtn.addEventListener('click', () => openLibraryPicker(slot.dataset.slot, mediaType));
+  input.insertAdjacentElement('afterend', libraryBtn);
+}
+
+document.querySelectorAll('.upload-slot').forEach(wireUploadSlot);
+
+// ---------------------------------------------------------------------
+// Shared asset library: existing After Earth art/sound, pre-uploaded once
+// to Storage under library/ (public read, never client-writable - see
+// storage.rules). Picking one of these needs no upload at all, so it's
+// the fast path compared to uploading your own file.
+// ---------------------------------------------------------------------
+let libraryManifest = [];
+async function loadLibraryManifest() {
+  try {
+    const snap = await getDocs(collection(db, 'libraryItems'));
+    libraryManifest = snap.docs.map((d) => d.data());
+  } catch (err) {
+    console.error('Could not load the asset library list:', err);
+  }
+}
+loadLibraryManifest();
+
+const libraryModal = document.getElementById('libraryModal');
+const libraryGrid = document.getElementById('libraryGrid');
+const libraryList = document.getElementById('libraryList');
+const libraryCategoryTabs = document.getElementById('libraryCategoryTabs');
+let libraryActiveSlotKey = null;
+
+function openLibraryPicker(slotKey, mediaType) {
+  libraryActiveSlotKey = slotKey;
+  const items = libraryManifest.filter((it) => it.type === mediaType);
+  if (items.length === 0) {
+    setSaveStatus('Library list hasn’t loaded yet — try again in a moment, or just upload your own file.', 'warn');
+    return;
+  }
+  const categories = [...new Set(items.map((it) => it.category))];
+  libraryCategoryTabs.innerHTML = '';
+  let activeCategory = categories[0];
+  function renderCategory(cat) {
+    activeCategory = cat;
+    libraryCategoryTabs.querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.cat === cat));
+    const catItems = items.filter((it) => it.category === cat);
+    if (mediaType === 'image') {
+      libraryGrid.hidden = false;
+      libraryList.hidden = true;
+      libraryGrid.innerHTML = '';
+      catItems.forEach((it) => {
+        const el = document.createElement('div');
+        el.className = 'library-item';
+        el.innerHTML = `<img src="${it.url}" loading="lazy" alt="${it.name}"><div class="lname">${it.name}</div>`;
+        el.addEventListener('click', () => selectLibraryAsset(it));
+        libraryGrid.appendChild(el);
+      });
+    } else {
+      libraryGrid.hidden = true;
+      libraryList.hidden = false;
+      libraryList.innerHTML = '';
+      catItems.forEach((it) => {
+        const el = document.createElement('div');
+        el.className = 'library-audio-item';
+        el.innerHTML = `<span>🎵 ${it.name}</span><span class="btn-secondary" style="font-size:11px;padding:4px 8px;">Use this</span>`;
+        el.addEventListener('click', () => selectLibraryAsset(it));
+        libraryList.appendChild(el);
+      });
+    }
+  }
+  categories.forEach((cat) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.dataset.cat = cat;
+    btn.textContent = cat;
+    btn.addEventListener('click', () => renderCategory(cat));
+    libraryCategoryTabs.appendChild(btn);
+  });
+  renderCategory(activeCategory);
+  libraryModal.hidden = false;
+}
+
+function selectLibraryAsset(item) {
+  const slotKey = libraryActiveSlotKey;
+  const slot = document.querySelector(`.upload-slot[data-slot="${slotKey}"]`);
+  if (slot) {
+    const input = slot.querySelector('input[type=file]');
+    input.value = ''; // an existing library URL takes priority; no file to upload
+    slot.querySelector('.name').textContent = item.name;
+    slot.querySelector('.status').textContent = 'from library ✓ (' + item.name + ')';
+    const thumb = slot.querySelector('.thumb');
+    if (item.type === 'image') {
+      thumb.style.backgroundImage = `url(${item.url})`;
+      thumb.textContent = '';
+    } else {
+      thumb.textContent = 'audio';
+    }
+  }
+  existingAssetUrls[slotKey] = item.url;
+  libraryModal.hidden = true;
+}
+
+document.getElementById('libraryCloseBtn').addEventListener('click', () => { libraryModal.hidden = true; });
+libraryModal.addEventListener('click', (e) => { if (e.target === libraryModal) libraryModal.hidden = true; });
 
 function showExistingAsset(slotKey, url) {
   existingAssetUrls[slotKey] = url;
@@ -583,17 +750,7 @@ function addUnitRow(data = {}) {
     delete existingAssetUrls[id];
     row.remove();
   });
-  const input = row.querySelector('input[type=file]');
-  const nameEl = row.querySelector('.upload-slot .name');
-  const thumb = row.querySelector('.upload-slot .thumb');
-  input.addEventListener('change', () => {
-    const file = input.files[0];
-    if (!file) return;
-    nameEl.textContent = file.name;
-    row.querySelector('.upload-slot .status').textContent = 'ready to upload';
-    thumb.style.backgroundImage = `url(${URL.createObjectURL(file)})`;
-    thumb.textContent = '';
-  });
+  wireUploadSlot(row.querySelector('.upload-slot'));
   unitList.appendChild(row);
   if (data.imageUrl) showExistingAsset(id, data.imageUrl);
   return row;
