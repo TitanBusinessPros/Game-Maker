@@ -115,7 +115,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
 import {
-  getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged
+  getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
 import {
   getFirestore, collection, doc, setDoc, getDocs, deleteDoc, serverTimestamp
@@ -156,8 +156,33 @@ document.getElementById('signInBtn').addEventListener('click', async () => {
   try {
     await signInWithPopup(auth, new GoogleAuthProvider());
   } catch (err) {
-    setStatus('Sign-in failed: ' + err.message, 'bad');
+    // Popups get blocked or silently fail in a lot of real-world browser
+    // setups (popup blockers, strict third-party-cookie/storage-access
+    // settings, some mobile browsers) - redirect to Google's own page
+    // instead of the popup for anything that looks like that, rather than
+    // just reporting the popup failure and stopping there.
+    const popupIssue = ['auth/popup-blocked', 'auth/popup-closed-by-user', 'auth/cancelled-popup-request', 'auth/operation-not-supported-in-this-environment'].includes(err.code);
+    if (popupIssue) {
+      setStatus('Popup sign-in didn’t work here — redirecting to Google instead…', 'warn');
+      try {
+        await signInWithRedirect(auth, new GoogleAuthProvider());
+      } catch (err2) {
+        setStatus(`Sign-in failed: ${err2.code || ''} ${err2.message}`, 'bad');
+      }
+    } else {
+      // Show the real error code, not just a generic message - if this is
+      // still failing, the exact code is what's needed to fix it for real
+      // instead of guessing again.
+      setStatus(`Sign-in failed: ${err.code || ''} ${err.message}`, 'bad');
+    }
   }
+});
+
+// Catches the result when the page reloads after signInWithRedirect()
+// above (the popup path resolves signInWithPopup()'s own promise instead
+// and never hits this).
+getRedirectResult(auth).catch((err) => {
+  setStatus(`Sign-in failed: ${err.code || ''} ${err.message}`, 'bad');
 });
 document.getElementById('signOutBtn').addEventListener('click', () => signOut(auth));
 document.getElementById('signOutBtnDenied').addEventListener('click', () => signOut(auth));
