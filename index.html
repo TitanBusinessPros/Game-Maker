@@ -252,6 +252,15 @@
         <label for="baseLabel">Homeworld is called a&hellip;</label>
         <input type="text" id="baseLabel" placeholder="Planet / Island / Base" value="Planet">
       </div>
+      <div class="field narrow">
+        <label for="mapSize">Map size</label>
+        <select id="mapSize">
+          <option value="tiny">Tiny</option>
+          <option value="small">Small (3&times; Tiny)</option>
+          <option value="medium" selected>Medium (2&times; Small)</option>
+          <option value="large">Large (2&times; Medium)</option>
+        </select>
+      </div>
     </div>
     <div class="field">
       <label>Map background art (optional)</label>
@@ -263,12 +272,12 @@
     </div>
   </section>
 
-  <!-- 2. Teams -->
+  <!-- 2. Factions -->
   <section class="section" id="sec-teams">
-    <h2><span class="num">2</span> Good Guys &amp; Bad Guys</h2>
-    <p class="hint">Pick a name, color, and homeworld art for each side. This is also where the map layout's two "teams" get their identity.</p>
+    <h2><span class="num">2</span> Your Faction &amp; Computer Players</h2>
+    <p class="hint">You're always the player faction. Add up to 5 computer-controlled factions &mdash; at play time you'll pick which ones are on your team (e.g. 5 computer players lets you do 3v3 or 2v4).</p>
     <div class="team-block good">
-      <h3>Good guys</h3>
+      <h3>Your faction</h3>
       <div class="row">
         <div class="field"><label>Faction name</label><input type="text" id="goodName" value="Allied Forces"></div>
         <div class="field narrow"><label>Color</label><input type="color" id="goodColor" value="#4fdc8f"></div>
@@ -282,21 +291,9 @@
         </div>
       </div>
     </div>
-    <div class="team-block bad">
-      <h3>Bad guys</h3>
-      <div class="row">
-        <div class="field"><label>Faction name</label><input type="text" id="badName" value="Hostile Forces"></div>
-        <div class="field narrow"><label>Color</label><input type="color" id="badColor" value="#ff5f6d"></div>
-      </div>
-      <div class="field">
-        <label>Homeworld art</label>
-        <div class="upload-slot" data-slot="badBaseImage">
-          <div class="thumb">none</div>
-          <div class="meta"><div class="name">No file chosen</div><div class="status">required to finish</div></div>
-          <input type="file" accept="image/*" style="width:auto">
-        </div>
-      </div>
-    </div>
+
+    <div id="computerPlayersList"></div>
+    <button type="button" class="btn-add" id="addComputerBtn">+ Add computer player (up to 5)</button>
   </section>
 
   <!-- 3. Resource & mining -->
@@ -808,6 +805,62 @@ function addUnitRow(data = {}) {
 document.getElementById('addUnitBtn').addEventListener('click', () => addUnitRow());
 addUnitRow({ name: 'Cruiser', hp: 300, attack: 200, range: 500, speed: 2, cost: 400 });
 
+// ---------------------------------------------------------------------
+// Computer players: 1-5 AI-controlled factions. At play time, the human
+// picks which of these join their team (e.g. 3v3 or 2v4 out of 5) - see
+// play.html's team-select screen. Reuses the same upload-slot pattern as
+// combat units above.
+// ---------------------------------------------------------------------
+const MAX_COMPUTER_PLAYERS = 5;
+const computerList = document.getElementById('computerPlayersList');
+const addComputerBtn = document.getElementById('addComputerBtn');
+let computerCounter = 0;
+const COMPUTER_COLORS = ['#ff5f6d', '#ff9d4f', '#c084fc', '#60a5fa', '#f472b6'];
+
+function addComputerRow(data = {}) {
+  const rows = computerList.querySelectorAll('.computer-row');
+  if (rows.length >= MAX_COMPUTER_PLAYERS) return null;
+  const id = 'computer_' + (computerCounter++);
+  const idx = rows.length;
+  const row = document.createElement('div');
+  row.className = 'team-block bad computer-row';
+  row.dataset.computerId = id;
+  row.innerHTML = `
+    <button type="button" class="remove-unit" title="Remove computer player">&times;</button>
+    <h3>Computer Player ${idx + 1}</h3>
+    <div class="row">
+      <div class="field"><label>Faction name</label><input type="text" class="c-name" value="${escapeAttr(data.name || `Hostile Forces ${idx + 1}`)}"></div>
+      <div class="field narrow"><label>Color</label><input type="color" class="c-color" value="${data.color || COMPUTER_COLORS[idx % COMPUTER_COLORS.length]}"></div>
+    </div>
+    <div class="field">
+      <label>Homeworld art</label>
+      <div class="upload-slot" data-slot="${id}">
+        <div class="thumb">none</div>
+        <div class="meta"><div class="name">No file chosen</div><div class="status">required to finish</div></div>
+        <input type="file" accept="image/*" style="width:auto">
+      </div>
+    </div>
+  `;
+  row.querySelector('.remove-unit').addEventListener('click', () => {
+    delete existingAssetUrls[id];
+    row.remove();
+    renumberComputerRows();
+    addComputerBtn.disabled = false;
+  });
+  wireUploadSlot(row.querySelector('.upload-slot'));
+  computerList.appendChild(row);
+  if (data.imageUrl) showExistingAsset(id, data.imageUrl);
+  if (computerList.querySelectorAll('.computer-row').length >= MAX_COMPUTER_PLAYERS) addComputerBtn.disabled = true;
+  return row;
+}
+function renumberComputerRows() {
+  computerList.querySelectorAll('.computer-row').forEach((row, i) => {
+    row.querySelector('h3').textContent = `Computer Player ${i + 1}`;
+  });
+}
+addComputerBtn.addEventListener('click', () => addComputerRow());
+addComputerRow({ name: 'Hostile Forces' });
+
 function escapeAttr(s) {
   return String(s).replace(/"/g, '&quot;');
 }
@@ -823,9 +876,21 @@ function setSaveStatus(text, cls) {
 }
 
 const FIXED_UPLOAD_SLOTS = [
-  'backgroundImage', 'goodBaseImage', 'badBaseImage', 'resourceImage', 'miningUnitImage',
+  'backgroundImage', 'goodBaseImage', 'resourceImage', 'miningUnitImage',
   'soundMusic', 'soundIntro', 'soundAttack', 'soundBuildingDestroyed', 'soundHomeUnderAttack', 'soundEndgame',
 ];
+
+function collectComputers(uploadResults) {
+  const rows = Array.from(computerList.querySelectorAll('.computer-row'));
+  return rows.map((row) => {
+    const id = row.dataset.computerId;
+    return {
+      name: row.querySelector('.c-name').value.trim() || 'Hostile Forces',
+      color: row.querySelector('.c-color').value,
+      baseImage: uploadResults[id] || null,
+    };
+  });
+}
 
 function collectUnits(uploadResults) {
   const rows = Array.from(unitList.querySelectorAll('.unit-row'));
@@ -845,26 +910,23 @@ function collectUnits(uploadResults) {
 
 async function buildMapDoc(status) {
   const unitSlots = Array.from(unitList.querySelectorAll('.unit-row')).map((row) => row.dataset.unitId);
-  const uploadResults = await uploadSlotsWithLimit([...FIXED_UPLOAD_SLOTS, ...unitSlots]);
+  const computerSlots = Array.from(computerList.querySelectorAll('.computer-row')).map((row) => row.dataset.computerId);
+  const uploadResults = await uploadSlotsWithLimit([...FIXED_UPLOAD_SLOTS, ...unitSlots, ...computerSlots]);
   const units = collectUnits(uploadResults);
+  const computers = collectComputers(uploadResults);
   return {
     ownerId: currentUser.uid,
     status, // 'draft' | 'complete'
     name: document.getElementById('mapName').value.trim() || 'Untitled Map',
     baseLabel: document.getElementById('baseLabel').value.trim() || 'Planet',
+    mapSize: document.getElementById('mapSize').value || 'medium',
     backgroundImage: uploadResults.backgroundImage,
-    factions: {
-      good: {
-        name: document.getElementById('goodName').value.trim() || 'Allied Forces',
-        color: document.getElementById('goodColor').value,
-        baseImage: uploadResults.goodBaseImage,
-      },
-      bad: {
-        name: document.getElementById('badName').value.trim() || 'Hostile Forces',
-        color: document.getElementById('badColor').value,
-        baseImage: uploadResults.badBaseImage,
-      },
+    player: {
+      name: document.getElementById('goodName').value.trim() || 'Allied Forces',
+      color: document.getElementById('goodColor').value,
+      baseImage: uploadResults.goodBaseImage,
     },
+    computers,
     resource: {
       name: document.getElementById('resourceName').value.trim() || 'Gold Mine',
       size: Number(document.getElementById('resourceSize').value) || 5000,
@@ -891,8 +953,9 @@ async function buildMapDoc(status) {
 function checklistGaps(mapDoc) {
   const gaps = [];
   if (!mapDoc.name || mapDoc.name === 'Untitled Map') gaps.push('map name');
-  if (!mapDoc.factions.good.baseImage) gaps.push('good guys’ homeworld art');
-  if (!mapDoc.factions.bad.baseImage) gaps.push('bad guys’ homeworld art');
+  if (!mapDoc.player.baseImage) gaps.push('your faction’s homeworld art');
+  if (mapDoc.computers.length === 0) gaps.push('at least one computer player');
+  mapDoc.computers.forEach((c, i) => { if (!c.baseImage) gaps.push(`computer player #${i + 1} (${c.name}) homeworld art`); });
   if (!mapDoc.resource.image) gaps.push('resource deposit art');
   if (!mapDoc.miningUnit.image) gaps.push('mining unit art');
   if (mapDoc.units.length === 0) gaps.push('at least one combat unit');
@@ -1002,15 +1065,18 @@ async function loadExistingMap() {
   const m = snap.data();
   document.getElementById('mapName').value = m.name || '';
   document.getElementById('baseLabel').value = m.baseLabel || 'Planet';
+  document.getElementById('mapSize').value = m.mapSize || 'medium';
   if (m.backgroundImage) showExistingAsset('backgroundImage', m.backgroundImage);
 
-  if (m.factions) {
-    document.getElementById('goodName').value = m.factions.good?.name || '';
-    document.getElementById('goodColor').value = m.factions.good?.color || '#4fdc8f';
-    if (m.factions.good?.baseImage) showExistingAsset('goodBaseImage', m.factions.good.baseImage);
-    document.getElementById('badName').value = m.factions.bad?.name || '';
-    document.getElementById('badColor').value = m.factions.bad?.color || '#ff5f6d';
-    if (m.factions.bad?.baseImage) showExistingAsset('badBaseImage', m.factions.bad.baseImage);
+  if (m.player) {
+    document.getElementById('goodName').value = m.player.name || '';
+    document.getElementById('goodColor').value = m.player.color || '#4fdc8f';
+    if (m.player.baseImage) showExistingAsset('goodBaseImage', m.player.baseImage);
+  }
+  if (Array.isArray(m.computers) && m.computers.length) {
+    computerList.innerHTML = '';
+    addComputerBtn.disabled = false;
+    m.computers.forEach((c) => addComputerRow(c));
   }
 
   if (m.resource) {

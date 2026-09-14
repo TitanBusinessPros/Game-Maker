@@ -14,24 +14,23 @@
   #topbar {
     position:absolute; top:0; left:0; right:0; z-index:20;
     background:rgba(11,14,20,0.9); border-bottom:1px solid var(--border);
-    display:flex; align-items:center; gap:10px; padding:8px 12px; flex-wrap:wrap; font-size:13px;
+    display:flex; align-items:center; gap:8px; padding:8px 12px; flex-wrap:wrap; font-size:12px;
   }
   #topbar .spacer { flex:1; }
   #topbar button, #topbar a {
     background:var(--panel2); color:var(--text); border:1px solid var(--border); border-radius:6px;
-    padding:6px 10px; font-size:12px; cursor:pointer; text-decoration:none;
+    padding:6px 9px; font-size:11px; cursor:pointer; text-decoration:none; white-space:nowrap;
   }
-  #topbar .hud-good { color:var(--good); }
-  #topbar .hud-bad { color:var(--bad); }
+  #hudRow { display:flex; gap:8px; flex-wrap:wrap; font-size:11px; }
   canvas { display:block; background:#06121f; }
   #sidePanel {
-    position:absolute; top:0; right:0; bottom:0; width:340px; max-width:88vw;
+    position:absolute; top:0; right:0; bottom:0; width:320px; max-width:88vw;
     background:rgba(11,14,20,0.95); border-left:1px solid var(--border); z-index:15;
     display:flex; flex-direction:column; transform:translateX(0); transition:transform .2s;
   }
   #sidePanel.collapsed { transform:translateX(100%); }
   #sideTabs { display:flex; border-bottom:1px solid var(--border); }
-  #sideTabs button { flex:1; background:var(--panel); color:var(--dim); border:none; padding:10px 4px; font-size:12px; cursor:pointer; border-bottom:2px solid transparent; }
+  #sideTabs button { flex:1; background:var(--panel); color:var(--dim); border:none; padding:9px 4px; font-size:11px; cursor:pointer; border-bottom:2px solid transparent; }
   #sideTabs button.active { color:var(--accent); border-bottom-color:var(--accent); }
   .sideTabContent { display:none; flex:1; overflow-y:auto; padding:10px; }
   .sideTabContent.active { display:block; }
@@ -47,20 +46,33 @@
   .techRow.done { opacity:0.5; }
   .techRow.active button { background:var(--warn); }
   #minimapWrap {
-    position:absolute; bottom:10px; right:10px; z-index:12; width:160px; height:110px;
+    position:absolute; bottom:10px; right:10px; z-index:12; width:180px; height:180px;
     border:1px solid var(--border); border-radius:6px; overflow:hidden; background:#06121f;
   }
   #banner {
-    position:absolute; inset:0; z-index:30; display:none; align-items:center; justify-content:center; flex-direction:column; gap:14px;
-    background:rgba(0,0,0,0.8); text-align:center; padding:20px;
+    position:absolute; inset:0; z-index:40; display:none; align-items:center; justify-content:center; flex-direction:column; gap:14px;
+    background:rgba(0,0,0,0.85); text-align:center; padding:20px;
   }
   #banner.show { display:flex; }
   #banner h2 { font-size:30px; margin:0; }
-  .sel-ring { }
   #unitInfoBox {
     position:absolute; left:10px; bottom:10px; z-index:12; background:rgba(11,14,20,0.9);
-    border:1px solid var(--border); border-radius:6px; padding:8px 10px; font-size:12px; max-width:220px; display:none;
+    border:1px solid var(--border); border-radius:6px; padding:8px 10px; font-size:12px; max-width:240px; display:none;
   }
+  #teamSelectScreen {
+    position:absolute; inset:0; z-index:50; background:#06121f; display:none; align-items:center; justify-content:center; padding:20px;
+  }
+  #teamSelectScreen.show { display:flex; }
+  #teamSelectPanel { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:24px; max-width:520px; width:100%; }
+  #teamSelectPanel h2 { margin-top:0; }
+  .allyRow {
+    display:flex; align-items:center; gap:10px; background:var(--panel2); border:1px solid var(--border);
+    border-radius:8px; padding:10px 12px; margin-bottom:8px; cursor:pointer;
+  }
+  .allyRow input { width:18px; height:18px; }
+  .allyRow .swatch { width:16px; height:16px; border-radius:50%; flex:none; }
+  #startMatchBtn { width:100%; padding:12px; font-size:15px; font-weight:600; border:none; border-radius:8px; background:var(--accent); color:#06121f; cursor:pointer; margin-top:14px; }
+  .selbox { position:absolute; border:1px solid #fff; background:rgba(255,255,255,0.1); pointer-events:none; z-index:11; }
 </style>
 </head>
 <body>
@@ -71,26 +83,25 @@
   <div id="topbar">
     <strong id="mapTitleLabel">Map</strong>
     <span class="spacer"></span>
-    <span id="hudGood" class="hud-good"></span>
-    <span id="hudBad" class="hud-bad"></span>
+    <div id="hudRow"></div>
     <span class="spacer"></span>
     <span id="turnLabel"></span>
     <button id="pauseBtn">⏸️ Pause</button>
     <button id="soundBtn">🔈 Sound</button>
     <button id="fogBtn">🌫️ Fog: Off</button>
     <button id="saveBtn">💾 Save</button>
-    <label style="background:var(--panel2); border:1px solid var(--border); border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;">
+    <label style="background:var(--panel2); border:1px solid var(--border); border-radius:6px; padding:6px 9px; font-size:11px; cursor:pointer;">
       📂 Load<input id="loadInput" type="file" accept=".json" style="display:none;">
     </label>
-    <button id="downloadBtn">⬇ Download as index.html</button>
-    <button id="panelToggleBtn">☰ Menu</button>
+    <button id="downloadBtn">⬇ index.html</button>
+    <button id="panelToggleBtn">☰</button>
   </div>
 
   <canvas id="canvas"></canvas>
+  <div id="dragBox" class="selbox" style="display:none;"></div>
 
   <div id="unitInfoBox"></div>
-
-  <div id="minimapWrap"><canvas id="minimap" width="160" height="110"></canvas></div>
+  <div id="minimapWrap"><canvas id="minimap" width="180" height="180"></canvas></div>
 
   <div id="sidePanel">
     <div id="sideTabs">
@@ -102,12 +113,13 @@
     <div class="sideTabContent" id="tab-research"></div>
     <div class="sideTabContent" id="tab-help">
       <p style="font-size:12px; color:var(--dim); line-height:1.6;">
-        <strong>Click</strong> one of your own units to select it.<br>
-        <strong>Click</strong> empty space to move there.<br>
+        <strong>Left-drag</strong> a box to select multiple units, or click one.<br>
+        <strong>Click</strong> empty space to move selected units there.<br>
         <strong>Click</strong> an enemy to attack it.<br>
+        <strong>Right-drag</strong> to pan the camera.<br>
+        A unit that attacks can't move again until the next turn.<br>
         A <strong>Mining Ship</strong> parked on your deposit earns resources automatically.<br>
-        Research at least one tech to unlock stronger economy/units.<br>
-        The match ends when a homeworld's HP reaches 0.
+        The match ends when a homeworld's HP reaches 0 - your whole team wins together.
       </p>
     </div>
   </div>
@@ -115,6 +127,15 @@
   <div id="banner">
     <h2 id="bannerText"></h2>
     <button id="restartBtn" style="padding:10px 22px; font-size:14px; cursor:pointer;">Play Again</button>
+  </div>
+
+  <div id="teamSelectScreen">
+    <div id="teamSelectPanel">
+      <h2>Choose your team</h2>
+      <p style="color:var(--dim); font-size:13px;">Check any computer players you want fighting <em>with</em> you. Everyone else is the opposing team.</p>
+      <div id="allyList"></div>
+      <button id="startMatchBtn">Start Match</button>
+    </div>
   </div>
 </div>
 
@@ -134,19 +155,6 @@ const firebaseConfig = {
 const statusEl = document.getElementById('status');
 const appEl = document.getElementById('app');
 
-// ===========================================================================
-// A standalone, self-contained skirmish engine: just the two factions from
-// one Game-Maker map, not After Earth's own 20-nation galaxy. Real turn
-// timer, real real-time mining economy, a real (trimmed) research tree,
-// real build queue, real combat, pause, sound, fog of war, save/load - the
-// same KIND of mechanics as After Earth, implemented fresh here rather than
-// loading After Earth's own file, so nothing of After Earth is in this game
-// except the rules it plays by.
-// ===========================================================================
-
-// window.GM_INLINE_CONFIG is set only in a standalone downloaded copy of
-// this file (see downloadStandalone() below) - when present, the game runs
-// entirely offline with no Firestore call at all.
 async function loadConfig() {
   if (window.GM_INLINE_CONFIG) return window.GM_INLINE_CONFIG;
   const mapId = new URLSearchParams(location.search).get('map');
@@ -174,13 +182,6 @@ function loadAudio(url) {
   return a;
 }
 
-// ---------------------------------------------------------------------
-// A trimmed version of After Earth's own tech tree - same numbers/effects
-// for the nodes that make sense with no ground/air/sea class split (every
-// custom unit here is just "a unit"), dropped the ones that only make
-// sense inside After Earth's own galaxy (Defense Cannon tiers, aircraft-
-// only Aerial Superiority, etc).
-// ---------------------------------------------------------------------
 const TECH_TREE = {
   mining_ops: { name: 'Mining Operations', cost: 300, timeSeconds: 60, prereq: null, effect: 'unlock_mining' },
   improved_extraction: { name: 'Improved Extraction', cost: 500, timeSeconds: 90, prereq: 'mining_ops', effect: 'mining_900' },
@@ -197,31 +198,19 @@ const MOVE_PX_PER_SPEED = 20;
 const ATTACK_INTERVAL = 1;
 const UNIT_SIZE = 34;
 const HOMEWORLD_SIZE = 90;
-const AI_TICK_SECONDS = 6; // how often the AI re-evaluates build/research/attack decisions
+const DEPOSIT_SIZE = 56;
+const AI_TICK_SECONDS = 6;
+const MAP_SIZE_MULTIPLIER = { tiny: 1, small: 3, medium: 6, large: 12 };
+const BASE_HOME_RADIUS = 420;
 
-function freshResearchState() { return { researched: new Set(), active: null }; }
+// Same idea as the laser-color pairing already in After Earth (each unit
+// type gets its own beam color) - cycles through this palette by unit
+// type index; once every color's been used once, later types repeat/
+// overlap a color instead of failing or going blank, matching what was
+// asked for.
+const LASER_COLORS = ['#ffe45e', '#4fa8ff', '#ff5f6d', '#4fdc8f', '#c084fc', '#ff9d4f', '#60d3ff', '#f472b6'];
 
-function makeCountry(side, cfg, factionCfg) {
-  return {
-    side,
-    name: factionCfg.name || (side === 'good' ? 'Allied Forces' : 'Hostile Forces'),
-    color: factionCfg.color || (side === 'good' ? '#4fdc8f' : '#ff5f6d'),
-    homeImg: null,
-    resources: 1000,
-    hp: HOMEWORLD_HP,
-    maxHp: HOMEWORLD_HP,
-    x: side === 'good' ? 140 : 0, // bad's x set relative to canvas width once known
-    y: 0,
-    research: freshResearchState(),
-    miningRate: 0, // 0 until mining_ops researched
-  };
-}
-
-function techBonus(country, effect) {
-  return country.research.researched.has(
-    Object.keys(TECH_TREE).find((k) => TECH_TREE[k].effect === effect)
-  );
-}
+function freshResearch() { return { researched: new Set(), active: null }; }
 
 async function main() {
   let cfg;
@@ -238,415 +227,490 @@ async function main() {
   const minimap = document.getElementById('minimap');
   const mctx = minimap.getContext('2d');
 
-  // The topbar wraps onto a second line on narrower widths (it holds a lot
-  // of buttons), so its real height isn't a fixed number - measuring it
-  // directly and offsetting the side panel from that avoids the panel's
-  // own tabs sitting a few pixels under the (higher z-index) topbar, which
-  // silently eats clicks meant for the tabs.
-  const topbarEl = document.getElementById('topbar');
-  const sidePanelEl = document.getElementById('sidePanel');
-  function resize() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    sidePanelEl.style.top = topbarEl.offsetHeight + 'px';
-  }
-  resize();
-  window.addEventListener('resize', resize);
-  new ResizeObserver(resize).observe(topbarEl);
+  function resizeCanvasOnly() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+  resizeCanvasOnly();
 
-  const [bgImg, goodImg, badImg, resourceImg, miningImg] = await Promise.all([
-    loadImage(cfg.backgroundImage),
-    loadImage(cfg.factions?.good?.baseImage),
-    loadImage(cfg.factions?.bad?.baseImage),
-    loadImage(cfg.resource?.image),
-    loadImage(cfg.miningUnit?.image),
+  const [bgImg, resourceImg, miningImg] = await Promise.all([
+    loadImage(cfg.backgroundImage), loadImage(cfg.resource?.image), loadImage(cfg.miningUnit?.image),
   ]);
+  const playerImg = await loadImage(cfg.player?.baseImage);
+  const computerCfgs = cfg.computers || [];
+  const computerImgs = await Promise.all(computerCfgs.map((c) => loadImage(c.baseImage)));
   const unitDefs = cfg.units || [];
   const unitImages = await Promise.all(unitDefs.map((u) => loadImage(u.imageUrl)));
 
   const sounds = {
     music: loadAudio(cfg.sounds?.music),
-    attack: cfg.sounds?.attack,
-    buildingDestroyed: cfg.sounds?.buildingDestroyed,
-    homeUnderAttack: cfg.sounds?.homeUnderAttack,
-    endgame: cfg.sounds?.endgame,
-    intro: cfg.sounds?.intro,
+    attack: cfg.sounds?.attack, buildingDestroyed: cfg.sounds?.buildingDestroyed,
+    homeUnderAttack: cfg.sounds?.homeUnderAttack, endgame: cfg.sounds?.endgame,
   };
   let soundOn = false;
-  function playSfx(url) {
-    if (!soundOn || !url) return;
-    try { new Audio(url).play().catch(() => {}); } catch (e) {}
-  }
+  function playSfx(url) { if (!soundOn || !url) return; try { new Audio(url).play().catch(() => {}); } catch (e) {} }
 
   document.getElementById('mapTitleLabel').textContent = cfg.name || 'Untitled Map';
 
-  const W = () => canvas.width, H = () => canvas.height;
-  const good = makeCountry('good', cfg, cfg.factions?.good || {});
-  const bad = makeCountry('bad', cfg, cfg.factions?.bad || {});
-  good.homeImg = goodImg; bad.homeImg = badImg;
-  good.x = 160; good.y = H() / 2;
-  bad.x = W() - 160; bad.y = H() / 2;
-  const countries = { good, bad };
+  // ---------------------------------------------------------------------
+  // Factions: faction 0 is always the human player; 1..N are the computer
+  // players from the map (1-5 of them). Arranged evenly around a circle
+  // whose radius comes from the map's chosen size (Tiny/Small/Medium/
+  // Large - see MAP_SIZE_MULTIPLIER), so a bigger map really is bigger,
+  // not just a label.
+  // ---------------------------------------------------------------------
+  const sizeMult = MAP_SIZE_MULTIPLIER[cfg.mapSize] || MAP_SIZE_MULTIPLIER.medium;
+  const homeRadius = BASE_HOME_RADIUS * sizeMult;
+  const factionCount = 1 + computerCfgs.length;
+  const worldCenter = { x: homeRadius + 400, y: homeRadius + 400 };
 
-  const units = []; // { id, side, type(index into unitDefs, or 'mining'), x,y,hp,maxHp,attack,range,speed,img,selected,orderType,moveTarget,target,alive,attackCooldown }
+  const factions = [];
+  for (let i = 0; i < factionCount; i++) {
+    const angle = (i / factionCount) * Math.PI * 2 - Math.PI / 2;
+    const isPlayer = i === 0;
+    const src = isPlayer ? cfg.player : computerCfgs[i - 1];
+    factions.push({
+      id: i, isPlayer,
+      name: src?.name || (isPlayer ? 'Player' : `Computer ${i}`),
+      color: src?.color || '#888',
+      img: isPlayer ? playerImg : computerImgs[i - 1],
+      x: worldCenter.x + Math.cos(angle) * homeRadius,
+      y: worldCenter.y + Math.sin(angle) * homeRadius,
+      hp: HOMEWORLD_HP, maxHp: HOMEWORLD_HP,
+      resources: 1000, research: freshResearch(),
+      team: null, // assigned on the team-select screen before the match starts
+    });
+  }
+  const player = factions[0];
+
+  const worldMinX = Math.min(...factions.map((f) => f.x)) - 400;
+  const worldMaxX = Math.max(...factions.map((f) => f.x)) + 400;
+  const worldMinY = Math.min(...factions.map((f) => f.y)) - 400;
+  const worldMaxY = Math.max(...factions.map((f) => f.y)) + 400;
+  const worldW = worldMaxX - worldMinX, worldH = worldMaxY - worldMinY;
+
+  const deposits = factions.map((f) => ({ factionId: f.id, x: f.x, y: f.y - 100, size: cfg.resource?.size || 5000 }));
+
+  const units = [];
   let nextUnitId = 1;
-
-  function unitDefFor(index) { return unitDefs[index]; }
-
-  function effectiveStat(country, base, kind) {
+  function factionOf(id) { return factions[id]; }
+  function techBonus(fac, effect) {
+    return fac.research.researched.has(Object.keys(TECH_TREE).find((k) => TECH_TREE[k].effect === effect));
+  }
+  function effectiveStat(fac, base, kind) {
     let v = base;
-    if (kind === 'hp' && techBonus(country, 'hp_15')) v *= 1.15;
-    if (kind === 'speed' && techBonus(country, 'speed_12')) v *= 1.12;
+    if (kind === 'hp' && techBonus(fac, 'hp_15')) v *= 1.15;
+    if (kind === 'speed' && techBonus(fac, 'speed_12')) v *= 1.12;
     return v;
   }
-
-  function spawnUnit(side, defIndex, x, y) {
-    const country = countries[side];
-    const def = unitDefFor(defIndex);
+  function spawnUnit(factionId, defIndex, x, y) {
+    const fac = factionOf(factionId);
+    const def = unitDefs[defIndex];
     const u = {
-      id: nextUnitId++, side, defIndex, isMiner: false,
-      hp: Math.round(effectiveStat(country, def.hp, 'hp')), maxHp: Math.round(effectiveStat(country, def.hp, 'hp')),
-      attack: def.attack, range: def.range, speed: effectiveStat(country, def.speed, 'speed'),
+      id: nextUnitId++, factionId, defIndex, isMiner: false,
+      hp: Math.round(effectiveStat(fac, def.hp, 'hp')), maxHp: Math.round(effectiveStat(fac, def.hp, 'hp')),
+      attack: def.attack, range: def.range, speed: effectiveStat(fac, def.speed, 'speed'),
       img: unitImages[defIndex], x, y, alive: true, selected: false,
       orderType: null, moveTarget: null, target: null, attackCooldown: Math.random() * ATTACK_INTERVAL,
+      lockedUntilTurn: 0,
     };
     units.push(u);
     return u;
   }
-  function spawnMiner(side, x, y) {
-    const country = countries[side];
+  function spawnMiner(factionId, x, y) {
     const u = {
-      id: nextUnitId++, side, defIndex: -1, isMiner: true,
+      id: nextUnitId++, factionId, defIndex: -1, isMiner: true,
       hp: 40, maxHp: 40, attack: 0, range: 0, speed: 1.6,
       img: miningImg, x, y, alive: true, selected: false,
-      orderType: null, moveTarget: null, target: null, attackCooldown: 0,
-      mining: true,
+      orderType: null, moveTarget: null, target: null, attackCooldown: 0, lockedUntilTurn: 0,
     };
     units.push(u);
     return u;
   }
 
-  // Each side starts with a resource deposit near its homeworld and (once
-  // Mining Operations is researched) can build a Mining Ship to work it -
-  // same two-step economy as After Earth, just without needing a whole
-  // galaxy around it.
-  const deposits = {
-    good: { x: good.x, y: good.y - 90, size: cfg.resource?.size || 5000 },
-    bad: { x: bad.x, y: bad.y - 90, size: cfg.resource?.size || 5000 },
-  };
-
-  function livingUnits(side) { return units.filter((u) => u.alive && u.side === side); }
+  function livingUnits(factionId) { return units.filter((u) => u.alive && u.factionId === factionId); }
+  function isAlly(a, b) { return a === b || factionOf(a).team === factionOf(b).team; }
   function nearestEnemy(u) {
-    const enemySide = u.side === 'good' ? 'bad' : 'good';
     let best = null, bestDist = Infinity;
-    for (const e of livingUnits(enemySide)) {
-      if (e.mining) continue; // AI prefers real targets over a miner, mirrors After Earth's own preference logic loosely
+    for (const f of factions) {
+      if (isAlly(u.factionId, f.id)) continue;
+      if (f.hp <= 0) continue;
+      const hd = Math.hypot(f.x - u.x, f.y - u.y);
+      if (hd < bestDist) { best = f; bestDist = hd; }
+    }
+    for (const e of units) {
+      if (!e.alive || e.mining || isAlly(u.factionId, e.factionId)) continue;
       const d = Math.hypot(e.x - u.x, e.y - u.y);
       if (d < bestDist) { best = e; bestDist = d; }
     }
-    const home = countries[enemySide];
-    const hd = Math.hypot(home.x - u.x, home.y - u.y);
-    if (hd < bestDist || !best) best = home;
     return best;
   }
 
-  let gameOver = false, paused = false;
+  let gameOver = false, paused = false, matchStarted = false;
+
+  // Beam/laser visual effects - short-lived, purely cosmetic.
+  const beams = [];
+  function fireBeam(u, t) {
+    beams.push({ x1: u.x, y1: u.y, x2: t.x, y2: t.y, color: LASER_COLORS[Math.max(0, u.defIndex) % LASER_COLORS.length], ttl: 0.18 });
+  }
 
   function combatTick(u, dt) {
     const t = u.target;
-    if (!t || (t.hp !== undefined && t.hp <= 0)) { u.target = null; return; }
+    if (!t || t.hp <= 0 || t.alive === false) { u.target = null; return; }
     const dist = Math.hypot(t.x - u.x, t.y - u.y);
     if (dist > u.range) {
-      const sp = u.speed * MOVE_PX_PER_SPEED;
-      u.x += (t.x - u.x) / dist * sp * dt;
-      u.y += (t.y - u.y) / dist * sp * dt;
+      if (turnNumber >= u.lockedUntilTurn) {
+        const sp = u.speed * MOVE_PX_PER_SPEED;
+        u.x += (t.x - u.x) / dist * sp * dt; u.y += (t.y - u.y) / dist * sp * dt;
+      }
     } else {
       u.attackCooldown -= dt;
       if (u.attackCooldown <= 0) {
         u.attackCooldown = ATTACK_INTERVAL;
         t.hp -= u.attack;
+        fireBeam(u, t);
         playSfx(sounds.attack);
+        // Attacking locks a unit in place until the next turn - it can
+        // keep firing from where it stands, it just can't reposition.
+        u.lockedUntilTurn = turnNumber + 1;
         if (t.hp <= 0) {
           t.hp = 0;
-          if (t.isHome) {
-            playSfx(sounds.homeUnderAttack);
-          } else {
-            t.alive = false;
-            playSfx(sounds.buildingDestroyed);
-          }
+          if (t.maxHp === undefined || t.isFactionHome) playSfx(sounds.homeUnderAttack);
+          if (!t.isFactionHome && t.alive !== undefined) { t.alive = false; playSfx(sounds.buildingDestroyed); }
         }
       }
     }
   }
+  // Tag every faction object once so combatTick can tell a homeworld
+  // target apart from a unit target without extra lookups.
+  factions.forEach((f) => { f.isFactionHome = true; });
 
-  let turnTimer = TURN_SECONDS;
-  let turnNumber = 1;
-  let aiTimer = AI_TICK_SECONDS;
-  let fogOn = false;
+  let turnTimer = TURN_SECONDS, turnNumber = 1, aiTimer = AI_TICK_SECONDS, fogOn = false;
 
-  function aiThink(dt) {
-    aiTimer -= dt;
-    if (aiTimer > 0) return;
-    aiTimer = AI_TICK_SECONDS;
-    // Research: pick mining_ops first if affordable & not yet active/done, else a random available node.
-    if (!bad.research.active) {
+  function startResearch(fac, id) {
+    const t = TECH_TREE[id];
+    if (!t || fac.research.active || fac.research.researched.has(id)) return;
+    if (t.prereq && !fac.research.researched.has(t.prereq)) return;
+    if (fac.resources < t.cost) return;
+    fac.resources -= t.cost;
+    fac.research.active = { id, remaining: t.timeSeconds };
+  }
+
+  function aiThink(fac, dt) {
+    if (!fac.research.active) {
       const options = Object.keys(TECH_TREE).filter((k) => {
         const t = TECH_TREE[k];
-        if (bad.research.researched.has(k)) return false;
-        if (t.prereq && !bad.research.researched.has(t.prereq)) return false;
-        return bad.resources >= t.cost;
+        if (fac.research.researched.has(k)) return false;
+        if (t.prereq && !fac.research.researched.has(t.prereq)) return false;
+        return fac.resources >= t.cost;
       });
-      if (options.length) {
-        const pick = options.includes('mining_ops') && !bad.research.researched.has('mining_ops') ? 'mining_ops' : options[Math.floor(Math.random() * options.length)];
-        startResearch(bad, pick);
-      }
+      if (options.length) startResearch(fac, options.includes('mining_ops') && !fac.research.researched.has('mining_ops') ? 'mining_ops' : options[Math.floor(Math.random() * options.length)]);
     }
-    // Build: a mining ship if it has none and can afford one, else the cheapest combat unit it can afford.
-    const hasMiner = units.some((u) => u.alive && u.side === 'bad' && u.isMiner);
-    if (!hasMiner && bad.research.researched.has('mining_ops') && bad.resources >= 80) {
-      spawnMiner('bad', bad.x - 40, bad.y);
-      bad.resources -= 80;
+    const hasMiner = units.some((u) => u.alive && u.factionId === fac.id && u.isMiner);
+    if (!hasMiner && fac.research.researched.has('mining_ops') && fac.resources >= 80) {
+      spawnMiner(fac.id, fac.x - 40, fac.y); fac.resources -= 80;
     } else if (unitDefs.length) {
-      const affordable = unitDefs.map((d, i) => ({ d, i })).filter((x) => bad.resources >= x.d.cost);
+      const affordable = unitDefs.map((d, i) => ({ d, i })).filter((x) => fac.resources >= x.d.cost);
       if (affordable.length) {
         const pick = affordable[Math.floor(Math.random() * affordable.length)];
-        bad.resources -= pick.d.cost;
-        spawnUnit('bad', pick.i, bad.x - 40 + (Math.random() - 0.5) * 60, bad.y + (Math.random() - 0.5) * 60);
+        fac.resources -= pick.d.cost;
+        spawnUnit(fac.id, pick.i, fac.x - 40 + (Math.random() - 0.5) * 60, fac.y + (Math.random() - 0.5) * 60);
       }
     }
   }
 
   function update(dt) {
-    if (paused || gameOver) return;
-
-    // Turn timer (cosmetic pacing, mirrors After Earth's 90s auto-turn feel)
+    if (paused || gameOver || !matchStarted) return;
     turnTimer -= dt;
     if (turnTimer <= 0) { turnTimer = TURN_SECONDS; turnNumber++; }
 
-    // Research progress (real time, both sides)
-    for (const c of [good, bad]) {
-      if (c.research.active) {
-        c.research.active.remaining -= dt;
-        if (c.research.active.remaining <= 0) {
-          c.research.researched.add(c.research.active.id);
-          c.research.active = null;
-          renderBuildPanel(); renderResearchPanel();
-        }
+    for (const f of factions) {
+      if (f.research.active) {
+        f.research.active.remaining -= dt;
+        if (f.research.active.remaining <= 0) { f.research.researched.add(f.research.active.id); f.research.active = null; renderBuildPanel(); renderResearchPanel(); }
       }
-    }
-
-    // Mining income
-    for (const side of ['good', 'bad']) {
-      const c = countries[side];
-      const miner = units.find((u) => u.alive && u.side === side && u.isMiner);
+      const miner = units.find((u) => u.alive && u.factionId === f.id && u.isMiner);
       if (miner) {
         let rate = 600;
-        if (techBonus(c, 'mining_900')) rate = 900;
-        if (techBonus(c, 'mining_1200')) rate = 1200;
-        c.resources += (rate / 3600) * dt;
+        if (techBonus(f, 'mining_900')) rate = 900;
+        if (techBonus(f, 'mining_1200')) rate = 1200;
+        f.resources += (rate / 3600) * dt;
+      }
+      if (!f.isPlayer && f.hp > 0) {
+        f._aiTimer = (f._aiTimer ?? AI_TICK_SECONDS) - dt;
+        if (f._aiTimer <= 0) { f._aiTimer = AI_TICK_SECONDS; aiThink(f, dt); }
       }
     }
 
-    aiThink(dt);
+    for (const b of beams) b.ttl -= dt;
+    while (beams.length && beams[0].ttl <= 0) beams.shift();
 
     for (const u of units) {
       if (!u.alive) continue;
-      if (u.side === 'bad' && !u.isMiner) {
+      const fac = factionOf(u.factionId);
+      if (!fac.isPlayer && !u.isMiner) {
         if (!u.target) u.target = nearestEnemy(u);
         combatTick(u, dt);
-      } else if (u.side === 'good' && !u.isMiner) {
+      } else if (fac.isPlayer && !u.isMiner) {
         if (u.orderType === 'attack' && u.target) combatTick(u, dt);
-        else if (u.orderType === 'move' && u.moveTarget) {
+        else if (u.orderType === 'move' && u.moveTarget && turnNumber >= u.lockedUntilTurn) {
           const dx = u.moveTarget.x - u.x, dy = u.moveTarget.y - u.y;
           const dist = Math.hypot(dx, dy);
           if (dist < 4) { u.orderType = null; u.moveTarget = null; }
-          else {
-            const sp = u.speed * MOVE_PX_PER_SPEED;
-            u.x += dx / dist * sp * dt; u.y += dy / dist * sp * dt;
-          }
+          else { const sp = u.speed * MOVE_PX_PER_SPEED; u.x += dx / dist * sp * dt; u.y += dy / dist * sp * dt; }
         }
       }
     }
 
-    if (good.hp <= 0 || bad.hp <= 0) {
+    const aliveTeams = new Set(factions.filter((f) => f.hp > 0).map((f) => f.team));
+    if (aliveTeams.size <= 1 && matchStarted) {
       gameOver = true;
-      const winner = good.hp <= 0 ? bad : good;
-      document.getElementById('bannerText').textContent = `${winner.name} wins!`;
+      const winningTeam = [...aliveTeams][0];
+      const winners = factions.filter((f) => f.team === winningTeam).map((f) => f.name).join(', ');
+      document.getElementById('bannerText').textContent = winningTeam === player.team ? `Your team wins! (${winners})` : `${winners} win${factions.filter(f=>f.team===winningTeam).length>1?'s':''}!`;
       document.getElementById('banner').classList.add('show');
       playSfx(sounds.endgame);
     }
   }
 
   // ---------------------------------------------------------------------
-  // Rendering
+  // Camera (pan only - maps can be much bigger than one screen now that
+  // size is configurable) + rendering
   // ---------------------------------------------------------------------
-  function drawHome(c) {
+  // Center the camera on the PLAYER's own homeworld, not the abstract
+  // center of the whole multi-faction circle - otherwise on any map with
+  // more than 2 factions, the player starts staring at empty space.
+  const camera = { x: player.x - canvas.width / 2, y: player.y - canvas.height / 2 };
+  function toScreen(x, y) { return { x: x - camera.x, y: y - camera.y }; }
+  function toWorld(x, y) { return { x: x + camera.x, y: y + camera.y }; }
+
+  function drawFactionHome(f) {
+    const p = toScreen(f.x, f.y);
     const size = HOMEWORLD_SIZE;
-    if (c.homeImg) ctx.drawImage(c.homeImg, c.x - size / 2, c.y - size / 2, size, size);
-    else { ctx.fillStyle = c.color; ctx.beginPath(); ctx.arc(c.x, c.y, size / 2, 0, 7); ctx.fill(); }
-    const pct = Math.max(0, c.hp / c.maxHp);
-    ctx.fillStyle = '#2a3550'; ctx.fillRect(c.x - size / 2, c.y - size / 2 - 10, size, 5);
-    ctx.fillStyle = c.color; ctx.fillRect(c.x - size / 2, c.y - size / 2 - 10, size * pct, 5);
-    ctx.fillStyle = c.color; ctx.font = '12px sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText(c.name, c.x, c.y + size / 2 + 16);
+    if (f.img) ctx.drawImage(f.img, p.x - size / 2, p.y - size / 2, size, size);
+    else { ctx.fillStyle = f.color; ctx.beginPath(); ctx.arc(p.x, p.y, size / 2, 0, 7); ctx.fill(); }
+    const pct = Math.max(0, f.hp / f.maxHp);
+    ctx.fillStyle = '#2a3550'; ctx.fillRect(p.x - size / 2, p.y - size / 2 - 10, size, 5);
+    ctx.fillStyle = f.color; ctx.fillRect(p.x - size / 2, p.y - size / 2 - 10, size * pct, 5);
+    ctx.fillStyle = f.color; ctx.font = '12px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(f.name, p.x, p.y + size / 2 + 16);
   }
   function drawUnit(u) {
-    if (u.selected) {
-      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.arc(u.x, u.y, UNIT_SIZE / 2 + 5, 0, 7); ctx.stroke();
-    }
-    if (u.img) ctx.drawImage(u.img, u.x - UNIT_SIZE / 2, u.y - UNIT_SIZE / 2, UNIT_SIZE, UNIT_SIZE);
-    else { ctx.fillStyle = countries[u.side].color; ctx.beginPath(); ctx.arc(u.x, u.y, UNIT_SIZE / 2, 0, 7); ctx.fill(); }
+    const p = toScreen(u.x, u.y);
+    if (p.x < -60 || p.x > canvas.width + 60 || p.y < -60 || p.y > canvas.height + 60) return;
+    if (u.selected) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p.x, p.y, UNIT_SIZE / 2 + 5, 0, 7); ctx.stroke(); }
+    if (u.img) ctx.drawImage(u.img, p.x - UNIT_SIZE / 2, p.y - UNIT_SIZE / 2, UNIT_SIZE, UNIT_SIZE);
+    else { ctx.fillStyle = factionOf(u.factionId).color; ctx.beginPath(); ctx.arc(p.x, p.y, UNIT_SIZE / 2, 0, 7); ctx.fill(); }
     const pct = Math.max(0, u.hp / u.maxHp);
-    ctx.fillStyle = '#2a3550'; ctx.fillRect(u.x - UNIT_SIZE / 2, u.y - UNIT_SIZE / 2 - 7, UNIT_SIZE, 3);
-    ctx.fillStyle = countries[u.side].color; ctx.fillRect(u.x - UNIT_SIZE / 2, u.y - UNIT_SIZE / 2 - 7, UNIT_SIZE * pct, 3);
+    ctx.fillStyle = '#2a3550'; ctx.fillRect(p.x - UNIT_SIZE / 2, p.y - UNIT_SIZE / 2 - 7, UNIT_SIZE, 3);
+    ctx.fillStyle = factionOf(u.factionId).color; ctx.fillRect(p.x - UNIT_SIZE / 2, p.y - UNIT_SIZE / 2 - 7, UNIT_SIZE * pct, 3);
+    if (turnNumber < u.lockedUntilTurn) { ctx.fillStyle = '#fff'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('🔒', p.x, p.y - UNIT_SIZE / 2 - 12); }
   }
   function drawDeposit(d) {
-    if (resourceImg) ctx.drawImage(resourceImg, d.x - 18, d.y - 18, 36, 36);
+    const p = toScreen(d.x, d.y);
+    if (resourceImg) ctx.drawImage(resourceImg, p.x - DEPOSIT_SIZE / 2, p.y - DEPOSIT_SIZE / 2, DEPOSIT_SIZE, DEPOSIT_SIZE);
+    else { ctx.fillStyle = '#e8b93a'; ctx.beginPath(); ctx.arc(p.x, p.y, DEPOSIT_SIZE / 2, 0, 7); ctx.fill(); }
+  }
+  function drawBeams() {
+    for (const b of beams) {
+      const p1 = toScreen(b.x1, b.y1), p2 = toScreen(b.x2, b.y2);
+      ctx.strokeStyle = b.color; ctx.globalAlpha = Math.max(0, b.ttl / 0.18); ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
   }
 
   function render() {
-    ctx.clearRect(0, 0, W(), H());
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (bgImg) {
-      const scale = Math.max(W() / bgImg.width, H() / bgImg.height);
+      const scale = Math.max(canvas.width / bgImg.width, canvas.height / bgImg.height);
       const dw = bgImg.width * scale, dh = bgImg.height * scale;
-      ctx.drawImage(bgImg, (W() - dw) / 2, (H() - dh) / 2, dw, dh);
-    } else { ctx.fillStyle = '#06121f'; ctx.fillRect(0, 0, W(), H()); }
+      ctx.save(); ctx.globalAlpha = 0.5;
+      ctx.drawImage(bgImg, -camera.x * 0.2, -camera.y * 0.2, dw, dh);
+      ctx.restore();
+    } else { ctx.fillStyle = '#06121f'; ctx.fillRect(0, 0, canvas.width, canvas.height); }
 
-    drawDeposit(deposits.good); drawDeposit(deposits.bad);
-    drawHome(good); drawHome(bad);
+    for (const d of deposits) drawDeposit(d);
+    for (const f of factions) if (f.hp > 0) drawFactionHome(f);
     for (const u of units) if (u.alive) drawUnit(u);
+    drawBeams();
 
-    // HUD text
-    document.getElementById('hudGood').textContent = `${good.name}: ${Math.round(good.hp)} HP · ${Math.round(good.resources)} ${cfg.resource?.name || 'resources'}`;
-    document.getElementById('hudBad').textContent = `${bad.name}: ${Math.round(bad.hp)} HP · ${Math.round(bad.resources)} ${cfg.resource?.name || 'resources'}`;
-    const mins = Math.floor(Math.max(0, turnTimer) / 60), secs = Math.floor(Math.max(0, turnTimer) % 60);
-    document.getElementById('turnLabel').textContent = `Turn ${turnNumber} · next in ${mins}:${String(secs).padStart(2, '0')}`;
-
+    renderHud();
     renderMinimap();
   }
 
+  function renderHud() {
+    const row = document.getElementById('hudRow');
+    row.innerHTML = factions.map((f) => `<span style="color:${f.color}">${f.name}: ${Math.round(f.hp)} HP · ${Math.round(f.resources)}${f.team === player.team ? ' 🤝' : ''}</span>`).join(' ');
+    const mins = Math.floor(Math.max(0, turnTimer) / 60), secs = Math.floor(Math.max(0, turnTimer) % 60);
+    document.getElementById('turnLabel').textContent = `Turn ${turnNumber} · next in ${mins}:${String(secs).padStart(2, '0')}`;
+  }
+
   function renderMinimap() {
-    mctx.clearRect(0, 0, 160, 110);
-    mctx.fillStyle = '#06121f'; mctx.fillRect(0, 0, 160, 110);
-    const sx = 160 / W(), sy = 110 / H();
+    mctx.clearRect(0, 0, 180, 180);
+    mctx.fillStyle = '#06121f'; mctx.fillRect(0, 0, 180, 180);
+    const sx = 180 / worldW, sy = 180 / worldH;
+    function toMini(x, y) { return { x: (x - worldMinX) * sx, y: (y - worldMinY) * sy }; }
     function within(x, y) {
       if (!fogOn) return true;
-      return livingUnits('good').some((u) => Math.hypot(u.x - x, u.y - y) < 260) || Math.hypot(good.x - x, good.y - y) < 400;
+      return livingUnits(player.id).some((u) => Math.hypot(u.x - x, u.y - y) < 500) || Math.hypot(player.x - x, player.y - y) < 700;
     }
-    if (within(good.x, good.y)) { mctx.fillStyle = good.color; mctx.beginPath(); mctx.arc(good.x * sx, good.y * sy, 4, 0, 7); mctx.fill(); }
-    if (within(bad.x, bad.y)) { mctx.fillStyle = bad.color; mctx.beginPath(); mctx.arc(bad.x * sx, bad.y * sy, 4, 0, 7); mctx.fill(); }
+    for (const f of factions) {
+      if (f.hp <= 0 || !within(f.x, f.y)) continue;
+      const p = toMini(f.x, f.y);
+      mctx.fillStyle = f.color; mctx.beginPath(); mctx.arc(p.x, p.y, 4, 0, 7); mctx.fill();
+    }
     for (const u of units) {
       if (!u.alive || !within(u.x, u.y)) continue;
-      mctx.fillStyle = countries[u.side].color; mctx.fillRect(u.x * sx - 1, u.y * sy - 1, 2, 2);
+      const p = toMini(u.x, u.y);
+      mctx.fillStyle = factionOf(u.factionId).color; mctx.fillRect(p.x - 1, p.y - 1, 2, 2);
     }
+    // viewport rectangle
+    const tl = toMini(camera.x, camera.y), br = toMini(camera.x + canvas.width, camera.y + canvas.height);
+    mctx.strokeStyle = 'rgba(255,255,255,0.6)'; mctx.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
   }
 
   // ---------------------------------------------------------------------
-  // Player controls: click-select, click-to-move/attack.
+  // Player controls: left-drag = box-select (multiple units at once),
+  // single left-click = select one / issue a command to whatever's
+  // selected, right-drag = pan camera.
   // ---------------------------------------------------------------------
-  let selectedUnit = null;
-  function canvasPoint(evt) {
-    const r = canvas.getBoundingClientRect();
-    return { x: (evt.clientX - r.left) * (W() / r.width), y: (evt.clientY - r.top) * (H() / r.height) };
-  }
-  canvas.addEventListener('click', (evt) => {
-    if (gameOver || paused) return;
-    const p = canvasPoint(evt);
-    const own = livingUnits('good').find((u) => Math.hypot(u.x - p.x, u.y - p.y) < UNIT_SIZE / 2 + 8);
-    if (own) {
-      if (selectedUnit) selectedUnit.selected = false;
-      selectedUnit = own; selectedUnit.selected = true;
-      showUnitInfo(own);
-      return;
-    }
-    if (!selectedUnit || !selectedUnit.alive) { hideUnitInfo(); return; }
-    const enemy = livingUnits('bad').find((u) => Math.hypot(u.x - p.x, u.y - p.y) < UNIT_SIZE / 2 + 8);
-    const enemyHome = Math.hypot(bad.x - p.x, bad.y - p.y) < HOMEWORLD_SIZE / 2 ? bad : null;
-    const target = enemy || enemyHome;
-    if (target) {
-      target.isHome = target === bad;
-      selectedUnit.orderType = 'attack'; selectedUnit.target = target; selectedUnit.moveTarget = null;
-    } else {
-      selectedUnit.orderType = 'move'; selectedUnit.moveTarget = { x: p.x, y: p.y }; selectedUnit.target = null;
+  let dragStart = null, isRightDrag = false, dragMoved = false;
+  const dragBoxEl = document.getElementById('dragBox');
+
+  canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+  canvas.addEventListener('mousedown', (evt) => {
+    if (gameOver || paused || !matchStarted) return;
+    dragStart = { x: evt.clientX, y: evt.clientY };
+    isRightDrag = evt.button === 2;
+    dragMoved = false;
+  });
+  window.addEventListener('mousemove', (evt) => {
+    if (!dragStart) return;
+    const dx = evt.clientX - dragStart.x, dy = evt.clientY - dragStart.y;
+    if (Math.hypot(dx, dy) > 4) dragMoved = true;
+    if (isRightDrag) {
+      camera.x -= dx; camera.y -= dy;
+      dragStart = { x: evt.clientX, y: evt.clientY };
+    } else if (dragMoved) {
+      const x0 = Math.min(dragStart.x, evt.clientX), y0 = Math.min(dragStart.y, evt.clientY);
+      const w = Math.abs(evt.clientX - dragStart.x), h = Math.abs(evt.clientY - dragStart.y);
+      dragBoxEl.style.display = 'block';
+      dragBoxEl.style.left = x0 + 'px'; dragBoxEl.style.top = y0 + 'px';
+      dragBoxEl.style.width = w + 'px'; dragBoxEl.style.height = h + 'px';
     }
   });
-  function showUnitInfo(u) {
+  window.addEventListener('mouseup', (evt) => {
+    if (!dragStart) return;
+    const wasRightDrag = isRightDrag, wasMoved = dragMoved;
+    dragBoxEl.style.display = 'none';
+    if (!wasRightDrag) {
+      if (wasMoved) {
+        const r = canvas.getBoundingClientRect();
+        const x0 = Math.min(dragStart.x, evt.clientX) - r.left, x1 = Math.max(dragStart.x, evt.clientX) - r.left;
+        const y0 = Math.min(dragStart.y, evt.clientY) - r.top, y1 = Math.max(dragStart.y, evt.clientY) - r.top;
+        const w0 = toWorld(x0, y0), w1 = toWorld(x1, y1);
+        const picked = livingUnits(player.id).filter((u) => !u.isMiner && u.x >= w0.x && u.x <= w1.x && u.y >= w0.y && u.y <= w1.y);
+        if (picked.length) {
+          livingUnits(player.id).forEach((u) => u.selected = false);
+          picked.forEach((u) => u.selected = true);
+          showUnitInfo(picked.length === 1 ? picked[0] : null, picked.length);
+        }
+      } else {
+        handleClick(evt);
+      }
+    }
+    dragStart = null;
+  });
+
+  function selectedUnits() { return livingUnits(player.id).filter((u) => u.selected); }
+
+  function handleClick(evt) {
+    const r = canvas.getBoundingClientRect();
+    const p = toWorld(evt.clientX - r.left, evt.clientY - r.top);
+    const own = livingUnits(player.id).find((u) => !u.isMiner && Math.hypot(u.x - p.x, u.y - p.y) < UNIT_SIZE / 2 + 8);
+    if (own) {
+      livingUnits(player.id).forEach((u) => u.selected = false);
+      own.selected = true;
+      showUnitInfo(own, 1);
+      return;
+    }
+    const sel = selectedUnits();
+    if (!sel.length) { hideUnitInfo(); return; }
+    let target = null;
+    for (const f of factions) {
+      if (isAlly(player.id, f.id) || f.hp <= 0) continue;
+      if (Math.hypot(f.x - p.x, f.y - p.y) < HOMEWORLD_SIZE / 2) { target = f; break; }
+    }
+    if (!target) {
+      target = units.find((u) => u.alive && !u.isMiner && !isAlly(player.id, u.factionId) && Math.hypot(u.x - p.x, u.y - p.y) < UNIT_SIZE / 2 + 8);
+    }
+    sel.forEach((u) => {
+      if (turnNumber < u.lockedUntilTurn) return; // attacked this turn - can't take a new order yet
+      if (target) { u.orderType = 'attack'; u.target = target; u.moveTarget = null; }
+      else { u.orderType = 'move'; u.moveTarget = { x: p.x, y: p.y }; u.target = null; }
+    });
+  }
+
+  function showUnitInfo(u, count) {
     const box = document.getElementById('unitInfoBox');
-    const def = u.isMiner ? { name: cfg.miningUnit?.name || 'Mining Ship' } : unitDefFor(u.defIndex);
+    if (!u) {
+      box.style.display = count ? 'block' : 'none';
+      if (count) box.innerHTML = `<strong>${count} units selected</strong>`;
+      return;
+    }
+    const def = u.isMiner ? { name: cfg.miningUnit?.name || 'Mining Ship' } : unitDefs[u.defIndex];
     box.style.display = 'block';
-    box.innerHTML = `<strong>${def.name}</strong><br>HP ${Math.round(u.hp)}/${u.maxHp}${u.isMiner ? '' : ` · ATK ${u.attack} · RNG ${u.range} · SPD ${u.speed.toFixed(1)}`}`;
+    box.innerHTML = `<strong>${def.name}</strong><br>HP ${Math.round(u.hp)}/${u.maxHp}${u.isMiner ? '' : ` · ATK ${u.attack} · RNG ${u.range} · SPD ${u.speed.toFixed(1)}`}${turnNumber < u.lockedUntilTurn ? '<br><span style="color:var(--warn)">🔒 locked until next turn</span>' : ''}`;
   }
   function hideUnitInfo() { document.getElementById('unitInfoBox').style.display = 'none'; }
 
   // ---------------------------------------------------------------------
-  // Build / Research panels
+  // Build / research panels (act on the player faction only)
   // ---------------------------------------------------------------------
-  function canAfford(c, cost) { return c.resources >= cost; }
-
+  function canAfford(fac, cost) { return fac.resources >= cost; }
   function renderBuildPanel() {
     const el = document.getElementById('tab-build');
     el.innerHTML = '';
     const minerRow = document.createElement('div');
     minerRow.className = 'buildRow';
-    const hasMiner = units.some((u) => u.alive && u.side === 'good' && u.isMiner);
-    const minerUnlocked = good.research.researched.has('mining_ops');
+    const hasMiner = units.some((u) => u.alive && u.factionId === player.id && u.isMiner);
+    const minerUnlocked = player.research.researched.has('mining_ops');
     minerRow.innerHTML = `<div class="name">${cfg.miningUnit?.name || 'Mining Ship'}</div><div class="stats">Cost 80 · ${minerUnlocked ? 'earns resources parked on your deposit' : 'requires Mining Operations research'}</div>`;
     const minerBtn = document.createElement('button');
     minerBtn.textContent = hasMiner ? 'Already built' : (minerUnlocked ? 'Build' : 'Locked');
-    minerBtn.disabled = hasMiner || !minerUnlocked || !canAfford(good, 80);
-    minerBtn.onclick = () => { good.resources -= 80; spawnMiner('good', good.x + 40, good.y); renderBuildPanel(); };
+    minerBtn.disabled = hasMiner || !minerUnlocked || !canAfford(player, 80);
+    minerBtn.onclick = () => { player.resources -= 80; spawnMiner(player.id, player.x + 40, player.y); renderBuildPanel(); };
     minerRow.appendChild(minerBtn);
     el.appendChild(minerRow);
-
     unitDefs.forEach((def, i) => {
       const row = document.createElement('div');
       row.className = 'buildRow';
       row.innerHTML = `<div class="name">${def.name}</div><div class="stats">HP ${def.hp} · ATK ${def.attack} · RNG ${def.range} · SPD ${def.speed} · Cost ${def.cost}</div>`;
       const btn = document.createElement('button');
       btn.textContent = 'Build';
-      btn.disabled = !canAfford(good, def.cost);
-      btn.onclick = () => {
-        good.resources -= def.cost;
-        spawnUnit('good', i, good.x + 40 + (Math.random() - 0.5) * 60, good.y + (Math.random() - 0.5) * 60);
-        renderBuildPanel();
-      };
+      btn.disabled = !canAfford(player, def.cost);
+      btn.onclick = () => { player.resources -= def.cost; spawnUnit(player.id, i, player.x + 40 + (Math.random() - 0.5) * 60, player.y + (Math.random() - 0.5) * 60); renderBuildPanel(); };
       row.appendChild(btn);
       el.appendChild(row);
     });
   }
-
-  function startResearch(country, id) {
-    const t = TECH_TREE[id];
-    if (!t || country.research.active || country.research.researched.has(id)) return;
-    if (t.prereq && !country.research.researched.has(t.prereq)) return;
-    if (country.resources < t.cost) return;
-    country.resources -= t.cost;
-    country.research.active = { id, remaining: t.timeSeconds };
-  }
-
   function renderResearchPanel() {
     const el = document.getElementById('tab-research');
     el.innerHTML = '';
     Object.entries(TECH_TREE).forEach(([id, t]) => {
       const row = document.createElement('div');
-      const done = good.research.researched.has(id);
-      const active = good.research.active && good.research.active.id === id;
+      const done = player.research.researched.has(id);
+      const active = player.research.active && player.research.active.id === id;
       row.className = 'techRow' + (done ? ' done' : '') + (active ? ' active' : '');
-      const lockedByPrereq = t.prereq && !good.research.researched.has(t.prereq);
-      row.innerHTML = `<div class="name">${t.name}</div><div class="desc">Cost ${t.cost} · ${t.timeSeconds}s${lockedByPrereq ? ' · requires ' + TECH_TREE[t.prereq].name : ''}${active ? ' · researching… ' + Math.ceil(good.research.active.remaining) + 's left' : ''}</div>`;
+      const lockedByPrereq = t.prereq && !player.research.researched.has(t.prereq);
+      row.innerHTML = `<div class="name">${t.name}</div><div class="desc">Cost ${t.cost} · ${t.timeSeconds}s${lockedByPrereq ? ' · requires ' + TECH_TREE[t.prereq].name : ''}${active ? ' · researching… ' + Math.ceil(player.research.active.remaining) + 's left' : ''}</div>`;
       const btn = document.createElement('button');
       btn.textContent = done ? 'Done' : (active ? 'In progress' : 'Research');
-      btn.disabled = done || !!good.research.active || lockedByPrereq || good.resources < t.cost;
-      btn.onclick = () => { startResearch(good, id); renderResearchPanel(); };
+      btn.disabled = done || !!player.research.active || lockedByPrereq || player.resources < t.cost;
+      btn.onclick = () => { startResearch(player, id); renderResearchPanel(); };
       row.appendChild(btn);
       el.appendChild(row);
     });
   }
 
-  // ---------------------------------------------------------------------
-  // Top bar controls: pause, sound, fog, save/load, download standalone
-  // ---------------------------------------------------------------------
   document.getElementById('pauseBtn').addEventListener('click', () => {
     paused = !paused;
     document.getElementById('pauseBtn').textContent = paused ? '▶️ Resume' : '⏸️ Pause';
@@ -669,17 +733,14 @@ async function main() {
       document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
     });
   });
-  document.getElementById('panelToggleBtn').addEventListener('click', () => {
-    document.getElementById('sidePanel').classList.toggle('collapsed');
-  });
+  document.getElementById('panelToggleBtn').addEventListener('click', () => document.getElementById('sidePanel').classList.toggle('collapsed'));
   document.getElementById('restartBtn').addEventListener('click', () => location.reload());
 
   function serializeState() {
     return {
       cfg, turnNumber, turnTimer,
-      good: { resources: good.resources, hp: good.hp, researched: [...good.research.researched], active: good.research.active },
-      bad: { resources: bad.resources, hp: bad.hp, researched: [...bad.research.researched], active: bad.research.active },
-      units: units.filter((u) => u.alive).map((u) => ({ side: u.side, defIndex: u.defIndex, isMiner: !!u.isMiner, x: u.x, y: u.y, hp: u.hp, maxHp: u.maxHp })),
+      factions: factions.map((f) => ({ id: f.id, resources: f.resources, hp: f.hp, team: f.team, researched: [...f.research.researched], active: f.research.active })),
+      units: units.filter((u) => u.alive).map((u) => ({ factionId: u.factionId, defIndex: u.defIndex, isMiner: !!u.isMiner, x: u.x, y: u.y, hp: u.hp, maxHp: u.maxHp })),
     };
   }
   document.getElementById('saveBtn').addEventListener('click', () => {
@@ -693,18 +754,20 @@ async function main() {
     const file = e.target.files[0];
     if (!file) return;
     const data = JSON.parse(await file.text());
-    good.resources = data.good.resources; good.hp = data.good.hp;
-    good.research.researched = new Set(data.good.researched); good.research.active = data.good.active;
-    bad.resources = data.bad.resources; bad.hp = data.bad.hp;
-    bad.research.researched = new Set(data.bad.researched); bad.research.active = data.bad.active;
+    data.factions.forEach((fd) => {
+      const f = factions[fd.id];
+      f.resources = fd.resources; f.hp = fd.hp; f.team = fd.team;
+      f.research.researched = new Set(fd.researched); f.research.active = fd.active;
+    });
     units.length = 0;
     data.units.forEach((u) => {
-      const spawned = u.isMiner ? spawnMiner(u.side, u.x, u.y) : spawnUnit(u.side, u.defIndex, u.x, u.y);
+      const spawned = u.isMiner ? spawnMiner(u.factionId, u.x, u.y) : spawnUnit(u.factionId, u.defIndex, u.x, u.y);
       spawned.hp = u.hp; spawned.maxHp = u.maxHp;
     });
+    matchStarted = true;
+    document.getElementById('teamSelectScreen').classList.remove('show');
     renderBuildPanel(); renderResearchPanel();
   });
-
   document.getElementById('downloadBtn').addEventListener('click', async () => {
     const html = await fetch(location.pathname).then((r) => r.text());
     const inline = `<script>window.GM_INLINE_CONFIG = ${JSON.stringify(cfg)};<\/script>\n`;
@@ -717,12 +780,50 @@ async function main() {
   });
 
   // ---------------------------------------------------------------------
+  // Team select screen - runs before the match actually starts.
+  // ---------------------------------------------------------------------
+  const allyListEl = document.getElementById('allyList');
+  computerCfgs.forEach((c, i) => {
+    const fac = factions[i + 1];
+    const row = document.createElement('label');
+    row.className = 'allyRow';
+    row.innerHTML = `<input type="checkbox" class="ally-check" data-fid="${fac.id}"><span class="swatch" style="background:${fac.color}"></span><span>${c.name}</span>`;
+    allyListEl.appendChild(row);
+  });
+  document.getElementById('teamSelectScreen').classList.add('show');
+  document.getElementById('startMatchBtn').addEventListener('click', () => {
+    player.team = 'A';
+    document.querySelectorAll('.ally-check').forEach((cb) => {
+      const fid = Number(cb.dataset.fid);
+      factions[fid].team = cb.checked ? 'A' : 'B';
+    });
+    factions.forEach((f) => { if (f.team === null) f.team = 'B'; });
+    document.getElementById('teamSelectScreen').classList.remove('show');
+    matchStarted = true;
+  });
+
+  // ---------------------------------------------------------------------
   // Boot
   // ---------------------------------------------------------------------
   renderBuildPanel();
   renderResearchPanel();
   statusEl.style.display = 'none';
   appEl.classList.add('ready');
+
+  // Read-only debug hook, harmless in normal play - lets automated testing
+  // (and just poking around in devtools) inspect real engine state instead
+  // of guessing screen coordinates.
+  window.__GM_DEBUG = { factions, units, deposits, camera, get turnNumber() { return turnNumber; }, toScreen, beams };
+
+  const topbarEl = document.getElementById('topbar');
+  const sidePanelEl = document.getElementById('sidePanel');
+  function resize() {
+    resizeCanvasOnly();
+    sidePanelEl.style.top = topbarEl.offsetHeight + 'px';
+  }
+  window.addEventListener('resize', resize);
+  new ResizeObserver(resize).observe(topbarEl);
+  resize();
 
   let last = performance.now();
   function loop(now) {
