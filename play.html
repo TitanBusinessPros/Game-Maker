@@ -220,6 +220,16 @@ async function main() {
     statusEl.textContent = err.message;
     return;
   }
+  // A map saved before computer players existed (the old good/bad-only
+  // schema) has no cfg.computers at all - loading it here used to fail
+  // silently into a broken 1-faction match with no opponent and, since
+  // there was nothing to pick, no team screen either (reported as
+  // "there is still no option for teams"). Failing loudly here instead,
+  // with a link straight back to the editor to fix it.
+  if (!Array.isArray(cfg.computers) || cfg.computers.length === 0) {
+    statusEl.innerHTML = `This map has no computer players to play against - it may have been saved before that feature existed. <a href="index.html?map=${new URLSearchParams(location.search).get('map') || ''}" style="color:var(--accent, #4fa8ff);">Open it in the editor</a> and add at least one, then save again.`;
+    return;
+  }
   statusEl.textContent = 'Loading art & sound…';
 
   const canvas = document.getElementById('canvas');

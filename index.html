@@ -246,6 +246,7 @@
   <h1>Game Maker</h1>
   <p>Build one map's worth of art, sound, and units. Nothing here changes the combat math &mdash; it just tells the engine what to call things and what to draw.</p>
   <div id="authBadge">Connecting to Firebase&hellip;</div>
+  <button type="button" id="googleSignInBtn" style="display:none; margin-top:6px; background:var(--panel-2); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:6px 12px; font-size:12px; cursor:pointer;">Sign in with Google (keeps your maps across devices)</button>
 </header>
 
 <main>
@@ -425,7 +426,10 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
 import { getAnalytics, isSupported as analyticsIsSupported } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-analytics.js";
-import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
+import {
+  getAuth, signInAnonymously, onAuthStateChanged,
+  GoogleAuthProvider, linkWithRedirect, signInWithRedirect, getRedirectResult
+} from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
 import {
   getFirestore, doc, setDoc, getDoc, collection, query, where, getDocs, serverTimestamp, deleteDoc
 } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
@@ -454,18 +458,57 @@ const storage = getStorage(app);
 analyticsIsSupported().then((ok) => { if (ok) { try { getAnalytics(app); } catch (e) {} } }).catch(() => {});
 
 const authBadge = document.getElementById('authBadge');
+const googleSignInBtn = document.getElementById('googleSignInBtn');
 let currentUser = null;
 
+// Anonymous sign-in (the default, zero-friction path) ties "My Maps" to
+// one specific browser's storage - clear site data, switch browsers, or
+// use another device and that list is gone even though the maps
+// themselves still exist. Signing in with Google is optional but keeps
+// the SAME account reachable everywhere. linkWithRedirect() (not a fresh
+// signInWithRedirect) is used when there's already an anonymous session,
+// so the upgrade keeps the same uid - maps already made under the
+// anonymous session stay visible afterward instead of "disappearing"
+// behind a new identity.
 onAuthStateChanged(auth, (user) => {
   if (user) {
     currentUser = user;
-    authBadge.textContent = 'Connected (signed in anonymously).';
+    if (user.isAnonymous) {
+      authBadge.textContent = 'Connected (signed in anonymously).';
+      googleSignInBtn.style.display = 'inline-block';
+    } else {
+      authBadge.textContent = 'Signed in as ' + (user.email || user.uid) + '.';
+      googleSignInBtn.style.display = 'none';
+    }
     authBadge.classList.add('ready');
     refreshMyMaps();
   }
 });
 signInAnonymously(auth).catch((err) => {
   authBadge.textContent = 'Could not connect to Firebase: ' + err.message;
+});
+
+googleSignInBtn.addEventListener('click', async () => {
+  authBadge.textContent = 'Redirecting to Google…';
+  try {
+    if (auth.currentUser && auth.currentUser.isAnonymous) {
+      await linkWithRedirect(auth.currentUser, new GoogleAuthProvider());
+    } else {
+      await signInWithRedirect(auth, new GoogleAuthProvider());
+    }
+  } catch (err) {
+    authBadge.textContent = 'Google sign-in failed: ' + (err.code || err.message);
+  }
+});
+getRedirectResult(auth).catch((err) => {
+  // credential-already-in-use: this Google account is already linked to a
+  // DIFFERENT anonymous session elsewhere - fall back to a plain sign-in
+  // (switches to that existing account's maps rather than merging them).
+  if (err.code === 'auth/credential-already-in-use') {
+    signInWithRedirect(auth, new GoogleAuthProvider());
+  } else if (err.code) {
+    authBadge.textContent = 'Google sign-in failed: ' + err.code;
+  }
 });
 
 // ---------------------------------------------------------------------

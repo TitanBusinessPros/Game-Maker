@@ -61,7 +61,8 @@
   </div>
 
   <div id="deniedView" class="section">
-    <p>Signed in, but this account isn't authorized to manage the library.</p>
+    <p id="deniedMessage">Signed in, but this account isn't authorized to manage the library.</p>
+    <button type="button" class="btn-primary" id="signInGoogleFromDenied">Sign in with Google</button>
     <button type="button" class="btn-secondary" id="signOutBtnDenied">Sign out</button>
   </div>
 
@@ -176,6 +177,19 @@ getRedirectResult(auth).catch((err) => {
 });
 document.getElementById('signOutBtn').addEventListener('click', () => signOut(auth));
 document.getElementById('signOutBtnDenied').addEventListener('click', () => signOut(auth));
+// One click instead of "sign out, notice you're signed out, click sign in
+// again" - most people landing here are in exactly this state because an
+// anonymous session from the map creator (index.html) got restored
+// automatically before they ever clicked anything on this page at all,
+// not because they tried and failed to sign in with Google.
+document.getElementById('signInGoogleFromDenied').addEventListener('click', async () => {
+  try {
+    await signOut(auth);
+    await signInWithRedirect(auth, new GoogleAuthProvider());
+  } catch (err) {
+    setStatus(`Sign-in failed: ${err.code || ''} ${err.message}`, 'bad');
+  }
+});
 
 onAuthStateChanged(auth, (user) => {
   signedOutView.style.display = 'none';
@@ -188,6 +202,13 @@ onAuthStateChanged(auth, (user) => {
   const isAdmin = user.email === ADMIN_EMAIL && user.emailVerified;
   if (!isAdmin) {
     deniedView.style.display = 'block';
+    // The map creator (index.html) signs everyone in anonymously
+    // automatically - if that session carried over here before you ever
+    // clicked Sign In on this page, this is what shows up, and it's not
+    // a failed Google sign-in attempt at all.
+    document.getElementById('deniedMessage').textContent = user.isAnonymous
+      ? 'You’re only signed in anonymously here (that’s the map creator’s session carrying over, not a Google sign-in) — use the button below to actually sign in with Google.'
+      : `Signed in as ${user.email || 'this account'}, but it isn’t authorized to manage the library.`;
     return;
   }
   adminView.style.display = 'block';
