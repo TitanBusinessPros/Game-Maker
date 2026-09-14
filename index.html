@@ -964,10 +964,14 @@ async function refreshMyMaps() {
     const m = d.data();
     const li = document.createElement('li');
     const tagClass = m.status === 'complete' ? 'complete' : 'draft';
+    const playBtn = m.status === 'complete'
+      ? `<a class="btn-primary" style="text-decoration:none; padding:8px 14px; font-size:13px; border-radius:6px; display:inline-block;" href="play.html?map=${d.id}">▶ Play</a>`
+      : '';
     li.innerHTML = `
       <span>${escapeAttr(m.name || 'Untitled Map')} <span class="tag ${tagClass}">${m.status}</span></span>
       <span>
-        <button type="button" class="btn-secondary open-map" data-id="${d.id}">Open</button>
+        ${playBtn}
+        <button type="button" class="btn-secondary open-map" data-id="${d.id}">Edit</button>
         <button type="button" class="btn-danger delete-map" data-id="${d.id}">Delete</button>
       </span>
     `;

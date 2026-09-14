@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Play Map</title>
+<style>
+  :root { --bg: #0b0e14; --panel: #131926; --border: #2a3550; --text: #e8ecf5; --text-dim: #93a0bd; --good: #4fdc8f; --bad: #ff5f6d; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+  header { padding: 12px 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 16px; margin: 0; flex: 1; }
+  header a, header button { font-size: 12px; color: var(--text-dim); background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 6px 12px; text-decoration: none; cursor: pointer; }
+  #hud { display: flex; justify-content: space-between; padding: 8px 16px; font-size: 13px; }
+  #hud .good { color: var(--good); } #hud .bad { color: var(--bad); }
+  #canvasWrap { position: relative; width: 100%; max-width: 1000px; margin: 0 auto; }
+  canvas { width: 100%; height: auto; display: block; background: #06121f; }
+  #banner {
+    position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.75); flex-direction: column; gap: 14px; text-align: center; padding: 20px;
+  }
+  #banner.show { display: flex; }
+  #banner h2 { font-size: 28px; margin: 0; }
+  #status { text-align: center; padding: 30px 16px; color: var(--text-dim); }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="mapTitle">Loading map&hellip;</h1>
+  <a href="index.html" id="editLink">&larr; Back to editor</a>
+</header>
+<div id="hud" hidden>
+  <span class="good" id="goodHud"></span>
+  <span class="bad" id="badHud"></span>
+</div>
+<div id="canvasWrap">
+  <canvas id="canvas" width="1000" height="560"></canvas>
+  <div id="banner">
+    <h2 id="bannerText"></h2>
+    <button type="button" id="restartBtn" style="padding:10px 20px; font-size:14px; cursor:pointer;">Play Again</button>
+  </div>
+</div>
+<p id="status"></p>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
+import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAJ-zJW3Z25mGucMA-hnO67yn-7Q5VgF1c",
+  authDomain: "game-maker-ed014.firebaseapp.com",
+  projectId: "game-maker-ed014",
+  storageBucket: "game-maker-ed014.firebasestorage.app",
+  messagingSenderId: "865333148999",
+  appId: "1:865333148999:web:689d470ba6a99e62806062",
+};
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const statusEl = document.getElementById('status');
+const mapId = new URLSearchParams(location.search).get('map');
+if (!mapId) {
+  statusEl.textContent = 'No map specified. Open a map from the editor’s "My Maps" list first.';
+  throw new Error('no map id');
+}
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+
+// ---------------------------------------------------------------------
+// Tunables for this minimal playable slice. The map's own uploaded art
+// and per-unit hp/attack/range/speed/cost drive everything visible; these
+// are just the constants needed to turn that data into a running scene.
+// ---------------------------------------------------------------------
+const HOMEWORLD_HP = 1000;
+const UNITS_PER_TYPE = 3;
+const MOVE_PIXELS_PER_SPEED_PER_SEC = 18; // turns a unit's "speed" stat into on-screen px/s
+const ATTACK_INTERVAL_SEC = 1;
+const UNIT_SIZE = 34;
+const HOMEWORLD_SIZE = 90;
+
+function loadImage(url) {
+  return new Promise((resolve) => {
+    if (!url) { resolve(null); return; }
+    const img = new Image();
+    // No crossOrigin here on purpose: drawImage() onto the canvas works
+    // fine without it (it only "taints" the canvas for pixel readback,
+    // which this page never does) and Storage's download URLs don't need
+    // to serve CORS headers for a plain, non-crossOrigin image load.
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+}
+
+async function main() {
+  statusEl.textContent = 'Loading map data…';
+  const snap = await getDoc(doc(db, 'maps', mapId));
+  if (!snap.exists()) {
+    statusEl.textContent = 'This map doesn’t exist (it may have been deleted).';
+    return;
+  }
+  const map = snap.data();
+  document.getElementById('mapTitle').textContent = map.name || 'Untitled Map';
+  document.getElementById('editLink').href = `index.html?map=${mapId}`;
+
+  statusEl.textContent = 'Loading art…';
+  const [bgImg, goodImg, badImg, resourceImg, miningImg] = await Promise.all([
+    loadImage(map.backgroundImage),
+    loadImage(map.factions?.good?.baseImage),
+    loadImage(map.factions?.bad?.baseImage),
+    loadImage(map.resource?.image),
+    loadImage(map.miningUnit?.image),
+  ]);
+  const unitImages = await Promise.all((map.units || []).map((u) => loadImage(u.imageUrl)));
+  statusEl.textContent = '';
+
+  // ---------------------------------------------------------------------
+  // Entities
+  // ---------------------------------------------------------------------
+  const homeworlds = {
+    good: { x: 90, y: H / 2, hp: HOMEWORLD_HP, maxHp: HOMEWORLD_HP, img: goodImg, side: 'good', isHomeworld: true, name: map.factions?.good?.name || 'Good', color: '#4fdc8f' },
+    bad: { x: W - 90, y: H / 2, hp: HOMEWORLD_HP, maxHp: HOMEWORLD_HP, img: badImg, side: 'bad', isHomeworld: true, name: map.factions?.bad?.name || 'Bad', color: '#ff5f6d' },
+  };
+
+  const units = [];
+  const unitDefs = map.units || [];
+  ['good', 'bad'].forEach((side) => {
+    const home = homeworlds[side];
+    unitDefs.forEach((def, defIndex) => {
+      for (let i = 0; i < UNITS_PER_TYPE; i++) {
+        units.push({
+          side,
+          name: def.name,
+          img: unitImages[defIndex],
+          hp: def.hp, maxHp: def.hp,
+          attack: def.attack, range: def.range, speed: def.speed,
+          x: home.x + (side === 'good' ? 40 : -40) + (Math.random() - 0.5) * 60,
+          y: 60 + (defIndex * UNITS_PER_TYPE + i) * (H - 120) / (unitDefs.length * UNITS_PER_TYPE || 1),
+          attackCooldown: Math.random() * ATTACK_INTERVAL_SEC,
+          target: null,
+          alive: true,
+        });
+      }
+    });
+  });
+
+  let resourcesGood = map.resource?.size || 0;
+  let resourcesBad = map.resource?.size || 0;
+  const ratePerSec = (map.miningUnit?.ratePerHour || 0) / 3600;
+
+  document.getElementById('hud').hidden = false;
+  const goodHud = document.getElementById('goodHud');
+  const badHud = document.getElementById('badHud');
+
+  function livingUnits(side) { return units.filter((u) => u.alive && u.side === side); }
+
+  function nearestEnemy(unit) {
+    const enemySide = unit.side === 'good' ? 'bad' : 'good';
+    let best = null, bestDist = Infinity;
+    for (const u of livingUnits(enemySide)) {
+      const d = Math.hypot(u.x - unit.x, u.y - unit.y);
+      if (d < bestDist) { best = u; bestDist = d; }
+    }
+    const home = homeworlds[enemySide];
+    const homeDist = Math.hypot(home.x - unit.x, home.y - unit.y);
+    if (homeDist < bestDist) best = home;
+    return best;
+  }
+
+  let gameOver = false;
+  let lastTime = performance.now();
+
+  function update(dt) {
+    if (gameOver) return;
+    resourcesGood += ratePerSec * dt;
+    resourcesBad += ratePerSec * dt;
+
+    for (const unit of units) {
+      if (!unit.alive) continue;
+      if (!unit.target || unit.target.hp <= 0 || (unit.target.alive === false)) {
+        unit.target = nearestEnemy(unit);
+      }
+      const t = unit.target;
+      if (!t) continue;
+      const dist = Math.hypot(t.x - unit.x, t.y - unit.y);
+      if (dist > unit.range) {
+        const speedPxSec = unit.speed * MOVE_PIXELS_PER_SPEED_PER_SEC;
+        unit.x += (t.x - unit.x) / dist * speedPxSec * dt;
+        unit.y += (t.y - unit.y) / dist * speedPxSec * dt;
+      } else {
+        unit.attackCooldown -= dt;
+        if (unit.attackCooldown <= 0) {
+          unit.attackCooldown = ATTACK_INTERVAL_SEC;
+          t.hp -= unit.attack;
+          if (t.hp <= 0) { t.hp = 0; if (!t.isHomeworld) t.alive = false; }
+        }
+      }
+    }
+
+    if (homeworlds.good.hp <= 0 || homeworlds.bad.hp <= 0) {
+      gameOver = true;
+      const winner = homeworlds.good.hp <= 0 ? homeworlds.bad : homeworlds.good;
+      document.getElementById('bannerText').textContent = `${winner.name} wins!`;
+      document.getElementById('banner').classList.add('show');
+    }
+  }
+
+  function drawEntity(e, size) {
+    if (e.img) {
+      ctx.drawImage(e.img, e.x - size / 2, e.y - size / 2, size, size);
+    } else {
+      ctx.fillStyle = e.side === 'good' ? '#4fdc8f' : '#ff5f6d';
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, size / 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // HP bar
+    const barW = size;
+    const pct = Math.max(0, e.hp / e.maxHp);
+    ctx.fillStyle = '#2a3550';
+    ctx.fillRect(e.x - barW / 2, e.y - size / 2 - 8, barW, 4);
+    ctx.fillStyle = e.side === 'good' ? '#4fdc8f' : '#ff5f6d';
+    ctx.fillRect(e.x - barW / 2, e.y - size / 2 - 8, barW * pct, 4);
+  }
+
+  function render() {
+    ctx.clearRect(0, 0, W, H);
+    if (bgImg) {
+      // Cover-fit instead of stretch-to-fill, so a real (non-square) photo
+      // isn't visibly distorted - scale uniformly, crop the overflow.
+      const scale = Math.max(W / bgImg.width, H / bgImg.height);
+      const dw = bgImg.width * scale, dh = bgImg.height * scale;
+      ctx.drawImage(bgImg, (W - dw) / 2, (H - dh) / 2, dw, dh);
+    } else {
+      ctx.fillStyle = '#06121f'; ctx.fillRect(0, 0, W, H);
+    }
+
+    // Resource deposits + mining units, purely decorative in this slice
+    if (resourceImg) ctx.drawImage(resourceImg, homeworlds.good.x - 20, homeworlds.good.y - 80, 40, 40);
+    if (resourceImg) ctx.drawImage(resourceImg, homeworlds.bad.x - 20, homeworlds.bad.y - 80, 40, 40);
+    if (miningImg) ctx.drawImage(miningImg, homeworlds.good.x - 15, homeworlds.good.y - 30, 30, 30);
+    if (miningImg) ctx.drawImage(miningImg, homeworlds.bad.x - 15, homeworlds.bad.y - 30, 30, 30);
+
+    drawEntity(homeworlds.good, HOMEWORLD_SIZE);
+    drawEntity(homeworlds.bad, HOMEWORLD_SIZE);
+    for (const u of units) { if (u.alive) drawEntity(u, UNIT_SIZE); }
+
+    goodHud.textContent = `${homeworlds.good.name}: ${Math.round(homeworlds.good.hp)} HP · ${Math.round(resourcesGood)} ${map.resource?.name || 'resources'} · ${livingUnits('good').length} units`;
+    badHud.textContent = `${homeworlds.bad.name}: ${Math.round(homeworlds.bad.hp)} HP · ${Math.round(resourcesBad)} ${map.resource?.name || 'resources'} · ${livingUnits('bad').length} units`;
+  }
+
+  function loop(now) {
+    const dt = Math.min(0.05, (now - lastTime) / 1000);
+    lastTime = now;
+    update(dt);
+    render();
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+
+  document.getElementById('restartBtn').addEventListener('click', () => location.reload());
+}
+
+main().catch((err) => {
+  console.error(err);
+  statusEl.textContent = 'Could not load this map: ' + err.message;
+});
+</script>
+</body>
+</html>
