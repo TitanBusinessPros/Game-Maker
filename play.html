@@ -569,6 +569,15 @@ async function main() {
   // (not screen space) so they pan/zoom with the camera instead of
   // sliding independently.
   const bgPattern = bgImg ? ctx.createPattern(bgImg, 'repeat') : null;
+  // Scale the tile itself by the same sizeMult that scales the world
+  // (Tiny=1x .. Large=12x, see MAP_SIZE_MULTIPLIER above). Without this,
+  // the pattern was one fixed native-pixel tile regardless of map size,
+  // so a chosen map size never actually changed how the uploaded
+  // background looked - Large just repeated the same small tile many
+  // more times instead of appearing as a proportionally bigger map.
+  if (bgPattern && bgPattern.setTransform) {
+    bgPattern.setTransform(new DOMMatrix().scale(sizeMult));
+  }
 
   // Draws an image FIT inside a maxSize x maxSize box, preserving its own
   // aspect ratio (the longer side equals maxSize), instead of forcing it
@@ -708,10 +717,13 @@ async function main() {
     camera.y = worldY;
     if (matchStarted && !gameOver && !paused) {
       const sel = selectedUnits();
-      sel.forEach((u) => {
-        if (turnNumber < u.lockedUntilTurn) return; // attacked this turn - can't take a new order yet
-        u.orderType = 'move'; u.moveTarget = { x: worldX, y: worldY }; u.target = null;
-      });
+      if (sel.length) {
+        sel.forEach((u) => {
+          if (turnNumber < u.lockedUntilTurn) return; // attacked this turn - can't take a new order yet
+          u.orderType = 'move'; u.moveTarget = { x: worldX, y: worldY }; u.target = null;
+        });
+        deselectAll(); // see handleClick's comment - same "stuck to the mouse" fix applies here
+      }
     }
   });
 
@@ -809,6 +821,13 @@ async function main() {
       if (target) { u.orderType = 'attack'; u.target = target; u.moveTarget = null; }
       else { u.orderType = 'move'; u.moveTarget = { x: p.x, y: p.y }; u.target = null; }
     });
+    // The order is issued - drop the selection so the unit stops trailing
+    // every future click. Without this, a selected unit stayed selected
+    // forever (only the Deselect button/Escape cleared it), so any later
+    // click anywhere on the map - even one meant to just look around -
+    // re-issued it a new move/attack order, which read as the unit being
+    // "stuck to the mouse."
+    deselectAll();
   }
 
   function showUnitInfo(u, count) {
