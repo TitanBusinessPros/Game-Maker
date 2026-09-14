@@ -91,11 +91,22 @@
   .upload-slot {
     display: flex;
     align-items: center;
-    gap: 10px;
+    flex-wrap: wrap;
+    gap: 8px 10px;
     background: var(--panel-2);
     border: 1px dashed var(--border);
     border-radius: 8px;
     padding: 8px;
+  }
+  /* The file input + Library button wrap onto their own line together
+     (not separately) when a slot is too narrow to fit everything on one
+     line - most often the sound section, which pairs two slots per row. */
+  .upload-slot-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-left: auto;
   }
   .upload-slot .thumb {
     width: 44px; height: 44px;
@@ -106,9 +117,9 @@
     display: flex; align-items: center; justify-content: center;
     font-size: 10px; color: var(--text-dim);
   }
-  .upload-slot .meta { flex: 1; min-width: 0; }
-  .upload-slot .meta .name { font-size: 13px; }
-  .upload-slot .meta .status { font-size: 11px; color: var(--text-dim); }
+  .upload-slot .meta { flex: 1; min-width: 60px; }
+  .upload-slot .meta .name { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .upload-slot .meta .status { font-size: 11px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .btn-library {
     background: var(--panel); color: var(--accent); border: 1px solid var(--accent);
     font-size: 11px; padding: 6px 10px; white-space: nowrap;
@@ -510,7 +521,17 @@ function wireUploadSlot(slot) {
   libraryBtn.className = 'btn-library';
   libraryBtn.textContent = '📚 Library';
   libraryBtn.addEventListener('click', () => openLibraryPicker(slot.dataset.slot, mediaType));
-  input.insertAdjacentElement('afterend', libraryBtn);
+  // The file input and Library button need to wrap onto their own line
+  // together (not separately) when a slot sits in a narrow two-column row
+  // (the sound section pairs two slots per row) - grouping them in one
+  // wrapper is what makes that a clean single extra line instead of the
+  // native file-picker control and this button squeezing/overlapping the
+  // name/status text.
+  const controls = document.createElement('div');
+  controls.className = 'upload-slot-controls';
+  input.insertAdjacentElement('afterend', controls);
+  controls.appendChild(input);
+  controls.appendChild(libraryBtn);
 }
 
 document.querySelectorAll('.upload-slot').forEach(wireUploadSlot);
