@@ -46,9 +46,18 @@
   .techRow.done { opacity:0.5; }
   .techRow.active button { background:var(--warn); }
   #minimapWrap {
-    position:absolute; bottom:10px; right:10px; z-index:12; width:180px; height:180px;
+    position:absolute; bottom:10px; right:330px; z-index:12; width:180px; height:180px;
     border:1px solid var(--border); border-radius:6px; overflow:hidden; background:#06121f;
+    transition: right .2s;
   }
+  /* The side panel (320px + 10px gap) sits on top of it (higher z-index)
+     otherwise - the minimap was genuinely unclickable, and likely
+     invisible too, the whole time the build/research panel was open
+     (which is the default state), found via testing a real click on it.
+     minimapWrap.panel-collapsed is toggled in JS alongside #sidePanel's
+     own .collapsed, since minimapWrap comes before it in the DOM (a
+     ~ sibling selector can't reach backwards). */
+  #minimapWrap.panel-collapsed { right: 10px; }
   #banner {
     position:absolute; inset:0; z-index:40; display:none; align-items:center; justify-content:center; flex-direction:column; gap:14px;
     background:rgba(0,0,0,0.85); text-align:center; padding:20px;
@@ -511,6 +520,20 @@ async function main() {
   function toScreen(x, y) { return { x: x - camera.x, y: y - camera.y }; }
   function toWorld(x, y) { return { x: x + camera.x, y: y + camera.y }; }
 
+  // Background art anchored once in WORLD space, cover-fit to the whole
+  // galaxy's bounding box (same idea as After Earth's own
+  // applyMapBackground() - a real world object, not a screen-space
+  // parallax trick) - previously it was a fixed-size image nudged by a
+  // fraction of the camera's own movement, which only ever covered a
+  // small part of the screen once you panned away from the start
+  // position, showing as a hard-edged black box everywhere else.
+  let bgDraw = null;
+  if (bgImg) {
+    const scale = Math.max(worldW / bgImg.width, worldH / bgImg.height);
+    const dw = bgImg.width * scale, dh = bgImg.height * scale;
+    bgDraw = { x: worldCenter.x - dw / 2, y: worldCenter.y - dh / 2, w: dw, h: dh };
+  }
+
   function drawFactionHome(f) {
     const p = toScreen(f.x, f.y);
     const size = HOMEWORLD_SIZE;
@@ -557,13 +580,17 @@ async function main() {
 
   function render() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    if (bgImg) {
-      const scale = Math.max(canvas.width / bgImg.width, canvas.height / bgImg.height);
-      const dw = bgImg.width * scale, dh = bgImg.height * scale;
+    // Solid fallback first, always - so panning anywhere the background
+    // image doesn't cover shows the game's own dark background, never a
+    // stark black/empty rectangle.
+    ctx.fillStyle = '#06121f';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    if (bgImg && bgDraw) {
+      const p = toScreen(bgDraw.x, bgDraw.y);
       ctx.save(); ctx.globalAlpha = 0.5;
-      ctx.drawImage(bgImg, -camera.x * 0.2, -camera.y * 0.2, dw, dh);
+      ctx.drawImage(bgImg, p.x, p.y, bgDraw.w, bgDraw.h);
       ctx.restore();
-    } else { ctx.fillStyle = '#06121f'; ctx.fillRect(0, 0, canvas.width, canvas.height); }
+    }
 
     for (const d of deposits) drawDeposit(d);
     for (const f of factions) if (f.hp > 0) drawFactionHome(f);
@@ -604,6 +631,19 @@ async function main() {
     const tl = toMini(camera.x, camera.y), br = toMini(camera.x + canvas.width, camera.y + canvas.height);
     mctx.strokeStyle = 'rgba(255,255,255,0.6)'; mctx.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
   }
+
+  // Click the minimap to jump the camera straight to that part of the map
+  // - inverse of toMini() above (minimap pixel -> world coordinate),
+  // centered under the click the same way the main canvas centers on the
+  // player's homeworld at the start.
+  minimap.style.cursor = 'pointer';
+  minimap.addEventListener('click', (evt) => {
+    const r = minimap.getBoundingClientRect();
+    const mx = (evt.clientX - r.left) * (180 / r.width), my = (evt.clientY - r.top) * (180 / r.height);
+    const worldX = mx / (180 / worldW) + worldMinX, worldY = my / (180 / worldH) + worldMinY;
+    camera.x = worldX - canvas.width / 2;
+    camera.y = worldY - canvas.height / 2;
+  });
 
   // ---------------------------------------------------------------------
   // Player controls: left-drag = box-select (multiple units at once),
@@ -771,7 +811,10 @@ async function main() {
       document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
     });
   });
-  document.getElementById('panelToggleBtn').addEventListener('click', () => document.getElementById('sidePanel').classList.toggle('collapsed'));
+  document.getElementById('panelToggleBtn').addEventListener('click', () => {
+    document.getElementById('sidePanel').classList.toggle('collapsed');
+    document.getElementById('minimapWrap').classList.toggle('panel-collapsed');
+  });
   document.getElementById('restartBtn').addEventListener('click', () => location.reload());
 
   function serializeState() {

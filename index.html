@@ -433,7 +433,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/fireba
 import { getAnalytics, isSupported as analyticsIsSupported } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-analytics.js";
 import {
   getAuth, onAuthStateChanged,
-  GoogleAuthProvider, linkWithRedirect, signInWithRedirect, getRedirectResult
+  GoogleAuthProvider, signInWithRedirect, getRedirectResult
 } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
 import {
   getFirestore, doc, setDoc, getDoc, collection, query, where, getDocs, serverTimestamp, deleteDoc
@@ -469,12 +469,20 @@ const mainEl = document.querySelector('main');
 const saveBarEl = document.getElementById('saveBar');
 let currentUser = null;
 
-// Google sign-in is now required before the page unlocks at all - no more
-// automatic anonymous session. (Any anonymous session left over from
-// BEFORE this requirement existed is treated as "not signed in" here too
-// - the gate stays up - but Sign In still links it via linkWithRedirect
-// rather than abandoning it, so maps already made under that old
-// anonymous session stay reachable instead of orphaned.)
+// Google sign-in is required before the page unlocks at all - no more
+// automatic anonymous session.
+//
+// This used to try linkWithRedirect() first (to preserve an old anonymous
+// session's maps when upgrading to Google) - dropped after a real report
+// of signing in with Google and landing back on "not signed in yet."
+// Likely cause: the same Google account had already been used to sign in
+// for real elsewhere (e.g. the admin page), which creates its own
+// separate, real Firebase account for that email - linking a DIFFERENT
+// (anonymous) session to an already-claimed credential fails with
+// auth/credential-already-in-use, and chaining a second redirect from
+// inside that failure handler was fragile. Always doing a plain sign-in
+// (same proven pattern the admin page already uses) trades away
+// preserving old anonymous-session maps for actually working reliably.
 onAuthStateChanged(auth, (user) => {
   if (user && !user.isAnonymous) {
     currentUser = user;
@@ -487,31 +495,22 @@ onAuthStateChanged(auth, (user) => {
     authGate.style.display = 'flex';
     mainEl.style.display = 'none';
     saveBarEl.style.display = 'none';
-    authBadge.textContent = user && user.isAnonymous ? 'Not signed in yet.' : 'Not signed in.';
+    authBadge.textContent = 'Not signed in yet.';
   }
 });
 
 googleSignInBtn.addEventListener('click', async () => {
   authBadge.textContent = 'Redirecting to Google…';
   try {
-    if (auth.currentUser && auth.currentUser.isAnonymous) {
-      await linkWithRedirect(auth.currentUser, new GoogleAuthProvider());
-    } else {
-      await signInWithRedirect(auth, new GoogleAuthProvider());
-    }
+    await signInWithRedirect(auth, new GoogleAuthProvider());
   } catch (err) {
     authBadge.textContent = 'Google sign-in failed: ' + (err.code || err.message);
   }
 });
-getRedirectResult(auth).catch((err) => {
-  // credential-already-in-use: this Google account is already linked to a
-  // DIFFERENT anonymous session elsewhere - fall back to a plain sign-in
-  // (switches to that existing account's maps rather than merging them).
-  if (err.code === 'auth/credential-already-in-use') {
-    signInWithRedirect(auth, new GoogleAuthProvider());
-  } else if (err.code) {
-    authBadge.textContent = 'Google sign-in failed: ' + err.code;
-  }
+getRedirectResult(auth).then((result) => {
+  if (result && result.user) authBadge.textContent = 'Signed in as ' + (result.user.email || result.user.uid) + '…';
+}).catch((err) => {
+  authBadge.textContent = 'Google sign-in failed: ' + (err.code || err.message);
 });
 
 // ---------------------------------------------------------------------
