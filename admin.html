@@ -209,7 +209,40 @@ function niceName(filename) {
   return filename.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim();
 }
 
+// Same reasoning as the main map creator: library art gets picked from a
+// small grid and drawn small in-game, so there's no reason to keep a
+// multi-MB source photo around - shrink it before it ever leaves the
+// browser, which is the one thing that actually speeds up the upload.
+const MAX_IMAGE_DIMENSION = 768;
+const IMAGE_QUALITY = 0.85;
+
+async function compressImageFile(file) {
+  if (!file.type.startsWith('image/') || file.type === 'image/gif') return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, MAX_IMAGE_DIMENSION / Math.max(bitmap.width, bitmap.height));
+    const w = Math.round(bitmap.width * scale);
+    const h = Math.round(bitmap.height * scale);
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    canvas.getContext('2d').drawImage(bitmap, 0, 0, w, h);
+    let blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/webp', IMAGE_QUALITY));
+    let outType = 'image/webp';
+    if (!blob) {
+      outType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+      blob = await new Promise((resolve) => canvas.toBlob(resolve, outType, IMAGE_QUALITY));
+    }
+    if (!blob || blob.size >= file.size) return file;
+    return new File([blob], file.name.replace(/\.[^.]+$/, '') + '.' + outType.split('/')[1], { type: outType });
+  } catch (err) {
+    console.error('Image compression failed, uploading original file instead:', err);
+    return file;
+  }
+}
+
 async function uploadOneFile(file, category) {
+  file = await compressImageFile(file);
   const type = file.type.startsWith('audio') ? 'audio' : 'image';
   const path = `library/${category}/${Date.now()}_${file.name}`;
   const ref = storageRef(storage, path);
