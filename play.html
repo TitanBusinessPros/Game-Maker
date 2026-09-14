@@ -116,7 +116,10 @@
   <canvas id="canvas"></canvas>
   <div id="dragBox" class="selbox" style="display:none;"></div>
 
-  <div id="unitInfoBox"></div>
+  <div id="unitInfoBox">
+    <div id="unitInfoText"></div>
+    <button type="button" id="deselectBtn" style="margin-top:6px; width:100%; background:var(--panel); color:var(--text); border:1px solid var(--border); border-radius:5px; padding:5px; font-size:11px; cursor:pointer;">&#10005; Deselect</button>
+  </div>
   <div id="minimapWrap"><canvas id="minimap" width="180" height="180"></canvas></div>
 
   <div id="sidePanel">
@@ -213,11 +216,11 @@ const TECH_TREE = {
 const HOMEWORLD_HP = 1000;
 const TURN_SECONDS = 90;
 const MOVE_PX_PER_SPEED = 20;
-const ATTACK_INTERVAL = 1;
 const UNIT_SIZE = 34;
 const HOMEWORLD_SIZE = 90;
 const DEPOSIT_SIZE = 56;
 const AI_TICK_SECONDS = 6;
+const MINING_RANGE = 80; // how close a Mining Ship has to be to its deposit to actually earn resources
 const MAP_SIZE_MULTIPLIER = { tiny: 1, small: 3, medium: 6, large: 12 };
 const BASE_HOME_RADIUS = 420;
 
@@ -336,18 +339,27 @@ async function main() {
       hp: Math.round(effectiveStat(fac, def.hp, 'hp')), maxHp: Math.round(effectiveStat(fac, def.hp, 'hp')),
       attack: def.attack, range: def.range, speed: effectiveStat(fac, def.speed, 'speed'),
       img: unitImages[defIndex], x, y, alive: true, selected: false,
-      orderType: null, moveTarget: null, target: null, attackCooldown: Math.random() * ATTACK_INTERVAL,
+      orderType: null, moveTarget: null, target: null,
       lockedUntilTurn: 0, facingAngle: 0,
     };
     units.push(u);
     return u;
   }
   function spawnMiner(factionId, x, y) {
+    // Auto-orders itself to its own faction's deposit the moment it's
+    // built - matching the real "a Mining Ship parked within range of a
+    // deposit drains it" mechanic, and giving it an actual reason to move
+    // instead of just sitting at its spawn point forever (see the
+    // isMiner-gated movement fix in update() below - previously nothing
+    // in the whole update loop moved a miner at all, regardless of any
+    // order it held).
+    const deposit = deposits.find((d) => d.factionId === factionId);
     const u = {
       id: nextUnitId++, factionId, defIndex: -1, isMiner: true,
       hp: 40, maxHp: 40, attack: 0, range: 0, speed: 1.6,
       img: miningImg, x, y, alive: true, selected: false,
-      orderType: null, moveTarget: null, target: null, attackCooldown: 0, lockedUntilTurn: 0, facingAngle: 0,
+      orderType: deposit ? 'move' : null, moveTarget: deposit ? { x: deposit.x, y: deposit.y } : null,
+      target: null, lockedUntilTurn: 0, facingAngle: 0,
     };
     units.push(u);
     return u;
@@ -387,31 +399,38 @@ async function main() {
     return Math.atan2(ty - u.y, tx - u.x) + Math.PI / 2;
   }
 
+  function runMoveOrder(u, dt) {
+    const dx = u.moveTarget.x - u.x, dy = u.moveTarget.y - u.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 4) { u.orderType = null; u.moveTarget = null; }
+    else {
+      u.facingAngle = facingToward(u, u.moveTarget.x, u.moveTarget.y);
+      const sp = u.speed * MOVE_PX_PER_SPEED; u.x += dx / dist * sp * dt; u.y += dy / dist * sp * dt;
+    }
+  }
+
   function combatTick(u, dt) {
     const t = u.target;
     if (!t || t.hp <= 0 || t.alive === false) { u.target = null; return; }
+    // A unit that already attacked this turn does nothing else at all
+    // until the next one - not "wait 1 second and fire again." One
+    // attack per turn, full stop, same rule that locks it out of new
+    // move orders (they're the same lock now, not two separate systems).
+    if (turnNumber < u.lockedUntilTurn) return;
     const dist = Math.hypot(t.x - u.x, t.y - u.y);
     u.facingAngle = facingToward(u, t.x, t.y);
     if (dist > u.range) {
-      if (turnNumber >= u.lockedUntilTurn) {
-        const sp = u.speed * MOVE_PX_PER_SPEED;
-        u.x += (t.x - u.x) / dist * sp * dt; u.y += (t.y - u.y) / dist * sp * dt;
-      }
+      const sp = u.speed * MOVE_PX_PER_SPEED;
+      u.x += (t.x - u.x) / dist * sp * dt; u.y += (t.y - u.y) / dist * sp * dt;
     } else {
-      u.attackCooldown -= dt;
-      if (u.attackCooldown <= 0) {
-        u.attackCooldown = ATTACK_INTERVAL;
-        t.hp -= u.attack;
-        fireBeam(u, t);
-        playSfx(sounds.attack);
-        // Attacking locks a unit in place until the next turn - it can
-        // keep firing from where it stands, it just can't reposition.
-        u.lockedUntilTurn = turnNumber + 1;
-        if (t.hp <= 0) {
-          t.hp = 0;
-          if (t.maxHp === undefined || t.isFactionHome) playSfx(sounds.homeUnderAttack);
-          if (!t.isFactionHome && t.alive !== undefined) { t.alive = false; playSfx(sounds.buildingDestroyed); }
-        }
+      t.hp -= u.attack;
+      fireBeam(u, t);
+      playSfx(sounds.attack);
+      u.lockedUntilTurn = turnNumber + 1;
+      if (t.hp <= 0) {
+        t.hp = 0;
+        if (t.maxHp === undefined || t.isFactionHome) playSfx(sounds.homeUnderAttack);
+        if (!t.isFactionHome && t.alive !== undefined) { t.alive = false; playSfx(sounds.buildingDestroyed); }
       }
     }
   }
@@ -463,8 +482,13 @@ async function main() {
         f.research.active.remaining -= dt;
         if (f.research.active.remaining <= 0) { f.research.researched.add(f.research.active.id); f.research.active = null; renderBuildPanel(); renderResearchPanel(); }
       }
+      // Income only flows while the miner is actually parked within range
+      // of its faction's own deposit - matching "a Mining Ship parked
+      // within range of a deposit drains it," not "having built one ever
+      // is enough regardless of where it is."
       const miner = units.find((u) => u.alive && u.factionId === f.id && u.isMiner);
-      if (miner) {
+      const deposit = deposits.find((d) => d.factionId === f.id);
+      if (miner && deposit && Math.hypot(miner.x - deposit.x, miner.y - deposit.y) < MINING_RANGE) {
         let rate = 600;
         if (techBonus(f, 'mining_900')) rate = 900;
         if (techBonus(f, 'mining_1200')) rate = 1200;
@@ -482,20 +506,20 @@ async function main() {
     for (const u of units) {
       if (!u.alive) continue;
       const fac = factionOf(u.factionId);
-      if (!fac.isPlayer && !u.isMiner) {
+      if (u.isMiner) {
+        // Nothing moved a miner at all before this - it had orderType/
+        // moveTarget fields but this loop only ever branched on
+        // (isPlayer && !isMiner) or (!isPlayer && !isMiner), so a miner
+        // just sat frozen at its spawn point forever regardless of any
+        // order it held. Reuses the same move-toward-point logic as a
+        // player-commanded unit.
+        if (u.orderType === 'move' && u.moveTarget) runMoveOrder(u, dt);
+      } else if (!fac.isPlayer) {
         if (!u.target) u.target = nearestEnemy(u);
         combatTick(u, dt);
-      } else if (fac.isPlayer && !u.isMiner) {
+      } else {
         if (u.orderType === 'attack' && u.target) combatTick(u, dt);
-        else if (u.orderType === 'move' && u.moveTarget && turnNumber >= u.lockedUntilTurn) {
-          const dx = u.moveTarget.x - u.x, dy = u.moveTarget.y - u.y;
-          const dist = Math.hypot(dx, dy);
-          if (dist < 4) { u.orderType = null; u.moveTarget = null; }
-          else {
-            u.facingAngle = facingToward(u, u.moveTarget.x, u.moveTarget.y);
-            const sp = u.speed * MOVE_PX_PER_SPEED; u.x += dx / dist * sp * dt; u.y += dy / dist * sp * dt;
-          }
-        }
+        else if (u.orderType === 'move' && u.moveTarget && turnNumber >= u.lockedUntilTurn) runMoveOrder(u, dt);
       }
     }
 
@@ -535,17 +559,16 @@ async function main() {
   // fraction of the camera's own movement, which only ever covered a
   // small part of the screen once you panned away from the start
   // position, showing as a hard-edged black box everywhere else.
-  let bgDraw = null;
-  if (bgImg) {
-    // Capped at 3x so a smallish source photo doesn't get blown up huge
-    // and blurry on a Medium/Large map - past that, the solid dark
-    // fallback fill (see render()) shows around the edges instead, which
-    // reads better than a heavily stretched, soft image filling the
-    // whole thing.
-    const scale = Math.min(3, Math.max(worldW / bgImg.width, worldH / bgImg.height));
-    const dw = bgImg.width * scale, dh = bgImg.height * scale;
-    bgDraw = { x: worldCenter.x - dw / 2, y: worldCenter.y - dh / 2, w: dw, h: dh };
-  }
+  // Tiled instead of stretched-to-fit: a single image stretched to cover
+  // the whole world either blurs badly on a big map (stretched far past
+  // its native resolution) or, capped to avoid that, leaves most of a
+  // Large map black - reported both ways ("black box" earlier, then "map
+  // is down in the corner, everywhere else black" on Large specifically).
+  // Tiling stays sharp at any map size and always fully covers it, with
+  // ctx's own transform matrix keeping the tiles aligned to world space
+  // (not screen space) so they pan/zoom with the camera instead of
+  // sliding independently.
+  const bgPattern = bgImg ? ctx.createPattern(bgImg, 'repeat') : null;
 
   // Draws an image FIT inside a maxSize x maxSize box, preserving its own
   // aspect ratio (the longer side equals maxSize), instead of forcing it
@@ -616,10 +639,17 @@ async function main() {
     // stark black/empty rectangle.
     ctx.fillStyle = '#06121f';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    if (bgImg && bgDraw) {
-      const p = toScreen(bgDraw.x, bgDraw.y);
-      ctx.save(); ctx.globalAlpha = 0.5;
-      ctx.drawImage(bgImg, p.x, p.y, bgDraw.w, bgDraw.h);
+    if (bgPattern) {
+      ctx.save();
+      ctx.globalAlpha = 0.55;
+      // Align the pattern to WORLD space: set the canvas transform so
+      // world (0,0) lands wherever toScreen(0,0) would put it, then fill
+      // a world-space rect covering exactly what's on screen. The tiles
+      // then pan/zoom with the camera instead of sliding across it.
+      ctx.setTransform(camera.zoom, 0, 0, camera.zoom, canvas.width / 2 - camera.x * camera.zoom, canvas.height / 2 - camera.y * camera.zoom);
+      ctx.fillStyle = bgPattern;
+      const viewX = camera.x - canvas.width / (2 * camera.zoom), viewY = camera.y - canvas.height / (2 * camera.zoom);
+      ctx.fillRect(viewX, viewY, canvas.width / camera.zoom, canvas.height / camera.zoom);
       ctx.restore();
     }
 
@@ -783,16 +813,23 @@ async function main() {
 
   function showUnitInfo(u, count) {
     const box = document.getElementById('unitInfoBox');
+    const textEl = document.getElementById('unitInfoText');
     if (!u) {
       box.style.display = count ? 'block' : 'none';
-      if (count) box.innerHTML = `<strong>${count} units selected</strong>`;
+      if (count) textEl.innerHTML = `<strong>${count} units selected</strong>`;
       return;
     }
     const def = u.isMiner ? { name: cfg.miningUnit?.name || 'Mining Ship' } : unitDefs[u.defIndex];
     box.style.display = 'block';
-    box.innerHTML = `<strong>${def.name}</strong><br>HP ${Math.round(u.hp)}/${u.maxHp}${u.isMiner ? '' : ` · ATK ${u.attack} · RNG ${u.range} · SPD ${u.speed.toFixed(1)}`}${turnNumber < u.lockedUntilTurn ? '<br><span style="color:var(--warn)">🔒 locked until next turn</span>' : ''}`;
+    textEl.innerHTML = `<strong>${def.name}</strong><br>HP ${Math.round(u.hp)}/${u.maxHp}${u.isMiner ? '' : ` · ATK ${u.attack} · RNG ${u.range} · SPD ${u.speed.toFixed(1)}`}${turnNumber < u.lockedUntilTurn ? '<br><span style="color:var(--warn)">🔒 locked until next turn</span>' : ''}`;
   }
   function hideUnitInfo() { document.getElementById('unitInfoBox').style.display = 'none'; }
+  function deselectAll() {
+    livingUnits(player.id).forEach((u) => u.selected = false);
+    hideUnitInfo();
+  }
+  document.getElementById('deselectBtn').addEventListener('click', deselectAll);
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape') deselectAll(); });
 
   // ---------------------------------------------------------------------
   // Build / research panels (act on the player faction only)
