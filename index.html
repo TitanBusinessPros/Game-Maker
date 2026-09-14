@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Game Maker &mdash; Create a Map</title>
+<style>
+  :root {
+    --bg: #0b0e14;
+    --panel: #131926;
+    --panel-2: #1a2233;
+    --border: #2a3550;
+    --text: #e8ecf5;
+    --text-dim: #93a0bd;
+    --accent: #4fa8ff;
+    --accent-2: #ff9d4f;
+    --good: #4fdc8f;
+    --bad: #ff5f6d;
+    --ok: #2fbf71;
+    --warn: #e8b93a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    padding-bottom: 80px;
+  }
+  header {
+    padding: 20px 16px 10px;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  header h1 { margin: 0 0 4px; font-size: 24px; }
+  header p { margin: 0; color: var(--text-dim); font-size: 14px; }
+  #authBadge { font-size: 12px; color: var(--text-dim); margin-top: 6px; }
+  #authBadge.ready { color: var(--good); }
+
+  main { max-width: 900px; margin: 0 auto; padding: 0 16px; }
+
+  .section {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+    margin-bottom: 16px;
+  }
+  .section h2 {
+    margin: 0 0 4px;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section h2 .num {
+    background: var(--accent);
+    color: #06121f;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    flex: none;
+  }
+  .section .hint { color: var(--text-dim); font-size: 12px; margin: 0 0 14px; }
+
+  .row { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
+  .field { flex: 1 1 220px; min-width: 0; }
+  .field.narrow { flex: 1 1 110px; }
+  label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 4px; }
+  input[type=text], input[type=number], input[type=color], select {
+    width: 100%;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 14px;
+  }
+  input[type=color] { padding: 2px; height: 36px; }
+  input[type=file] {
+    width: 100%;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+
+  .upload-slot {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--panel-2);
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    padding: 8px;
+  }
+  .upload-slot .thumb {
+    width: 44px; height: 44px;
+    border-radius: 6px;
+    background: #0b0e14 center/cover no-repeat;
+    border: 1px solid var(--border);
+    flex: none;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; color: var(--text-dim);
+  }
+  .upload-slot .meta { flex: 1; min-width: 0; }
+  .upload-slot .meta .name { font-size: 13px; }
+  .upload-slot .meta .status { font-size: 11px; color: var(--text-dim); }
+
+  .team-block { border-radius: 8px; padding: 12px; margin-bottom: 10px; }
+  .team-block.good { background: rgba(79,220,143,0.08); border: 1px solid rgba(79,220,143,0.3); }
+  .team-block.bad { background: rgba(255,95,109,0.08); border: 1px solid rgba(255,95,109,0.3); }
+  .team-block h3 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
+  .team-block.good h3 { color: var(--good); }
+  .team-block.bad h3 { color: var(--bad); }
+
+  .unit-row {
+    border: 1px solid var(--border);
+    background: var(--panel-2);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 10px;
+    position: relative;
+  }
+  .unit-row .remove-unit {
+    position: absolute; top: 8px; right: 8px;
+    background: none; border: none; color: var(--bad);
+    cursor: pointer; font-size: 16px; line-height: 1;
+  }
+
+  button {
+    cursor: pointer;
+    border: none;
+    border-radius: 6px;
+    padding: 9px 16px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .btn-primary { background: var(--accent); color: #06121f; }
+  .btn-secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
+  .btn-add { background: transparent; color: var(--accent); border: 1px dashed var(--accent); width: 100%; padding: 10px; }
+  .btn-danger { background: transparent; color: var(--bad); border: 1px solid var(--bad); }
+
+  #saveBar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--panel);
+    border-top: 1px solid var(--border);
+    padding: 12px 16px;
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+    align-items: center;
+    z-index: 50;
+  }
+  #saveStatus { font-size: 12px; color: var(--text-dim); flex-basis: 100%; text-align: center; }
+  #saveStatus.ok { color: var(--ok); }
+  #saveStatus.warn { color: var(--warn); }
+  #saveStatus.bad { color: var(--bad); }
+
+  #myMapsList { list-style: none; margin: 0; padding: 0; }
+  #myMapsList li {
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 8px 10px; margin-bottom: 6px; font-size: 13px;
+  }
+  #myMapsList li .tag {
+    font-size: 10px; padding: 2px 6px; border-radius: 10px; margin-left: 8px;
+  }
+  .tag.draft { background: rgba(232,185,58,0.2); color: var(--warn); }
+  .tag.complete { background: rgba(47,191,113,0.2); color: var(--ok); }
+
+  @media (max-width: 480px) {
+    .row { gap: 10px; }
+    header h1 { font-size: 20px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Game Maker</h1>
+  <p>Build one map's worth of art, sound, and units. Nothing here changes the combat math &mdash; it just tells the engine what to call things and what to draw.</p>
+  <div id="authBadge">Connecting to Firebase&hellip;</div>
+</header>
+
+<main>
+
+  <!-- 1. Map basics -->
+  <section class="section" id="sec-basics">
+    <h2><span class="num">1</span> Map Basics</h2>
+    <p class="hint">The name of this map and what to call a "homeworld" here &mdash; Planet, Island, Base, whatever fits your theme.</p>
+    <div class="row">
+      <div class="field">
+        <label for="mapName">Map name</label>
+        <input type="text" id="mapName" placeholder="e.g. Pacific Theater">
+      </div>
+      <div class="field narrow">
+        <label for="baseLabel">Homeworld is called a&hellip;</label>
+        <input type="text" id="baseLabel" placeholder="Planet / Island / Base" value="Planet">
+      </div>
+    </div>
+    <div class="field">
+      <label>Map background art (optional)</label>
+      <div class="upload-slot" data-slot="backgroundImage">
+        <div class="thumb">none</div>
+        <div class="meta"><div class="name">No file chosen</div><div class="status">image, any size</div></div>
+        <input type="file" accept="image/*" style="width:auto">
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. Teams -->
+  <section class="section" id="sec-teams">
+    <h2><span class="num">2</span> Good Guys &amp; Bad Guys</h2>
+    <p class="hint">Pick a name, color, and homeworld art for each side. This is also where the map layout's two "teams" get their identity.</p>
+    <div class="team-block good">
+      <h3>Good guys</h3>
+      <div class="row">
+        <div class="field"><label>Faction name</label><input type="text" id="goodName" value="Allied Forces"></div>
+        <div class="field narrow"><label>Color</label><input type="color" id="goodColor" value="#4fdc8f"></div>
+      </div>
+      <div class="field">
+        <label>Homeworld art</label>
+        <div class="upload-slot" data-slot="goodBaseImage">
+          <div class="thumb">none</div>
+          <div class="meta"><div class="name">No file chosen</div><div class="status">required to finish</div></div>
+          <input type="file" accept="image/*" style="width:auto">
+        </div>
+      </div>
+    </div>
+    <div class="team-block bad">
+      <h3>Bad guys</h3>
+      <div class="row">
+        <div class="field"><label>Faction name</label><input type="text" id="badName" value="Hostile Forces"></div>
+        <div class="field narrow"><label>Color</label><input type="color" id="badColor" value="#ff5f6d"></div>
+      </div>
+      <div class="field">
+        <label>Homeworld art</label>
+        <div class="upload-slot" data-slot="badBaseImage">
+          <div class="thumb">none</div>
+          <div class="meta"><div class="name">No file chosen</div><div class="status">required to finish</div></div>
+          <input type="file" accept="image/*" style="width:auto">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. Resource & mining -->
+  <section class="section" id="sec-resource">
+    <h2><span class="num">3</span> Resource &amp; Mining</h2>
+    <p class="hint">Every homeworld gets one of these nearby. Name it whatever fits &mdash; Gold Mine, Fishing Ground, Oil Rig &mdash; and give it an income rate.</p>
+    <div class="row">
+      <div class="field">
+        <label>Resource deposit name</label>
+        <input type="text" id="resourceName" value="Gold Mine">
+      </div>
+      <div class="field narrow">
+        <label>Deposit size (resources)</label>
+        <input type="number" id="resourceSize" value="5000" min="100" step="100">
+      </div>
+    </div>
+    <div class="field" style="margin-bottom:12px;">
+      <label>Resource deposit art</label>
+      <div class="upload-slot" data-slot="resourceImage">
+        <div class="thumb">none</div>
+        <div class="meta"><div class="name">No file chosen</div><div class="status">required to finish</div></div>
+        <input type="file" accept="image/*" style="width:auto">
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>Mining unit name</label>
+        <input type="text" id="miningUnitName" value="Mining Ship">
+      </div>
+      <div class="field narrow">
+        <label>Income per hour</label>
+        <input type="number" id="miningRate" value="600" min="1" step="10">
+      </div>
+    </div>
+    <div class="field">
+      <label>Mining unit art</label>
+      <div class="upload-slot" data-slot="miningUnitImage">
+        <div class="thumb">none</div>
+        <div class="meta"><div class="name">No file chosen</div><div class="status">required to finish</div></div>
+        <input type="file" accept="image/*" style="width:auto">
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. Combat units -->
+  <section class="section" id="sec-units">
+    <h2><span class="num">4</span> Combat Units</h2>
+    <p class="hint">Add as many as you want. Stats work exactly like the original engine: HP, attack, range, speed, build cost. Swap a "Cruiser" sprite for a "Navy Destroyer" sprite and it still fights the same way.</p>
+    <div id="unitList"></div>
+    <button type="button" class="btn-add" id="addUnitBtn">+ Add another unit</button>
+  </section>
+
+  <!-- 5. Audio -->
+  <section class="section" id="sec-audio">
+    <h2><span class="num">5</span> Sounds</h2>
+    <p class="hint">All optional, all .mp3. Skip any you don't have &mdash; the engine just won't play that cue.</p>
+    <div class="row">
+      <div class="field">
+        <label>Background music</label>
+        <div class="upload-slot" data-slot="soundMusic"><div class="thumb">none</div><div class="meta"><div class="name">No file chosen</div><div class="status">loops during play</div></div><input type="file" accept="audio/*" style="width:auto"></div>
+      </div>
+      <div class="field">
+        <label>Intro / briefing music</label>
+        <div class="upload-slot" data-slot="soundIntro"><div class="thumb">none</div><div class="meta"><div class="name">No file chosen</div><div class="status">plays once at start</div></div><input type="file" accept="audio/*" style="width:auto"></div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>Attack / weapon fire sfx</label>
+        <div class="upload-slot" data-slot="soundAttack"><div class="thumb">none</div><div class="meta"><div class="name">No file chosen</div><div class="status">per shot</div></div><input type="file" accept="audio/*" style="width:auto"></div>
+      </div>
+      <div class="field">
+        <label>Building destroyed sfx</label>
+        <div class="upload-slot" data-slot="soundBuildingDestroyed"><div class="thumb">none</div><div class="meta"><div class="name">No file chosen</div><div class="status">per building lost</div></div><input type="file" accept="audio/*" style="width:auto"></div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>Homeworld under attack sfx</label>
+        <div class="upload-slot" data-slot="soundHomeUnderAttack"><div class="thumb">none</div><div class="meta"><div class="name">No file chosen</div><div class="status">warning cue</div></div><input type="file" accept="audio/*" style="width:auto"></div>
+      </div>
+      <div class="field">
+        <label>Game over sfx</label>
+        <div class="upload-slot" data-slot="soundEndgame"><div class="thumb">none</div><div class="meta"><div class="name">No file chosen</div><div class="status">win/loss</div></div><input type="file" accept="audio/*" style="width:auto"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6. My maps -->
+  <section class="section" id="sec-mine">
+    <h2><span class="num">6</span> My Maps</h2>
+    <p class="hint">Drafts and finished maps saved from this browser.</p>
+    <ul id="myMapsList"><li style="color:var(--text-dim);">No maps saved yet.</li></ul>
+  </section>
+
+</main>
+
+<div id="saveBar">
+  <div id="saveStatus">Not saved yet.</div>
+  <button type="button" class="btn-secondary" id="newMapBtn">Start a new map</button>
+  <button type="button" class="btn-secondary" id="saveDraftBtn">Save Draft (finish later)</button>
+  <button type="button" class="btn-primary" id="saveFinalBtn">Finish &amp; Save Map</button>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
+import { getAnalytics, isSupported as analyticsIsSupported } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-analytics.js";
+import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
+import {
+  getFirestore, doc, setDoc, getDoc, collection, query, where, getDocs, serverTimestamp, deleteDoc
+} from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+import {
+  getStorage, ref as storageRef, uploadBytes, getDownloadURL
+} from "https://www.gstatic.com/firebasejs/10.13.2/firebase-storage.js";
+
+// Your web app's Firebase configuration (Game-Maker project)
+const firebaseConfig = {
+  apiKey: "AIzaSyAJ-zJW3Z25mGucMA-hnO67yn-7Q5VgF1c",
+  authDomain: "game-maker-ed014.firebaseapp.com",
+  projectId: "game-maker-ed014",
+  storageBucket: "game-maker-ed014.firebasestorage.app",
+  messagingSenderId: "865333148999",
+  appId: "1:865333148999:web:689d470ba6a99e62806062",
+  measurementId: "G-R4ZE981Z5B"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const storage = getStorage(app);
+
+// Analytics can silently fail (ad blockers, non-https local file, etc.) -
+// never let it block the actual map-creation flow.
+analyticsIsSupported().then((ok) => { if (ok) { try { getAnalytics(app); } catch (e) {} } }).catch(() => {});
+
+const authBadge = document.getElementById('authBadge');
+let currentUser = null;
+
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    currentUser = user;
+    authBadge.textContent = 'Connected (signed in anonymously).';
+    authBadge.classList.add('ready');
+    refreshMyMaps();
+  }
+});
+signInAnonymously(auth).catch((err) => {
+  authBadge.textContent = 'Could not connect to Firebase: ' + err.message;
+});
+
+// ---------------------------------------------------------------------
+// Map identity: one Firestore doc id per map being edited, carried in the
+// URL (?map=ID) so a saved draft can be reopened later just by revisiting
+// the link. A brand-new id is minted client-side on first load.
+// ---------------------------------------------------------------------
+function newMapId() {
+  return doc(collection(db, 'maps')).id;
+}
+let currentMapId = new URLSearchParams(location.search).get('map') || newMapId();
+setMapIdInUrl(currentMapId);
+
+function setMapIdInUrl(id) {
+  const url = new URL(location.href);
+  url.searchParams.set('map', id);
+  history.replaceState(null, '', url);
+}
+
+// ---------------------------------------------------------------------
+// Upload slots: every .upload-slot has a data-slot key. We track the
+// last-known download URL per key (existingAssetUrls) so re-saving a
+// draft without touching a given file keeps its previous upload instead
+// of requiring a re-upload every time.
+// ---------------------------------------------------------------------
+const existingAssetUrls = {};
+
+document.querySelectorAll('.upload-slot').forEach((slot) => {
+  const input = slot.querySelector('input[type=file]');
+  const nameEl = slot.querySelector('.name');
+  const thumb = slot.querySelector('.thumb');
+  input.addEventListener('change', () => {
+    const file = input.files[0];
+    if (!file) return;
+    nameEl.textContent = file.name;
+    slot.querySelector('.status').textContent = 'ready to upload (' + Math.round(file.size / 1024) + ' KB)';
+    if (file.type.startsWith('image/')) {
+      const url = URL.createObjectURL(file);
+      thumb.style.backgroundImage = `url(${url})`;
+      thumb.textContent = '';
+    } else {
+      thumb.textContent = 'audio';
+    }
+  });
+});
+
+function showExistingAsset(slotKey, url) {
+  existingAssetUrls[slotKey] = url;
+  const slot = document.querySelector(`.upload-slot[data-slot="${slotKey}"]`);
+  if (!slot || !url) return;
+  slot.querySelector('.name').textContent = 'Saved file';
+  slot.querySelector('.status').textContent = 'already uploaded ✓';
+  const thumb = slot.querySelector('.thumb');
+  if (/\.(mp3|wav|ogg)(\?|$)/i.test(url)) {
+    thumb.textContent = 'audio';
+  } else {
+    thumb.style.backgroundImage = `url(${url})`;
+    thumb.textContent = '';
+  }
+}
+
+async function uploadSlotIfChanged(slotKey) {
+  const slot = document.querySelector(`.upload-slot[data-slot="${slotKey}"]`);
+  const input = slot.querySelector('input[type=file]');
+  const file = input.files[0];
+  if (!file) return existingAssetUrls[slotKey] || null;
+  const path = `maps/${currentUser.uid}/${currentMapId}/${slotKey}_${Date.now()}_${file.name}`;
+  const ref = storageRef(storage, path);
+  await uploadBytes(ref, file);
+  const url = await getDownloadURL(ref);
+  existingAssetUrls[slotKey] = url;
+  return url;
+}
+
+// ---------------------------------------------------------------------
+// Combat units: a repeatable checklist row. Same stat fields the engine
+// itself uses (hp / attack / range / speed / cost) so a saved map can
+// later be dropped straight into the combat resolver unchanged.
+// ---------------------------------------------------------------------
+const unitList = document.getElementById('unitList');
+let unitCounter = 0;
+
+function addUnitRow(data = {}) {
+  const id = 'unit_' + (unitCounter++);
+  const row = document.createElement('div');
+  row.className = 'unit-row';
+  row.dataset.unitId = id;
+  row.innerHTML = `
+    <button type="button" class="remove-unit" title="Remove unit">&times;</button>
+    <div class="row">
+      <div class="field"><label>Unit name</label><input type="text" class="u-name" value="${escapeAttr(data.name || '')}" placeholder="e.g. Destroyer"></div>
+    </div>
+    <div class="upload-slot" data-slot="${id}">
+      <div class="thumb">none</div>
+      <div class="meta"><div class="name">No file chosen</div><div class="status">unit sprite</div></div>
+      <input type="file" accept="image/*" style="width:auto">
+    </div>
+    <div class="row" style="margin-top:10px;">
+      <div class="field narrow"><label>HP</label><input type="number" class="u-hp" value="${data.hp ?? 300}" min="1"></div>
+      <div class="field narrow"><label>Attack</label><input type="number" class="u-attack" value="${data.attack ?? 200}" min="0"></div>
+      <div class="field narrow"><label>Range</label><input type="number" class="u-range" value="${data.range ?? 500}" min="0"></div>
+      <div class="field narrow"><label>Speed</label><input type="number" class="u-speed" value="${data.speed ?? 2}" min="0" step="0.1"></div>
+      <div class="field narrow"><label>Cost</label><input type="number" class="u-cost" value="${data.cost ?? 400}" min="0" step="10"></div>
+    </div>
+  `;
+  row.querySelector('.remove-unit').addEventListener('click', () => {
+    delete existingAssetUrls[id];
+    row.remove();
+  });
+  const input = row.querySelector('input[type=file]');
+  const nameEl = row.querySelector('.upload-slot .name');
+  const thumb = row.querySelector('.upload-slot .thumb');
+  input.addEventListener('change', () => {
+    const file = input.files[0];
+    if (!file) return;
+    nameEl.textContent = file.name;
+    row.querySelector('.upload-slot .status').textContent = 'ready to upload';
+    thumb.style.backgroundImage = `url(${URL.createObjectURL(file)})`;
+    thumb.textContent = '';
+  });
+  unitList.appendChild(row);
+  if (data.imageUrl) showExistingAsset(id, data.imageUrl);
+  return row;
+}
+
+document.getElementById('addUnitBtn').addEventListener('click', () => addUnitRow());
+addUnitRow({ name: 'Cruiser', hp: 300, attack: 200, range: 500, speed: 2, cost: 400 });
+
+function escapeAttr(s) {
+  return String(s).replace(/"/g, '&quot;');
+}
+
+// ---------------------------------------------------------------------
+// Save (draft or finished) + reload
+// ---------------------------------------------------------------------
+const saveStatus = document.getElementById('saveStatus');
+
+function setSaveStatus(text, cls) {
+  saveStatus.textContent = text;
+  saveStatus.className = cls || '';
+}
+
+async function collectUnits() {
+  const rows = Array.from(unitList.querySelectorAll('.unit-row'));
+  const units = [];
+  for (const row of rows) {
+    const id = row.dataset.unitId;
+    units.push({
+      name: row.querySelector('.u-name').value.trim() || 'Unnamed Unit',
+      imageUrl: await uploadSlotIfChanged(id),
+      hp: Number(row.querySelector('.u-hp').value) || 0,
+      attack: Number(row.querySelector('.u-attack').value) || 0,
+      range: Number(row.querySelector('.u-range').value) || 0,
+      speed: Number(row.querySelector('.u-speed').value) || 0,
+      cost: Number(row.querySelector('.u-cost').value) || 0,
+    });
+  }
+  return units;
+}
+
+async function buildMapDoc(status) {
+  const units = await collectUnits();
+  return {
+    ownerId: currentUser.uid,
+    status, // 'draft' | 'complete'
+    name: document.getElementById('mapName').value.trim() || 'Untitled Map',
+    baseLabel: document.getElementById('baseLabel').value.trim() || 'Planet',
+    backgroundImage: await uploadSlotIfChanged('backgroundImage'),
+    factions: {
+      good: {
+        name: document.getElementById('goodName').value.trim() || 'Allied Forces',
+        color: document.getElementById('goodColor').value,
+        baseImage: await uploadSlotIfChanged('goodBaseImage'),
+      },
+      bad: {
+        name: document.getElementById('badName').value.trim() || 'Hostile Forces',
+        color: document.getElementById('badColor').value,
+        baseImage: await uploadSlotIfChanged('badBaseImage'),
+      },
+    },
+    resource: {
+      name: document.getElementById('resourceName').value.trim() || 'Gold Mine',
+      size: Number(document.getElementById('resourceSize').value) || 5000,
+      image: await uploadSlotIfChanged('resourceImage'),
+    },
+    miningUnit: {
+      name: document.getElementById('miningUnitName').value.trim() || 'Mining Ship',
+      ratePerHour: Number(document.getElementById('miningRate').value) || 600,
+      image: await uploadSlotIfChanged('miningUnitImage'),
+    },
+    units,
+    sounds: {
+      music: await uploadSlotIfChanged('soundMusic'),
+      intro: await uploadSlotIfChanged('soundIntro'),
+      attack: await uploadSlotIfChanged('soundAttack'),
+      buildingDestroyed: await uploadSlotIfChanged('soundBuildingDestroyed'),
+      homeUnderAttack: await uploadSlotIfChanged('soundHomeUnderAttack'),
+      endgame: await uploadSlotIfChanged('soundEndgame'),
+    },
+    updatedAt: serverTimestamp(),
+  };
+}
+
+function checklistGaps(mapDoc) {
+  const gaps = [];
+  if (!mapDoc.name || mapDoc.name === 'Untitled Map') gaps.push('map name');
+  if (!mapDoc.factions.good.baseImage) gaps.push('good guys’ homeworld art');
+  if (!mapDoc.factions.bad.baseImage) gaps.push('bad guys’ homeworld art');
+  if (!mapDoc.resource.image) gaps.push('resource deposit art');
+  if (!mapDoc.miningUnit.image) gaps.push('mining unit art');
+  if (mapDoc.units.length === 0) gaps.push('at least one combat unit');
+  mapDoc.units.forEach((u, i) => { if (!u.imageUrl) gaps.push(`unit #${i + 1} (${u.name}) art`); });
+  return gaps;
+}
+
+async function saveMap(status) {
+  if (!currentUser) { setSaveStatus('Still connecting to Firebase — try again in a second.', 'warn'); return; }
+  setSaveStatus('Uploading files and saving…');
+  try {
+    const mapDoc = await buildMapDoc(status);
+    if (status === 'complete') {
+      const gaps = checklistGaps(mapDoc);
+      if (gaps.length) {
+        setSaveStatus('Saved as draft instead — still missing: ' + gaps.join(', '), 'warn');
+        await setDoc(doc(db, 'maps', currentMapId), { ...mapDoc, status: 'draft' }, { merge: true });
+        refreshMyMaps();
+        return;
+      }
+    }
+    await setDoc(doc(db, 'maps', currentMapId), mapDoc, { merge: true });
+    setSaveStatus(status === 'complete' ? 'Map finished and saved ✓' : 'Draft saved — come back anytime with this link.', 'ok');
+    refreshMyMaps();
+  } catch (err) {
+    console.error(err);
+    setSaveStatus('Save failed: ' + err.message, 'bad');
+  }
+}
+
+document.getElementById('saveDraftBtn').addEventListener('click', () => saveMap('draft'));
+document.getElementById('saveFinalBtn').addEventListener('click', () => saveMap('complete'));
+document.getElementById('newMapBtn').addEventListener('click', () => {
+  currentMapId = newMapId();
+  setMapIdInUrl(currentMapId);
+  location.reload();
+});
+
+async function refreshMyMaps() {
+  const listEl = document.getElementById('myMapsList');
+  if (!currentUser) return;
+  const q = query(collection(db, 'maps'), where('ownerId', '==', currentUser.uid));
+  const snap = await getDocs(q);
+  if (snap.empty) {
+    listEl.innerHTML = '<li style="color:var(--text-dim);">No maps saved yet.</li>';
+    return;
+  }
+  listEl.innerHTML = '';
+  snap.forEach((d) => {
+    const m = d.data();
+    const li = document.createElement('li');
+    const tagClass = m.status === 'complete' ? 'complete' : 'draft';
+    li.innerHTML = `
+      <span>${escapeAttr(m.name || 'Untitled Map')} <span class="tag ${tagClass}">${m.status}</span></span>
+      <span>
+        <button type="button" class="btn-secondary open-map" data-id="${d.id}">Open</button>
+        <button type="button" class="btn-danger delete-map" data-id="${d.id}">Delete</button>
+      </span>
+    `;
+    listEl.appendChild(li);
+  });
+  listEl.querySelectorAll('.open-map').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const url = new URL(location.href);
+      url.searchParams.set('map', btn.dataset.id);
+      location.href = url.toString();
+    });
+  });
+  listEl.querySelectorAll('.delete-map').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Delete this map? This cannot be undone.')) return;
+      await deleteDoc(doc(db, 'maps', btn.dataset.id));
+      refreshMyMaps();
+    });
+  });
+}
+
+// ---------------------------------------------------------------------
+// Load an existing map (from ?map=ID) into the form, if one exists.
+// ---------------------------------------------------------------------
+async function loadExistingMap() {
+  const snap = await getDoc(doc(db, 'maps', currentMapId));
+  if (!snap.exists()) return;
+  const m = snap.data();
+  document.getElementById('mapName').value = m.name || '';
+  document.getElementById('baseLabel').value = m.baseLabel || 'Planet';
+  if (m.backgroundImage) showExistingAsset('backgroundImage', m.backgroundImage);
+
+  if (m.factions) {
+    document.getElementById('goodName').value = m.factions.good?.name || '';
+    document.getElementById('goodColor').value = m.factions.good?.color || '#4fdc8f';
+    if (m.factions.good?.baseImage) showExistingAsset('goodBaseImage', m.factions.good.baseImage);
+    document.getElementById('badName').value = m.factions.bad?.name || '';
+    document.getElementById('badColor').value = m.factions.bad?.color || '#ff5f6d';
+    if (m.factions.bad?.baseImage) showExistingAsset('badBaseImage', m.factions.bad.baseImage);
+  }
+
+  if (m.resource) {
+    document.getElementById('resourceName').value = m.resource.name || 'Gold Mine';
+    document.getElementById('resourceSize').value = m.resource.size || 5000;
+    if (m.resource.image) showExistingAsset('resourceImage', m.resource.image);
+  }
+  if (m.miningUnit) {
+    document.getElementById('miningUnitName').value = m.miningUnit.name || 'Mining Ship';
+    document.getElementById('miningRate').value = m.miningUnit.ratePerHour || 600;
+    if (m.miningUnit.image) showExistingAsset('miningUnitImage', m.miningUnit.image);
+  }
+
+  if (Array.isArray(m.units) && m.units.length) {
+    unitList.innerHTML = '';
+    m.units.forEach((u) => addUnitRow(u));
+  }
+
+  if (m.sounds) {
+    if (m.sounds.music) showExistingAsset('soundMusic', m.sounds.music);
+    if (m.sounds.intro) showExistingAsset('soundIntro', m.sounds.intro);
+    if (m.sounds.attack) showExistingAsset('soundAttack', m.sounds.attack);
+    if (m.sounds.buildingDestroyed) showExistingAsset('soundBuildingDestroyed', m.sounds.buildingDestroyed);
+    if (m.sounds.homeUnderAttack) showExistingAsset('soundHomeUnderAttack', m.sounds.homeUnderAttack);
+    if (m.sounds.endgame) showExistingAsset('soundEndgame', m.sounds.endgame);
+  }
+
+  setSaveStatus('Loaded "' + (m.name || 'Untitled Map') + '" (' + m.status + ').', m.status === 'complete' ? 'ok' : 'warn');
+}
+
+onAuthStateChanged(auth, (user) => {
+  if (user) loadExistingMap();
+});
+</script>
+
+</body>
+</html>

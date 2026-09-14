@@ -1,0 +1,16 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // One document per map. Readable by anyone (a published game needs to
+    // load its own map data without the viewer being signed in) but only
+    // writable by the anonymous-auth user who owns it.
+    match /maps/{mapId} {
+      allow read: if true;
+      allow create: if request.auth != null
+                    && request.resource.data.ownerId == request.auth.uid;
+      allow update, delete: if request.auth != null
+                    && resource.data.ownerId == request.auth.uid;
+    }
+  }
+}

@@ -1,0 +1,16 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // maps/{uid}/{mapId}/<file> - only the owning anonymous-auth user can
+    // upload into their own folder; anyone can read (published games need
+    // to load the art/sound without the viewer being signed in). 15MB cap
+    // per file is generous for sprites/mp3s and keeps a bad upload cheap.
+    match /maps/{uid}/{mapId}/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.auth.uid == uid
+                   && request.resource.size < 15 * 1024 * 1024;
+    }
+  }
+}
