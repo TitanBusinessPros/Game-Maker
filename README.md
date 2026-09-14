@@ -69,15 +69,28 @@ entirely by one map's saved data:
   always A). At least one has to stay on B or Start Match refuses -
   otherwise there's nothing to fight.
 - **Real player control**: left-drag a box to select multiple units,
-  click to move or attack. A unit that attacks locks (can't take a new
-  move order) until the next turn - can't fire-and-reposition freely.
+  click to move or attack. A unit that attacks fires exactly once, then
+  locks (can't take a new move or attack order) until the next turn -
+  can't repeat-fire or fire-and-reposition freely. A **✕ Deselect**
+  button (also the Escape key) clears the current selection so units stop
+  following the mouse.
+- **Mining ships auto-travel**: built next to your own deposit, a miner
+  immediately gets a move order there on its own - no manual command
+  needed - and income only flows while it's actually parked within range
+  of the deposit, not just for existing somewhere on the map.
 - Laser beams on every attack, colored per unit type from an 8-color
   palette (colors repeat past 8 types).
 - Units rotate to face their actual direction of travel.
-- A pannable camera (right-drag) over a world sized by the map's chosen
-  size, a minimap (click it to jump the camera there), fog of war
-  (toggle - minimap-only reveal radius around your own units), sound
-  on/off, pause (freezes the whole simulation), Save/Load to a JSON file.
+- A pannable camera (right-drag) with scroll-wheel zoom (centered on the
+  cursor) over a world sized by the map's chosen size, and a minimap that
+  both jumps the camera there on click AND, if units are selected, issues
+  them a move order to that point. Also: fog of war (toggle - minimap-only
+  reveal radius around your own units), sound on/off, pause (freezes the
+  whole simulation), Save/Load to a JSON file.
+- Background art is drawn as a **tiled world-space pattern**
+  (`ctx.createPattern`), so it stays sharp and always covers the full map
+  regardless of chosen size - earlier cover-fit/capped-scale approaches
+  either blurred or left black gaps on larger maps.
 - **⬇ Download as index.html** - packages the map's data inline into a
   fully standalone copy of this page. Verified: opens and runs from
   `file://` with zero network calls.
@@ -96,6 +109,22 @@ compresses them the same way `index.html` does, and writes to Firestore
 by the rules below (checked directly: an unauthorized session's write is
 actually rejected, not just hidden in the UI), not just a client check.
 
+Categories are hierarchical: **Maps**, **Characters** (with a sub-picker
+for **Space Ships**, **Navy Ships**, **Jets**, **Army Men** - stored as
+`characters/<type>`), **Worlds**, **Bases**, **Sounds**. The "Current
+library" list renders these as real nested sections (a Characters heading
+with its four sub-headings under it), and anything uploaded under an
+older flat category before this structure existed still shows up under
+an "Other" section instead of disappearing. `index.html`'s library picker
+groups by whatever category string it finds, so it reflects this
+hierarchy automatically - it also has a label map so tabs read
+"Space Ships" instead of the raw `characters/space_ships` id.
+
+`window.__ADMIN_DEBUG` (CATEGORY_TREE / renderLibraryInto / currentCategory,
+read-only) is left in for the same reason as `play.html`'s `__GM_DEBUG` -
+it lets the category grouping/labeling be verified against fabricated
+data without needing a real Google sign-in.
+
 ## Firebase project
 
 Project: `game-maker-ed014`.
@@ -109,6 +138,12 @@ Project: `game-maker-ed014`.
   Firebase Auth weak point under modern browser storage-partitioning and
   was reported broken (differently, but from the same root cause) both
   ways. GIS hands a credential straight to a page-local callback instead.
+  Separately, the OAuth Client itself has its own "Authorized JavaScript
+  origins" allowlist in
+  [GCP Console](https://console.cloud.google.com/apis/credentials?project=game-maker-ed014)
+  (different from Firebase's "Authorized domains") - console-only, no
+  API/CLI path - so a new hosting origin has to be added there by hand or
+  sign-in fails with `Error 400: origin_mismatch`.
 - **Firestore** — `maps/{mapId}` (one doc per map) and `libraryItems/{id}`
   (the shared asset library), both public-read; writes locked to the
   owning `uid` (maps) or the admin email (library) via rules.
