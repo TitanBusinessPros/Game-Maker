@@ -132,8 +132,9 @@
         <strong>Left-drag</strong> a box to select multiple units, or click one.<br>
         <strong>Click</strong> empty space to move selected units there.<br>
         <strong>Click</strong> an enemy to attack it.<br>
-        <strong>Right-drag</strong> to pan the camera.<br>
-        A unit that attacks can't move again until the next turn.<br>
+        <strong>Right-drag</strong> to pan the camera. <strong>Scroll wheel</strong> to zoom in/out.<br>
+        <strong>Click the minimap</strong> to jump the camera there - with units selected, it also sends them there.<br>
+        A unit that attacks locks in place (can't take a new move order, still keeps firing) until the next turn.<br>
         A <strong>Mining Ship</strong> parked on your deposit earns resources automatically.<br>
         The match ends when a homeworld's HP reaches 0 - your whole team wins together.
       </p>
@@ -513,12 +514,19 @@ async function main() {
   // Camera (pan only - maps can be much bigger than one screen now that
   // size is configurable) + rendering
   // ---------------------------------------------------------------------
-  // Center the camera on the PLAYER's own homeworld, not the abstract
-  // center of the whole multi-faction circle - otherwise on any map with
-  // more than 2 factions, the player starts staring at empty space.
-  const camera = { x: player.x - canvas.width / 2, y: player.y - canvas.height / 2 };
-  function toScreen(x, y) { return { x: x - camera.x, y: y - camera.y }; }
-  function toWorld(x, y) { return { x: x + camera.x, y: y + camera.y }; }
+  // camera.x/y is the WORLD point currently at the center of the screen
+  // (not the top-left corner) - centered on the PLAYER's own homeworld,
+  // not the abstract center of the whole multi-faction circle, otherwise
+  // on any map with more than 2 factions the player starts staring at
+  // empty space. camera.zoom scales everything around that center point.
+  const camera = { x: player.x, y: player.y, zoom: 1 };
+  const ZOOM_MIN = 0.35, ZOOM_MAX = 2.5;
+  function toScreen(x, y) {
+    return { x: (x - camera.x) * camera.zoom + canvas.width / 2, y: (y - camera.y) * camera.zoom + canvas.height / 2 };
+  }
+  function toWorld(x, y) {
+    return { x: (x - canvas.width / 2) / camera.zoom + camera.x, y: (y - canvas.height / 2) / camera.zoom + camera.y };
+  }
 
   // Background art anchored once in WORLD space, cover-fit to the whole
   // galaxy's bounding box (same idea as After Earth's own
@@ -529,16 +537,34 @@ async function main() {
   // position, showing as a hard-edged black box everywhere else.
   let bgDraw = null;
   if (bgImg) {
-    const scale = Math.max(worldW / bgImg.width, worldH / bgImg.height);
+    // Capped at 3x so a smallish source photo doesn't get blown up huge
+    // and blurry on a Medium/Large map - past that, the solid dark
+    // fallback fill (see render()) shows around the edges instead, which
+    // reads better than a heavily stretched, soft image filling the
+    // whole thing.
+    const scale = Math.min(3, Math.max(worldW / bgImg.width, worldH / bgImg.height));
     const dw = bgImg.width * scale, dh = bgImg.height * scale;
     bgDraw = { x: worldCenter.x - dw / 2, y: worldCenter.y - dh / 2, w: dw, h: dh };
   }
 
+  // Draws an image FIT inside a maxSize x maxSize box, preserving its own
+  // aspect ratio (the longer side equals maxSize), instead of forcing it
+  // into a square - a non-square uploaded image (most photos/sprites
+  // aren't perfectly square) was visibly squished/stretched before this,
+  // which is very likely what "the map looks distorted" was describing.
+  function fittedSize(img, maxSize) {
+    if (!img || !img.width || !img.height) return { w: maxSize, h: maxSize };
+    const ar = img.width / img.height;
+    return ar >= 1 ? { w: maxSize, h: maxSize / ar } : { w: maxSize * ar, h: maxSize };
+  }
+
   function drawFactionHome(f) {
     const p = toScreen(f.x, f.y);
-    const size = HOMEWORLD_SIZE;
-    if (f.img) ctx.drawImage(f.img, p.x - size / 2, p.y - size / 2, size, size);
-    else { ctx.fillStyle = f.color; ctx.beginPath(); ctx.arc(p.x, p.y, size / 2, 0, 7); ctx.fill(); }
+    const size = HOMEWORLD_SIZE * camera.zoom;
+    if (f.img) {
+      const fit = fittedSize(f.img, size);
+      ctx.drawImage(f.img, p.x - fit.w / 2, p.y - fit.h / 2, fit.w, fit.h);
+    } else { ctx.fillStyle = f.color; ctx.beginPath(); ctx.arc(p.x, p.y, size / 2, 0, 7); ctx.fill(); }
     const pct = Math.max(0, f.hp / f.maxHp);
     ctx.fillStyle = '#2a3550'; ctx.fillRect(p.x - size / 2, p.y - size / 2 - 10, size, 5);
     ctx.fillStyle = f.color; ctx.fillRect(p.x - size / 2, p.y - size / 2 - 10, size * pct, 5);
@@ -548,26 +574,31 @@ async function main() {
   function drawUnit(u) {
     const p = toScreen(u.x, u.y);
     if (p.x < -60 || p.x > canvas.width + 60 || p.y < -60 || p.y > canvas.height + 60) return;
-    if (u.selected) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p.x, p.y, UNIT_SIZE / 2 + 5, 0, 7); ctx.stroke(); }
+    const size = UNIT_SIZE * camera.zoom;
+    if (u.selected) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p.x, p.y, size / 2 + 5, 0, 7); ctx.stroke(); }
     // Only the sprite itself rotates to face where the unit is headed
     // (same as After Earth's own Unit.draw()) - the HP bar/lock icon below
     // stay screen-aligned, same as the real game keeps them too.
     if (u.img) {
+      const fit = fittedSize(u.img, size);
       ctx.save();
       ctx.translate(p.x, p.y);
       ctx.rotate(u.facingAngle || 0);
-      ctx.drawImage(u.img, -UNIT_SIZE / 2, -UNIT_SIZE / 2, UNIT_SIZE, UNIT_SIZE);
+      ctx.drawImage(u.img, -fit.w / 2, -fit.h / 2, fit.w, fit.h);
       ctx.restore();
-    } else { ctx.fillStyle = factionOf(u.factionId).color; ctx.beginPath(); ctx.arc(p.x, p.y, UNIT_SIZE / 2, 0, 7); ctx.fill(); }
+    } else { ctx.fillStyle = factionOf(u.factionId).color; ctx.beginPath(); ctx.arc(p.x, p.y, size / 2, 0, 7); ctx.fill(); }
     const pct = Math.max(0, u.hp / u.maxHp);
-    ctx.fillStyle = '#2a3550'; ctx.fillRect(p.x - UNIT_SIZE / 2, p.y - UNIT_SIZE / 2 - 7, UNIT_SIZE, 3);
-    ctx.fillStyle = factionOf(u.factionId).color; ctx.fillRect(p.x - UNIT_SIZE / 2, p.y - UNIT_SIZE / 2 - 7, UNIT_SIZE * pct, 3);
-    if (turnNumber < u.lockedUntilTurn) { ctx.fillStyle = '#fff'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('🔒', p.x, p.y - UNIT_SIZE / 2 - 12); }
+    ctx.fillStyle = '#2a3550'; ctx.fillRect(p.x - size / 2, p.y - size / 2 - 7, size, 3);
+    ctx.fillStyle = factionOf(u.factionId).color; ctx.fillRect(p.x - size / 2, p.y - size / 2 - 7, size * pct, 3);
+    if (turnNumber < u.lockedUntilTurn) { ctx.fillStyle = '#fff'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('🔒', p.x, p.y - size / 2 - 12); }
   }
   function drawDeposit(d) {
     const p = toScreen(d.x, d.y);
-    if (resourceImg) ctx.drawImage(resourceImg, p.x - DEPOSIT_SIZE / 2, p.y - DEPOSIT_SIZE / 2, DEPOSIT_SIZE, DEPOSIT_SIZE);
-    else { ctx.fillStyle = '#e8b93a'; ctx.beginPath(); ctx.arc(p.x, p.y, DEPOSIT_SIZE / 2, 0, 7); ctx.fill(); }
+    const size = DEPOSIT_SIZE * camera.zoom;
+    if (resourceImg) {
+      const fit = fittedSize(resourceImg, size);
+      ctx.drawImage(resourceImg, p.x - fit.w / 2, p.y - fit.h / 2, fit.w, fit.h);
+    } else { ctx.fillStyle = '#e8b93a'; ctx.beginPath(); ctx.arc(p.x, p.y, size / 2, 0, 7); ctx.fill(); }
   }
   function drawBeams() {
     for (const b of beams) {
@@ -627,22 +658,31 @@ async function main() {
       const p = toMini(u.x, u.y);
       mctx.fillStyle = factionOf(u.factionId).color; mctx.fillRect(p.x - 1, p.y - 1, 2, 2);
     }
-    // viewport rectangle
-    const tl = toMini(camera.x, camera.y), br = toMini(camera.x + canvas.width, camera.y + canvas.height);
+    // viewport rectangle - the world-space area actually visible right now,
+    // accounting for zoom (toWorld() already folds zoom in).
+    const viewTL = toWorld(0, 0), viewBR = toWorld(canvas.width, canvas.height);
+    const tl = toMini(viewTL.x, viewTL.y), br = toMini(viewBR.x, viewBR.y);
     mctx.strokeStyle = 'rgba(255,255,255,0.6)'; mctx.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
   }
 
-  // Click the minimap to jump the camera straight to that part of the map
-  // - inverse of toMini() above (minimap pixel -> world coordinate),
-  // centered under the click the same way the main canvas centers on the
-  // player's homeworld at the start.
+  // Click the minimap to jump the camera there. If units are selected,
+  // this ALSO commands them to move to that point - clicking the minimap
+  // is a real way to send units anywhere on the map, not just a way to
+  // look around.
   minimap.style.cursor = 'pointer';
   minimap.addEventListener('click', (evt) => {
     const r = minimap.getBoundingClientRect();
     const mx = (evt.clientX - r.left) * (180 / r.width), my = (evt.clientY - r.top) * (180 / r.height);
     const worldX = mx / (180 / worldW) + worldMinX, worldY = my / (180 / worldH) + worldMinY;
-    camera.x = worldX - canvas.width / 2;
-    camera.y = worldY - canvas.height / 2;
+    camera.x = worldX;
+    camera.y = worldY;
+    if (matchStarted && !gameOver && !paused) {
+      const sel = selectedUnits();
+      sel.forEach((u) => {
+        if (turnNumber < u.lockedUntilTurn) return; // attacked this turn - can't take a new order yet
+        u.orderType = 'move'; u.moveTarget = { x: worldX, y: worldY }; u.target = null;
+      });
+    }
   });
 
   // ---------------------------------------------------------------------
@@ -654,6 +694,20 @@ async function main() {
   const dragBoxEl = document.getElementById('dragBox');
 
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+  // Scroll wheel zooms in/out, centered on the cursor (the world point
+  // under the cursor stays put while the zoom level changes, standard
+  // map-app behavior) - was entirely missing before, pan-only.
+  canvas.addEventListener('wheel', (evt) => {
+    evt.preventDefault();
+    const r = canvas.getBoundingClientRect();
+    const mx = evt.clientX - r.left, my = evt.clientY - r.top;
+    const worldBefore = toWorld(mx, my);
+    const factor = evt.deltaY < 0 ? 1.12 : 1 / 1.12;
+    camera.zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, camera.zoom * factor));
+    const worldAfter = toWorld(mx, my);
+    camera.x += worldBefore.x - worldAfter.x;
+    camera.y += worldBefore.y - worldAfter.y;
+  }, { passive: false });
   canvas.addEventListener('mousedown', (evt) => {
     if (gameOver || paused || !matchStarted) return;
     dragStart = { x: evt.clientX, y: evt.clientY };
@@ -665,7 +719,7 @@ async function main() {
     const dx = evt.clientX - dragStart.x, dy = evt.clientY - dragStart.y;
     if (Math.hypot(dx, dy) > 4) dragMoved = true;
     if (isRightDrag) {
-      camera.x -= dx; camera.y -= dy;
+      camera.x -= dx / camera.zoom; camera.y -= dy / camera.zoom;
       dragStart = { x: evt.clientX, y: evt.clientY };
     } else if (dragMoved) {
       const x0 = Math.min(dragStart.x, evt.clientX), y0 = Math.min(dragStart.y, evt.clientY);
