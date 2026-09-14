@@ -160,6 +160,10 @@
   #saveStatus.ok { color: var(--ok); }
   #saveStatus.warn { color: var(--warn); }
   #saveStatus.bad { color: var(--bad); }
+  #saveWarning {
+    flex-basis: 100%; text-align: center;
+    font-size: 11px; color: var(--warn);
+  }
 
   #myMapsList { list-style: none; margin: 0; padding: 0; }
   #myMapsList li {
@@ -345,6 +349,7 @@
 </main>
 
 <div id="saveBar">
+  <div id="saveWarning">&#9201;&#65039; Saving uploads your files 5 at a time &mdash; the more images/sounds on this map, the longer it takes. Keep this tab open until it says done.</div>
   <div id="saveStatus">Not saved yet.</div>
   <button type="button" class="btn-secondary" id="newMapBtn">Start a new map</button>
   <button type="button" class="btn-secondary" id="saveDraftBtn">Save Draft (finish later)</button>
@@ -466,7 +471,31 @@ async function uploadSlotIfChanged(slotKey) {
   await uploadBytes(ref, file);
   const url = await getDownloadURL(ref);
   existingAssetUrls[slotKey] = url;
+  // Clear the input so a later save (e.g. Finish & Save right after Save
+  // Draft) reuses this URL instead of silently re-uploading the same file.
+  input.value = '';
+  slot.querySelector('.status').textContent = 'uploaded ✓ (saved)';
   return url;
+}
+
+// Uploads never used to happen more than one at a time, which made a map
+// with several units/sounds take minutes to save. This runs at most
+// MAX_CONCURRENT_UPLOADS at once instead of either "all in one go" (which
+// can trip Storage rate limits on a slow connection) or fully sequential.
+const MAX_CONCURRENT_UPLOADS = 5;
+
+async function uploadSlotsWithLimit(slotKeys) {
+  const results = {};
+  let nextIndex = 0;
+  async function worker() {
+    while (nextIndex < slotKeys.length) {
+      const key = slotKeys[nextIndex++];
+      results[key] = await uploadSlotIfChanged(key);
+    }
+  }
+  const workerCount = Math.min(MAX_CONCURRENT_UPLOADS, slotKeys.length);
+  await Promise.all(Array.from({ length: workerCount }, worker));
+  return results;
 }
 
 // ---------------------------------------------------------------------
@@ -537,62 +566,67 @@ function setSaveStatus(text, cls) {
   saveStatus.className = cls || '';
 }
 
-async function collectUnits() {
+const FIXED_UPLOAD_SLOTS = [
+  'backgroundImage', 'goodBaseImage', 'badBaseImage', 'resourceImage', 'miningUnitImage',
+  'soundMusic', 'soundIntro', 'soundAttack', 'soundBuildingDestroyed', 'soundHomeUnderAttack', 'soundEndgame',
+];
+
+function collectUnits(uploadResults) {
   const rows = Array.from(unitList.querySelectorAll('.unit-row'));
-  const units = [];
-  for (const row of rows) {
+  return rows.map((row) => {
     const id = row.dataset.unitId;
-    units.push({
+    return {
       name: row.querySelector('.u-name').value.trim() || 'Unnamed Unit',
-      imageUrl: await uploadSlotIfChanged(id),
+      imageUrl: uploadResults[id] || null,
       hp: Number(row.querySelector('.u-hp').value) || 0,
       attack: Number(row.querySelector('.u-attack').value) || 0,
       range: Number(row.querySelector('.u-range').value) || 0,
       speed: Number(row.querySelector('.u-speed').value) || 0,
       cost: Number(row.querySelector('.u-cost').value) || 0,
-    });
-  }
-  return units;
+    };
+  });
 }
 
 async function buildMapDoc(status) {
-  const units = await collectUnits();
+  const unitSlots = Array.from(unitList.querySelectorAll('.unit-row')).map((row) => row.dataset.unitId);
+  const uploadResults = await uploadSlotsWithLimit([...FIXED_UPLOAD_SLOTS, ...unitSlots]);
+  const units = collectUnits(uploadResults);
   return {
     ownerId: currentUser.uid,
     status, // 'draft' | 'complete'
     name: document.getElementById('mapName').value.trim() || 'Untitled Map',
     baseLabel: document.getElementById('baseLabel').value.trim() || 'Planet',
-    backgroundImage: await uploadSlotIfChanged('backgroundImage'),
+    backgroundImage: uploadResults.backgroundImage,
     factions: {
       good: {
         name: document.getElementById('goodName').value.trim() || 'Allied Forces',
         color: document.getElementById('goodColor').value,
-        baseImage: await uploadSlotIfChanged('goodBaseImage'),
+        baseImage: uploadResults.goodBaseImage,
       },
       bad: {
         name: document.getElementById('badName').value.trim() || 'Hostile Forces',
         color: document.getElementById('badColor').value,
-        baseImage: await uploadSlotIfChanged('badBaseImage'),
+        baseImage: uploadResults.badBaseImage,
       },
     },
     resource: {
       name: document.getElementById('resourceName').value.trim() || 'Gold Mine',
       size: Number(document.getElementById('resourceSize').value) || 5000,
-      image: await uploadSlotIfChanged('resourceImage'),
+      image: uploadResults.resourceImage,
     },
     miningUnit: {
       name: document.getElementById('miningUnitName').value.trim() || 'Mining Ship',
       ratePerHour: Number(document.getElementById('miningRate').value) || 600,
-      image: await uploadSlotIfChanged('miningUnitImage'),
+      image: uploadResults.miningUnitImage,
     },
     units,
     sounds: {
-      music: await uploadSlotIfChanged('soundMusic'),
-      intro: await uploadSlotIfChanged('soundIntro'),
-      attack: await uploadSlotIfChanged('soundAttack'),
-      buildingDestroyed: await uploadSlotIfChanged('soundBuildingDestroyed'),
-      homeUnderAttack: await uploadSlotIfChanged('soundHomeUnderAttack'),
-      endgame: await uploadSlotIfChanged('soundEndgame'),
+      music: uploadResults.soundMusic,
+      intro: uploadResults.soundIntro,
+      attack: uploadResults.soundAttack,
+      buildingDestroyed: uploadResults.soundBuildingDestroyed,
+      homeUnderAttack: uploadResults.soundHomeUnderAttack,
+      endgame: uploadResults.soundEndgame,
     },
     updatedAt: serverTimestamp(),
   };
@@ -612,7 +646,7 @@ function checklistGaps(mapDoc) {
 
 async function saveMap(status) {
   if (!currentUser) { setSaveStatus('Still connecting to Firebase — try again in a second.', 'warn'); return; }
-  setSaveStatus('Uploading files and saving…');
+  setSaveStatus('Uploading files (5 at a time) and saving… this can take a while, please keep this tab open.');
   try {
     const mapDoc = await buildMapDoc(status);
     if (status === 'complete') {
