@@ -143,6 +143,7 @@
   .btn-secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
   .btn-add { background: transparent; color: var(--accent); border: 1px dashed var(--accent); width: 100%; padding: 10px; }
   .btn-danger { background: transparent; color: var(--bad); border: 1px solid var(--bad); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
 
   #saveBar {
     position: fixed; bottom: 0; left: 0; right: 0;
@@ -461,6 +462,29 @@ function showExistingAsset(slotKey, url) {
   }
 }
 
+// Shared across every in-flight upload during one save, so the status line
+// shows real "N of M files done" progress instead of a static "saving…"
+// message that looks identical whether it's working normally or stuck.
+//
+// NOTE: an earlier version of this switched to uploadBytesResumable() to
+// get true byte-level percentages, but that hung indefinitely in testing
+// (confirmed against this same Firebase project - uploads sat at a fixed
+// percentage with the same chunk POSTed over and over, never resolving,
+// even for a tiny file). uploadBytes() is the version actually verified
+// working end-to-end multiple times against this project, so this sticks
+// with it and settles for coarser per-file (not per-byte) progress.
+let uploadProgress = null; // { doneCount, totalCount }
+
+function renderUploadProgress() {
+  if (!uploadProgress || uploadProgress.totalCount === 0) return;
+  setSaveStatus(`Uploading (5 at a time)… ${uploadProgress.doneCount}/${uploadProgress.totalCount} files done. Keep this tab open.`);
+}
+
+// If a single file's upload+getDownloadURL round trip goes this long
+// without finishing, treat the connection as dead and fail it loudly
+// instead of leaving it (and the whole save) hanging silently forever.
+const UPLOAD_TIMEOUT_MS = 90000;
+
 async function uploadSlotIfChanged(slotKey) {
   const slot = document.querySelector(`.upload-slot[data-slot="${slotKey}"]`);
   const input = slot.querySelector('input[type=file]');
@@ -468,13 +492,25 @@ async function uploadSlotIfChanged(slotKey) {
   if (!file) return existingAssetUrls[slotKey] || null;
   const path = `maps/${currentUser.uid}/${currentMapId}/${slotKey}_${Date.now()}_${file.name}`;
   const ref = storageRef(storage, path);
-  await uploadBytes(ref, file);
-  const url = await getDownloadURL(ref);
+  slot.querySelector('.status').textContent = 'uploading…';
+
+  const url = await Promise.race([
+    (async () => {
+      await uploadBytes(ref, file);
+      return getDownloadURL(ref);
+    })(),
+    new Promise((_, reject) => setTimeout(
+      () => reject(new Error(`"${file.name}" didn't finish within ${UPLOAD_TIMEOUT_MS / 1000}s — your connection may be too slow or unstable right now. Try again, or use a smaller file.`)),
+      UPLOAD_TIMEOUT_MS
+    )),
+  ]);
+
   existingAssetUrls[slotKey] = url;
   // Clear the input so a later save (e.g. Finish & Save right after Save
   // Draft) reuses this URL instead of silently re-uploading the same file.
   input.value = '';
   slot.querySelector('.status').textContent = 'uploaded ✓ (saved)';
+  if (uploadProgress) { uploadProgress.doneCount++; renderUploadProgress(); }
   return url;
 }
 
@@ -485,6 +521,16 @@ async function uploadSlotIfChanged(slotKey) {
 const MAX_CONCURRENT_UPLOADS = 5;
 
 async function uploadSlotsWithLimit(slotKeys) {
+  // Only count slots that actually have a pending file - most calls here
+  // include a bunch of empty/already-uploaded slots that resolve instantly.
+  let totalCount = 0;
+  for (const key of slotKeys) {
+    const file = document.querySelector(`.upload-slot[data-slot="${key}"] input[type=file]`)?.files[0];
+    if (file) totalCount++;
+  }
+  uploadProgress = { totalCount, doneCount: 0 };
+  renderUploadProgress();
+
   const results = {};
   let nextIndex = 0;
   async function worker() {
@@ -494,7 +540,11 @@ async function uploadSlotsWithLimit(slotKeys) {
     }
   }
   const workerCount = Math.min(MAX_CONCURRENT_UPLOADS, slotKeys.length);
-  await Promise.all(Array.from({ length: workerCount }, worker));
+  try {
+    await Promise.all(Array.from({ length: workerCount }, worker));
+  } finally {
+    uploadProgress = null;
+  }
   return results;
 }
 
@@ -644,8 +694,23 @@ function checklistGaps(mapDoc) {
   return gaps;
 }
 
+let saveInProgress = false;
+const saveDraftBtn = document.getElementById('saveDraftBtn');
+const saveFinalBtn = document.getElementById('saveFinalBtn');
+
 async function saveMap(status) {
   if (!currentUser) { setSaveStatus('Still connecting to Firebase — try again in a second.', 'warn'); return; }
+  // Without this guard, clicking Save again while an earlier save is still
+  // uploading starts a second, fully independent upload pass over every
+  // still-populated slot - silently re-uploading files that were already
+  // in flight or already done, on top of whatever the first click is doing.
+  if (saveInProgress) {
+    setSaveStatus('Already saving — please wait for it to finish before saving again.', 'warn');
+    return;
+  }
+  saveInProgress = true;
+  saveDraftBtn.disabled = true;
+  saveFinalBtn.disabled = true;
   setSaveStatus('Uploading files (5 at a time) and saving… this can take a while, please keep this tab open.');
   try {
     const mapDoc = await buildMapDoc(status);
@@ -664,11 +729,15 @@ async function saveMap(status) {
   } catch (err) {
     console.error(err);
     setSaveStatus('Save failed: ' + err.message, 'bad');
+  } finally {
+    saveInProgress = false;
+    saveDraftBtn.disabled = false;
+    saveFinalBtn.disabled = false;
   }
 }
 
-document.getElementById('saveDraftBtn').addEventListener('click', () => saveMap('draft'));
-document.getElementById('saveFinalBtn').addEventListener('click', () => saveMap('complete'));
+saveDraftBtn.addEventListener('click', () => saveMap('draft'));
+saveFinalBtn.addEventListener('click', () => saveMap('complete'));
 document.getElementById('newMapBtn').addEventListener('click', () => {
   currentMapId = newMapId();
   setMapIdInUrl(currentMapId);
