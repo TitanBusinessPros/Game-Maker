@@ -33,6 +33,12 @@ appear) — a genuinely separate, self-contained game per map.
 2. **Your faction & computer players** — you're always the human player;
    add 1-5 computer-controlled opponents, each with its own name, color,
    and homeworld art.
+2a. **Game style** — ⏱️ Real-Time (default, unchanged) or 🔄 Turn-Based
+   (hot-seat: 2-5 people share this device, a timer of 10-60s per turn).
+   Turn-Based adds a **turn timer** field and, per computer player, a
+   "Controlled by: 🤖 AI / 🧑 Human (hot-seat)" toggle - a human-flagged
+   one takes a real turn instead of thinking on its own. Real-Time mode
+   never shows either control; every computer player there is always AI.
 3. **Resource & mining** — the deposit every homeworld gets nearby (name,
    size, art - a real "mine" image, separate from the vessel that works
    it) and the mining unit that drains it (name, income/hour, art).
@@ -61,23 +67,41 @@ entirely by one map's saved data:
 
 - Real-time mining economy (600 → 900 → 1200/hour via research tiers),
   a 7-node research tree (economy chain + generic combat/utility
-  upgrades), a real build queue using every unit's actual stats.
-- A 90-second turn clock (cosmetic pacing, matching the source game's
-  feel) alongside the real-time economy.
+  upgrades), a real build queue using every unit's actual stats. Income
+  and research keep running for every faction regardless of game style
+  or whose turn it is - never paused by anything except Pause itself.
+- **Two game styles**, picked at map-creation time:
+  - **Real-Time** (default) - a 90-second cosmetic turn clock; a unit
+    that attacks fires exactly once, then locks (can't take a new move
+    or attack order) until that clock's next turn.
+  - **Turn-Based (hot-seat)** - 2-5 people share this device. Only the
+    active faction's units can act at all (move/attack/build/research
+    via the panel) - everyone else, AI factions included, is completely
+    frozen until their own turn comes back around. A per-faction timer
+    (10-60s, set on the map) counts down and then passes control to the
+    next faction automatically - "no continued [global] timer," just
+    each faction's own window. The top bar shows whose turn it is and
+    the seconds left; the camera snaps to their homeworld when it
+    becomes their turn. A unit that attacks here locks for a short
+    real-time cooldown instead of the 90s clock-turn, since this mode
+    has no such clock at all.
 - **Team A / Team B** - shown before every match, for every player, with
   up to 5 computer opponents each getting an explicit A/B toggle (you're
   always A). At least one has to stay on B or Start Match refuses -
-  otherwise there's nothing to fight.
+  otherwise there's nothing to fight. In Turn-Based mode this screen
+  also shows 🧑 Human/🤖 AI next to each faction.
 - **Real player control**: left-drag a box to select multiple units,
-  click to move or attack. A unit that attacks fires exactly once, then
-  locks (can't take a new move or attack order) until the next turn -
-  can't repeat-fire or fire-and-reposition freely. A **✕ Deselect**
-  button (also the Escape key) clears the current selection so units stop
-  following the mouse.
+  click to move or attack. Issuing an order deselects automatically -
+  a unit doesn't stay glued to your next click the way it used to. A
+  **✕ Deselect** button (also the Escape key) clears the current
+  selection too.
 - **Mining ships auto-travel**: built next to your own deposit, a miner
   immediately gets a move order there on its own - no manual command
   needed - and income only flows while it's actually parked within range
-  of the deposit, not just for existing somewhere on the map.
+  of the deposit, not just for existing somewhere on the map. It's a
+  real, killable unit (40 HP) the whole time, and now shows its own live
+  income right above it ("⛏ +900/hr" / "⛏ en route…"), same idea as the
+  source game's own display.
 - Laser beams on every attack, colored per unit type from an 8-color
   palette (colors repeat past 8 types).
 - Units rotate to face their actual direction of travel.
@@ -87,18 +111,25 @@ entirely by one map's saved data:
   them a move order to that point. Also: fog of war (toggle - minimap-only
   reveal radius around your own units), sound on/off, pause (freezes the
   whole simulation), Save/Load to a JSON file.
-- Background art is drawn as a **tiled world-space pattern**
-  (`ctx.createPattern`), so it stays sharp and always covers the full map
-  regardless of chosen size - earlier cover-fit/capped-scale approaches
-  either blurred or left black gaps on larger maps.
+- Background art is a **single image, cover-fit once** over the whole
+  world's bounding box (scale = the larger of width/height ratio,
+  uncapped, so it always fully covers with no gaps) - not tiled. A tiled
+  repeating pattern was tried first but reads as an obvious grid of
+  identical squares rather than one map; a cover-fit single image trades
+  some softness on a big map for actually looking like one accurate
+  picture.
+- The homeworld's HP is also a real bar at the top of the Build panel
+  (updated live every frame), not just the small one floating over its
+  canvas sprite - and the resource counter up top is explicitly labeled
+  "🪙 ... Gold" instead of a bare, unlabeled number.
 - **⬇ Download as index.html** - packages the map's data inline into a
   fully standalone copy of this page. Verified: opens and runs from
   `file://` with zero network calls.
 
-`window.__GM_DEBUG` (factions/units/camera/etc, read-only) is left in
-deliberately - real automated tests throughout this project's build used
-it to verify game state directly instead of guessing at screen
-coordinates.
+`window.__GM_DEBUG` (factions/units/camera/turnMode/activeFaction/etc,
+read-only) is left in deliberately - real automated tests throughout
+this project's build used it to verify game state directly instead of
+guessing at screen coordinates.
 
 ## `admin.html`
 

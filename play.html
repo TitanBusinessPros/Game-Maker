@@ -146,6 +146,7 @@
         A <strong>Mining Ship</strong> parked on your deposit earns resources automatically.<br>
         The match ends when a homeworld's HP reaches 0 - your whole team wins together.
       </p>
+      <p id="turnModeHelp" style="display:none; font-size:12px; color:var(--dim); line-height:1.6; border-top:1px solid var(--border); padding-top:8px; margin-top:8px;"></p>
     </div>
   </div>
 
@@ -225,6 +226,7 @@ const UNIT_SIZE = 34;
 const HOMEWORLD_SIZE = 90;
 const DEPOSIT_SIZE = 56;
 const AI_TICK_SECONDS = 6;
+const ATTACK_COOLDOWN_SECONDS = 1.2; // per-shot cooldown used in Turn-Based mode instead of the Real-Time "once per 90s clock-turn" rule - see isLocked()/lockUnit() below
 const MINING_RANGE = 80; // how close a Mining Ship has to be to its deposit to actually earn resources
 const MAP_SIZE_MULTIPLIER = { tiny: 1, small: 3, medium: 6, large: 12 };
 const BASE_HOME_RADIUS = 420;
@@ -257,6 +259,13 @@ async function main() {
     return;
   }
   statusEl.textContent = 'Loading art & sound…';
+  // Turn-Based (hot-seat): 2-5 people share this device. Only the active
+  // faction's units can act at all (move/attack) - everyone else is
+  // frozen until their own turn comes back around. Set at map-creation
+  // time (index.html's Game Style picker); Real-Time is the default and
+  // behaves exactly as before this mode existed.
+  const turnMode = cfg.gameStyle === 'turnbased';
+  const TURN_TIMER_SECONDS = Math.max(10, Math.min(60, Number(cfg.turnTimerSeconds) || 30));
 
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
@@ -304,6 +313,13 @@ async function main() {
     const src = isPlayer ? cfg.player : computerCfgs[i - 1];
     factions.push({
       id: i, isPlayer,
+      // Faction 0 (you) is always human. In Turn-Based mode, any computer
+      // player can be flagged "Human (hot-seat)" at map-creation time
+      // instead of AI - they then take a real turn like anyone else,
+      // frozen the rest of the time same as an AI faction would be. In
+      // Real-Time mode this never applies - computer players are always
+      // AI, exactly as before this mode existed.
+      isHuman: isPlayer || (turnMode && src?.controlledBy === 'human'),
       name: src?.name || (isPlayer ? 'Player' : `Computer ${i}`),
       color: src?.color || '#888',
       img: isPlayer ? playerImg : computerImgs[i - 1],
@@ -315,6 +331,13 @@ async function main() {
     });
   }
   const player = factions[0];
+  // The faction currently allowed to act. Real-Time mode: always the
+  // player, forever (matches every "player"-keyed UI/control path exactly
+  // as before this mode existed). Turn-Based mode: rotates through every
+  // faction in order via advanceTurn() below, starting with faction 0.
+  let activeIdx = 0;
+  let activeFaction = player;
+  let hotseatTimer = TURN_TIMER_SECONDS;
 
   const worldMinX = Math.min(...factions.map((f) => f.x)) - 400;
   const worldMaxX = Math.max(...factions.map((f) => f.x)) + 400;
@@ -419,14 +442,25 @@ async function main() {
     }
   }
 
+  // A unit that just attacked does nothing else at all - can't re-attack
+  // or take a new move order - until it's allowed to again. What "until"
+  // means depends on the mode: Real-Time uses the old 90-second cosmetic
+  // clock-turn (unchanged); Turn-Based has no such clock at all (that's
+  // the whole point of the mode), so it uses a short real-time cooldown
+  // instead - long enough to stop one unit deleting its target in a
+  // single frame, short enough that a 10-60s turn window still gets real
+  // combat done in it.
+  function isLocked(u) {
+    return turnMode ? elapsed < (u.attackCooldownUntil || 0) : turnNumber < u.lockedUntilTurn;
+  }
+  function lockUnit(u) {
+    if (turnMode) u.attackCooldownUntil = elapsed + ATTACK_COOLDOWN_SECONDS;
+    else u.lockedUntilTurn = turnNumber + 1;
+  }
   function combatTick(u, dt) {
     const t = u.target;
     if (!t || t.hp <= 0 || t.alive === false) { u.target = null; return; }
-    // A unit that already attacked this turn does nothing else at all
-    // until the next one - not "wait 1 second and fire again." One
-    // attack per turn, full stop, same rule that locks it out of new
-    // move orders (they're the same lock now, not two separate systems).
-    if (turnNumber < u.lockedUntilTurn) return;
+    if (isLocked(u)) return;
     const dist = Math.hypot(t.x - u.x, t.y - u.y);
     u.facingAngle = facingToward(u, t.x, t.y);
     if (dist > u.range) {
@@ -436,7 +470,7 @@ async function main() {
       t.hp -= u.attack;
       fireBeam(u, t);
       playSfx(sounds.attack);
-      u.lockedUntilTurn = turnNumber + 1;
+      lockUnit(u);
       if (t.hp <= 0) {
         t.hp = 0;
         if (t.maxHp === undefined || t.isFactionHome) playSfx(sounds.homeUnderAttack);
@@ -449,6 +483,27 @@ async function main() {
   factions.forEach((f) => { f.isFactionHome = true; });
 
   let turnTimer = TURN_SECONDS, turnNumber = 1, aiTimer = AI_TICK_SECONDS, fogOn = false;
+  let elapsed = 0; // real seconds since the match started - drives Turn-Based's attack cooldown (see isLocked/lockUnit above)
+
+  // Turn-Based mode only: rotate control to the next living faction,
+  // wrapping around, and reset everything that's specific to "whose turn
+  // is it" - the hot-seat timer, the camera (so whoever's picking up the
+  // device next actually sees their own side of the map), any leftover
+  // selection from the player who just finished, and the build/research
+  // panels (they render whatever activeFaction currently is).
+  function advanceTurn() {
+    const alive = factions.filter((f) => f.hp > 0);
+    if (!alive.length) return;
+    deselectAll(); // clear the outgoing faction's selection ring before switching - else it stays visible, stale, during the next faction's turn
+    do {
+      activeIdx = (activeIdx + 1) % factions.length;
+    } while (factions[activeIdx].hp <= 0);
+    activeFaction = factions[activeIdx];
+    hotseatTimer = TURN_TIMER_SECONDS;
+    camera.x = activeFaction.x; camera.y = activeFaction.y;
+    renderBuildPanel();
+    renderResearchPanel();
+  }
 
   function startResearch(fac, id) {
     const t = TECH_TREE[id];
@@ -484,8 +539,16 @@ async function main() {
 
   function update(dt) {
     if (paused || gameOver || !matchStarted) return;
-    turnTimer -= dt;
-    if (turnTimer <= 0) { turnTimer = TURN_SECONDS; turnNumber++; }
+    elapsed += dt;
+    if (turnMode) {
+      // No continued/global clock in this mode - just each faction's own
+      // hot-seat window, counting down in real time.
+      hotseatTimer -= dt;
+      if (hotseatTimer <= 0) advanceTurn();
+    } else {
+      turnTimer -= dt;
+      if (turnTimer <= 0) { turnTimer = TURN_SECONDS; turnNumber++; }
+    }
 
     for (const f of factions) {
       if (f.research.active) {
@@ -506,7 +569,11 @@ async function main() {
       // meant to stay a real, killable target the whole time.
       if (miner) miner.activelyMining = !!mining; // read by drawUnit for the live income label
       if (mining) f.resources += (miningRate(f) / 3600) * dt;
-      if (!f.isPlayer && f.hp > 0) {
+      // AI factions only get to act (build/research decisions) during
+      // their own turn in Turn-Based mode - frozen the rest of the time,
+      // same as a human faction would be. In Real-Time mode this is
+      // unchanged: every AI faction thinks continuously.
+      if (!f.isHuman && f.hp > 0 && (!turnMode || f.id === activeIdx)) {
         f._aiTimer = (f._aiTimer ?? AI_TICK_SECONDS) - dt;
         if (f._aiTimer <= 0) { f._aiTimer = AI_TICK_SECONDS; aiThink(f, dt); }
       }
@@ -518,6 +585,12 @@ async function main() {
     for (const u of units) {
       if (!u.alive) continue;
       const fac = factionOf(u.factionId);
+      // Turn-Based mode: a faction that isn't the active one is fully
+      // frozen - none of its units move, chase, or attack at all,
+      // regardless of what orders they're holding. They pick back up
+      // exactly where they left off once their turn comes back around.
+      // Real-Time mode: always true, so this never changes anything there.
+      if (turnMode && fac.id !== activeIdx) continue;
       if (u.isMiner) {
         // Nothing moved a miner at all before this - it had orderType/
         // moveTarget fields but this loop only ever branched on
@@ -526,12 +599,12 @@ async function main() {
         // order it held. Reuses the same move-toward-point logic as a
         // player-commanded unit.
         if (u.orderType === 'move' && u.moveTarget) runMoveOrder(u, dt);
-      } else if (!fac.isPlayer) {
+      } else if (!fac.isHuman) {
         if (!u.target) u.target = nearestEnemy(u);
         combatTick(u, dt);
       } else {
         if (u.orderType === 'attack' && u.target) combatTick(u, dt);
-        else if (u.orderType === 'move' && u.moveTarget && turnNumber >= u.lockedUntilTurn) runMoveOrder(u, dt);
+        else if (u.orderType === 'move' && u.moveTarget && !isLocked(u)) runMoveOrder(u, dt);
       }
     }
 
@@ -540,7 +613,13 @@ async function main() {
       gameOver = true;
       const winningTeam = [...aliveTeams][0];
       const winners = factions.filter((f) => f.team === winningTeam).map((f) => f.name).join(', ');
-      document.getElementById('bannerText').textContent = winningTeam === player.team ? `Your team wins! (${winners})` : `${winners} win${factions.filter(f=>f.team===winningTeam).length>1?'s':''}!`;
+      const winnerCountPlural = factions.filter((f) => f.team === winningTeam).length > 1 ? 's' : '';
+      // Turn-Based hot-seat has no single privileged "you" - everyone
+      // takes a turn as everyone - so always name the winner(s) instead
+      // of personalizing it to whoever created the map.
+      document.getElementById('bannerText').textContent = (!turnMode && winningTeam === player.team)
+        ? `Your team wins! (${winners})`
+        : `${winners} win${winnerCountPlural}!`;
       document.getElementById('banner').classList.add('show');
       playSfx(sounds.endgame);
     }
@@ -634,14 +713,16 @@ async function main() {
     const pct = Math.max(0, u.hp / u.maxHp);
     ctx.fillStyle = '#2a3550'; ctx.fillRect(p.x - size / 2, p.y - size / 2 - 7, size, 3);
     ctx.fillStyle = factionOf(u.factionId).color; ctx.fillRect(p.x - size / 2, p.y - size / 2 - 7, size * pct, 3);
-    if (turnNumber < u.lockedUntilTurn) { ctx.fillStyle = '#fff'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('🔒', p.x, p.y - size / 2 - 12); }
-    // Live income label over your own (or an ally's) Mining Ship - same
-    // idea as After Earth showing what a mining vessel is actually
-    // earning right now, not just a silent number ticking up somewhere
-    // else on screen. Only own/allied miners, not enemy ones - seeing an
-    // opponent's live income would be more intel than this game gives
-    // you anywhere else.
-    if (u.isMiner && isAlly(player.id, u.factionId)) {
+    if (isLocked(u)) { ctx.fillStyle = '#fff'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('🔒', p.x, p.y - size / 2 - 12); }
+    // Live income label over the current viewpoint's own (or an ally's)
+    // Mining Ship - same idea as After Earth showing what a mining vessel
+    // is actually earning right now, not just a silent number ticking up
+    // somewhere else on screen. "Current viewpoint" is activeFaction -
+    // in Turn-Based mode that's whoever's turn it is; in Real-Time mode
+    // it's always the player, same as before this mode existed. Not
+    // shown for enemies - seeing an opponent's live income would be more
+    // intel than this game gives you anywhere else.
+    if (u.isMiner && isAlly(activeFaction.id, u.factionId)) {
       ctx.fillStyle = '#ffd24a'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center';
       ctx.fillText(u.activelyMining ? `⛏ +${miningRate(factionOf(u.factionId))}/hr` : '⛏ en route…', p.x, p.y - size / 2 - 12);
     }
@@ -696,9 +777,17 @@ async function main() {
     const row = document.getElementById('hudRow');
     // "🪙 ... Gold" - the ticking number up top had no label at all before
     // this, so there was nothing on screen saying what it actually was.
-    row.innerHTML = factions.map((f) => `<span style="color:${f.color}">${f.name}: ${Math.round(f.hp)} HP · 🪙 ${Math.round(f.resources)} Gold${f.team === player.team ? ' 🤝' : ''}</span>`).join(' ');
-    const mins = Math.floor(Math.max(0, turnTimer) / 60), secs = Math.floor(Math.max(0, turnTimer) % 60);
-    document.getElementById('turnLabel').textContent = `Turn ${turnNumber} · next in ${mins}:${String(secs).padStart(2, '0')}`;
+    // Turn-Based mode: no fixed "you" to show a 🤝 relative to, so name
+    // each faction's team instead - true regardless of viewpoint - and
+    // point at whoever's turn it currently is.
+    row.innerHTML = factions.map((f) => `<span style="color:${f.color}">${turnMode && f.id === activeIdx ? '👉 ' : ''}${f.name}: ${Math.round(f.hp)} HP · 🪙 ${Math.round(f.resources)} Gold${turnMode ? ` [Team ${f.team}]` : (f.team === player.team ? ' 🤝' : '')}</span>`).join(' ');
+    if (turnMode) {
+      const secs = Math.max(0, Math.ceil(hotseatTimer));
+      document.getElementById('turnLabel').textContent = `🔄 ${activeFaction.name}'s turn · ${secs}s left`;
+    } else {
+      const mins = Math.floor(Math.max(0, turnTimer) / 60), secs = Math.floor(Math.max(0, turnTimer) % 60);
+      document.getElementById('turnLabel').textContent = `Turn ${turnNumber} · next in ${mins}:${String(secs).padStart(2, '0')}`;
+    }
   }
 
   function renderMinimap() {
@@ -708,7 +797,7 @@ async function main() {
     function toMini(x, y) { return { x: (x - worldMinX) * sx, y: (y - worldMinY) * sy }; }
     function within(x, y) {
       if (!fogOn) return true;
-      return livingUnits(player.id).some((u) => Math.hypot(u.x - x, u.y - y) < 500) || Math.hypot(player.x - x, player.y - y) < 700;
+      return livingUnits(activeFaction.id).some((u) => Math.hypot(u.x - x, u.y - y) < 500) || Math.hypot(activeFaction.x - x, activeFaction.y - y) < 700;
     }
     for (const f of factions) {
       if (f.hp <= 0 || !within(f.x, f.y)) continue;
@@ -742,7 +831,7 @@ async function main() {
       const sel = selectedUnits();
       if (sel.length) {
         sel.forEach((u) => {
-          if (turnNumber < u.lockedUntilTurn) return; // attacked this turn - can't take a new order yet
+          if (isLocked(u)) return; // attacked this turn - can't take a new order yet
           u.orderType = 'move'; u.moveTarget = { x: worldX, y: worldY }; u.target = null;
         });
         deselectAll(); // see handleClick's comment - same "stuck to the mouse" fix applies here
@@ -804,9 +893,9 @@ async function main() {
         const x0 = Math.min(dragStart.x, evt.clientX) - r.left, x1 = Math.max(dragStart.x, evt.clientX) - r.left;
         const y0 = Math.min(dragStart.y, evt.clientY) - r.top, y1 = Math.max(dragStart.y, evt.clientY) - r.top;
         const w0 = toWorld(x0, y0), w1 = toWorld(x1, y1);
-        const picked = livingUnits(player.id).filter((u) => !u.isMiner && u.x >= w0.x && u.x <= w1.x && u.y >= w0.y && u.y <= w1.y);
+        const picked = livingUnits(activeFaction.id).filter((u) => !u.isMiner && u.x >= w0.x && u.x <= w1.x && u.y >= w0.y && u.y <= w1.y);
         if (picked.length) {
-          livingUnits(player.id).forEach((u) => u.selected = false);
+          livingUnits(activeFaction.id).forEach((u) => u.selected = false);
           picked.forEach((u) => u.selected = true);
           showUnitInfo(picked.length === 1 ? picked[0] : null, picked.length);
         }
@@ -817,14 +906,14 @@ async function main() {
     dragStart = null;
   });
 
-  function selectedUnits() { return livingUnits(player.id).filter((u) => u.selected); }
+  function selectedUnits() { return livingUnits(activeFaction.id).filter((u) => u.selected); }
 
   function handleClick(evt) {
     const r = canvas.getBoundingClientRect();
     const p = toWorld(evt.clientX - r.left, evt.clientY - r.top);
-    const own = livingUnits(player.id).find((u) => !u.isMiner && Math.hypot(u.x - p.x, u.y - p.y) < UNIT_SIZE / 2 + 8);
+    const own = livingUnits(activeFaction.id).find((u) => !u.isMiner && Math.hypot(u.x - p.x, u.y - p.y) < UNIT_SIZE / 2 + 8);
     if (own) {
-      livingUnits(player.id).forEach((u) => u.selected = false);
+      livingUnits(activeFaction.id).forEach((u) => u.selected = false);
       own.selected = true;
       showUnitInfo(own, 1);
       return;
@@ -833,14 +922,14 @@ async function main() {
     if (!sel.length) { hideUnitInfo(); return; }
     let target = null;
     for (const f of factions) {
-      if (isAlly(player.id, f.id) || f.hp <= 0) continue;
+      if (isAlly(activeFaction.id, f.id) || f.hp <= 0) continue;
       if (Math.hypot(f.x - p.x, f.y - p.y) < HOMEWORLD_SIZE / 2) { target = f; break; }
     }
     if (!target) {
-      target = units.find((u) => u.alive && !u.isMiner && !isAlly(player.id, u.factionId) && Math.hypot(u.x - p.x, u.y - p.y) < UNIT_SIZE / 2 + 8);
+      target = units.find((u) => u.alive && !u.isMiner && !isAlly(activeFaction.id, u.factionId) && Math.hypot(u.x - p.x, u.y - p.y) < UNIT_SIZE / 2 + 8);
     }
     sel.forEach((u) => {
-      if (turnNumber < u.lockedUntilTurn) return; // attacked this turn - can't take a new order yet
+      if (isLocked(u)) return; // attacked this turn - can't take a new order yet
       if (target) { u.orderType = 'attack'; u.target = target; u.moveTarget = null; }
       else { u.orderType = 'move'; u.moveTarget = { x: p.x, y: p.y }; u.target = null; }
     });
@@ -863,31 +952,36 @@ async function main() {
     }
     const def = u.isMiner ? { name: cfg.miningUnit?.name || 'Mining Ship' } : unitDefs[u.defIndex];
     box.style.display = 'block';
-    textEl.innerHTML = `<strong>${def.name}</strong><br>HP ${Math.round(u.hp)}/${u.maxHp}${u.isMiner ? '' : ` · ATK ${u.attack} · RNG ${u.range} · SPD ${u.speed.toFixed(1)}`}${turnNumber < u.lockedUntilTurn ? '<br><span style="color:var(--warn)">🔒 locked until next turn</span>' : ''}`;
+    textEl.innerHTML = `<strong>${def.name}</strong><br>HP ${Math.round(u.hp)}/${u.maxHp}${u.isMiner ? '' : ` · ATK ${u.attack} · RNG ${u.range} · SPD ${u.speed.toFixed(1)}`}${isLocked(u) ? '<br><span style="color:var(--warn)">🔒 locked until next turn</span>' : ''}`;
   }
   function hideUnitInfo() { document.getElementById('unitInfoBox').style.display = 'none'; }
   function deselectAll() {
-    livingUnits(player.id).forEach((u) => u.selected = false);
+    livingUnits(activeFaction.id).forEach((u) => u.selected = false);
     hideUnitInfo();
   }
   document.getElementById('deselectBtn').addEventListener('click', deselectAll);
   window.addEventListener('keydown', (e) => { if (e.key === 'Escape') deselectAll(); });
 
   // ---------------------------------------------------------------------
-  // Build / research panels (act on the player faction only)
+  // Build / research panels. Act on activeFaction, not always "player" -
+  // in Real-Time mode activeFaction never changes from player, so this
+  // behaves exactly as before that variable existed. In Turn-Based mode
+  // this is what makes the panel actually show whoever's turn it is:
+  // advanceTurn() re-renders both panels every time the active faction
+  // changes.
   // ---------------------------------------------------------------------
   function canAfford(fac, cost) { return fac.resources >= cost; }
-  // Your homeworld's HP as an actual bar at the top of the build panel -
-  // before this, the only way to see it was the small floating bar over
-  // its sprite on the canvas, easy to lose track of while heads-down in
-  // the build/research panel. Updated every frame from render() (cheap
-  // text/width tweak, not a full panel rebuild) so it tracks combat
-  // damage live, not just after your next build click.
+  // The active faction's homeworld HP as an actual bar at the top of the
+  // build panel - before this, the only way to see it was the small
+  // floating bar over its sprite on the canvas, easy to lose track of
+  // while heads-down in the build/research panel. Updated every frame
+  // from render() (cheap text/width tweak, not a full panel rebuild) so
+  // it tracks combat damage live, not just after your next build click.
   function updateHomeHpBar() {
     const bar = document.getElementById('homeHpBar');
     if (!bar) return;
-    const pct = Math.max(0, player.hp / player.maxHp);
-    bar.querySelector('.label span:last-child').textContent = `${Math.round(player.hp)} / ${player.maxHp} HP`;
+    const pct = Math.max(0, activeFaction.hp / activeFaction.maxHp);
+    bar.querySelector('.label span:last-child').textContent = `${Math.round(activeFaction.hp)} / ${activeFaction.maxHp} HP`;
     const fill = bar.querySelector('.fill');
     fill.style.width = pct * 100 + '%';
     fill.classList.toggle('low', pct < 0.3);
@@ -897,18 +991,18 @@ async function main() {
     el.innerHTML = '';
     const homeBar = document.createElement('div');
     homeBar.id = 'homeHpBar';
-    homeBar.innerHTML = `<div class="label"><span>🏠 ${player.name}</span><span></span></div><div class="track"><div class="fill" style="width:0%"></div></div>`;
+    homeBar.innerHTML = `<div class="label"><span>🏠 ${activeFaction.name}</span><span></span></div><div class="track"><div class="fill" style="width:0%"></div></div>`;
     el.appendChild(homeBar);
     updateHomeHpBar();
     const minerRow = document.createElement('div');
     minerRow.className = 'buildRow';
-    const hasMiner = units.some((u) => u.alive && u.factionId === player.id && u.isMiner);
-    const minerUnlocked = player.research.researched.has('mining_ops');
+    const hasMiner = units.some((u) => u.alive && u.factionId === activeFaction.id && u.isMiner);
+    const minerUnlocked = activeFaction.research.researched.has('mining_ops');
     minerRow.innerHTML = `<div class="name">${cfg.miningUnit?.name || 'Mining Ship'}</div><div class="stats">Cost 80 · ${minerUnlocked ? 'earns resources parked on your deposit' : 'requires Mining Operations research'}</div>`;
     const minerBtn = document.createElement('button');
     minerBtn.textContent = hasMiner ? 'Already built' : (minerUnlocked ? 'Build' : 'Locked');
-    minerBtn.disabled = hasMiner || !minerUnlocked || !canAfford(player, 80);
-    minerBtn.onclick = () => { player.resources -= 80; spawnMiner(player.id, player.x + 40, player.y); renderBuildPanel(); };
+    minerBtn.disabled = hasMiner || !minerUnlocked || !canAfford(activeFaction, 80);
+    minerBtn.onclick = () => { activeFaction.resources -= 80; spawnMiner(activeFaction.id, activeFaction.x + 40, activeFaction.y); renderBuildPanel(); };
     minerRow.appendChild(minerBtn);
     el.appendChild(minerRow);
     unitDefs.forEach((def, i) => {
@@ -917,8 +1011,8 @@ async function main() {
       row.innerHTML = `<div class="name">${def.name}</div><div class="stats">HP ${def.hp} · ATK ${def.attack} · RNG ${def.range} · SPD ${def.speed} · Cost ${def.cost}</div>`;
       const btn = document.createElement('button');
       btn.textContent = 'Build';
-      btn.disabled = !canAfford(player, def.cost);
-      btn.onclick = () => { player.resources -= def.cost; spawnUnit(player.id, i, player.x + 40 + (Math.random() - 0.5) * 60, player.y + (Math.random() - 0.5) * 60); renderBuildPanel(); };
+      btn.disabled = !canAfford(activeFaction, def.cost);
+      btn.onclick = () => { activeFaction.resources -= def.cost; spawnUnit(activeFaction.id, i, activeFaction.x + 40 + (Math.random() - 0.5) * 60, activeFaction.y + (Math.random() - 0.5) * 60); renderBuildPanel(); };
       row.appendChild(btn);
       el.appendChild(row);
     });
@@ -928,15 +1022,15 @@ async function main() {
     el.innerHTML = '';
     Object.entries(TECH_TREE).forEach(([id, t]) => {
       const row = document.createElement('div');
-      const done = player.research.researched.has(id);
-      const active = player.research.active && player.research.active.id === id;
+      const done = activeFaction.research.researched.has(id);
+      const active = activeFaction.research.active && activeFaction.research.active.id === id;
       row.className = 'techRow' + (done ? ' done' : '') + (active ? ' active' : '');
-      const lockedByPrereq = t.prereq && !player.research.researched.has(t.prereq);
-      row.innerHTML = `<div class="name">${t.name}</div><div class="desc">Cost ${t.cost} · ${t.timeSeconds}s${lockedByPrereq ? ' · requires ' + TECH_TREE[t.prereq].name : ''}${active ? ' · researching… ' + Math.ceil(player.research.active.remaining) + 's left' : ''}</div>`;
+      const lockedByPrereq = t.prereq && !activeFaction.research.researched.has(t.prereq);
+      row.innerHTML = `<div class="name">${t.name}</div><div class="desc">Cost ${t.cost} · ${t.timeSeconds}s${lockedByPrereq ? ' · requires ' + TECH_TREE[t.prereq].name : ''}${active ? ' · researching… ' + Math.ceil(activeFaction.research.active.remaining) + 's left' : ''}</div>`;
       const btn = document.createElement('button');
       btn.textContent = done ? 'Done' : (active ? 'In progress' : 'Research');
-      btn.disabled = done || !!player.research.active || lockedByPrereq || player.resources < t.cost;
-      btn.onclick = () => { startResearch(player, id); renderResearchPanel(); };
+      btn.disabled = done || !!activeFaction.research.active || lockedByPrereq || activeFaction.resources < t.cost;
+      btn.onclick = () => { startResearch(activeFaction, id); renderResearchPanel(); };
       row.appendChild(btn);
       el.appendChild(row);
     });
@@ -972,7 +1066,7 @@ async function main() {
 
   function serializeState() {
     return {
-      cfg, turnNumber, turnTimer,
+      cfg, turnNumber, turnTimer, activeIdx, hotseatTimer,
       factions: factions.map((f) => ({ id: f.id, resources: f.resources, hp: f.hp, team: f.team, researched: [...f.research.researched], active: f.research.active })),
       units: units.filter((u) => u.alive).map((u) => ({ factionId: u.factionId, defIndex: u.defIndex, isMiner: !!u.isMiner, x: u.x, y: u.y, hp: u.hp, maxHp: u.maxHp })),
     };
@@ -998,6 +1092,11 @@ async function main() {
       const spawned = u.isMiner ? spawnMiner(u.factionId, u.x, u.y) : spawnUnit(u.factionId, u.defIndex, u.x, u.y);
       spawned.hp = u.hp; spawned.maxHp = u.maxHp;
     });
+    if (turnMode && typeof data.activeIdx === 'number') {
+      activeIdx = data.activeIdx;
+      activeFaction = factions[activeIdx];
+      hotseatTimer = typeof data.hotseatTimer === 'number' ? data.hotseatTimer : TURN_TIMER_SECONDS;
+    }
     matchStarted = true;
     document.getElementById('teamSelectScreen').classList.remove('show');
     renderBuildPanel(); renderResearchPanel();
@@ -1027,16 +1126,26 @@ async function main() {
   const teamErrorEl = document.getElementById('teamSelectError');
   const pickedTeam = {}; // factionId -> 'A' | 'B', for computer players only
 
+  // Turn-Based only: label each row as 🧑 Human (hot-seat) or 🤖 AI so
+  // whoever's setting up the match can see who's actually going to need
+  // to sit down and take a turn, versus who plays itself.
+  if (turnMode) {
+    const note = document.createElement('p');
+    note.style.cssText = 'color:var(--dim); font-size:12px; margin-top:-8px;';
+    note.textContent = `🔄 Turn-Based: control passes to each faction below in order, ${TURN_TIMER_SECONDS}s at a time. Pass the device when it's someone else's turn.`;
+    document.getElementById('teamSelectPanel').insertBefore(note, allyListEl);
+  }
   function renderTeamRow(name, color, fid, isPlayer) {
     const row = document.createElement('div');
     row.className = 'allyRow';
+    const controlBadge = turnMode ? `<span style="font-size:11px; color:var(--dim); margin-right:8px;">${(isPlayer || factionOf(fid).isHuman) ? '🧑 Human' : '🤖 AI'}</span>` : '';
     if (isPlayer) {
-      row.innerHTML = `<span class="swatch" style="background:${color}"></span><span class="name">${name} (you)</span><div class="team-toggle"><button class="active-a" disabled>Team A</button></div>`;
+      row.innerHTML = `<span class="swatch" style="background:${color}"></span><span class="name">${name} (you)</span>${controlBadge}<div class="team-toggle"><button class="active-a" disabled>Team A</button></div>`;
       allyListEl.appendChild(row);
       return;
     }
     pickedTeam[fid] = 'B';
-    row.innerHTML = `<span class="swatch" style="background:${color}"></span><span class="name">${name}</span><div class="team-toggle"><button data-fid="${fid}" data-team="A">Team A</button><button data-fid="${fid}" data-team="B" class="active-b">Team B</button></div>`;
+    row.innerHTML = `<span class="swatch" style="background:${color}"></span><span class="name">${name}</span>${controlBadge}<div class="team-toggle"><button data-fid="${fid}" data-team="A">Team A</button><button data-fid="${fid}" data-team="B" class="active-b">Team B</button></div>`;
     allyListEl.appendChild(row);
   }
   renderTeamRow(player.name, player.color, player.id, true);
@@ -1068,13 +1177,21 @@ async function main() {
   // ---------------------------------------------------------------------
   renderBuildPanel();
   renderResearchPanel();
+  if (turnMode) {
+    const help = document.getElementById('turnModeHelp');
+    help.style.display = 'block';
+    help.innerHTML = `🔄 <strong>Turn-Based mode:</strong> only the faction named at the top can act right now - everyone else is frozen. You get ${TURN_TIMER_SECONDS}s, then control passes to the next faction automatically. Resource income and research keep running in the background for everyone, turn or no turn.`;
+  }
   statusEl.style.display = 'none';
   appEl.classList.add('ready');
 
   // Read-only debug hook, harmless in normal play - lets automated testing
   // (and just poking around in devtools) inspect real engine state instead
   // of guessing screen coordinates.
-  window.__GM_DEBUG = { factions, units, deposits, camera, get turnNumber() { return turnNumber; }, toScreen, beams };
+  window.__GM_DEBUG = {
+    factions, units, deposits, camera, get turnNumber() { return turnNumber; }, toScreen, beams,
+    turnMode, get activeFaction() { return activeFaction; }, get hotseatTimer() { return hotseatTimer; },
+  };
 
   const topbarEl = document.getElementById('topbar');
   const sidePanelEl = document.getElementById('sidePanel');

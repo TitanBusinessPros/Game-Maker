@@ -280,6 +280,22 @@
         </select>
       </div>
     </div>
+    <div class="row">
+      <div class="field narrow">
+        <label for="gameStyle">Game style</label>
+        <select id="gameStyle">
+          <option value="realtime" selected>&#9201;&#65039; Real-Time (vs computer players)</option>
+          <option value="turnbased">&#128260; Turn-Based (hot-seat, 2-5 players share this device)</option>
+        </select>
+      </div>
+      <div class="field narrow" id="turnTimerField" style="display:none;">
+        <label for="turnTimerSeconds">Turn timer (seconds)</label>
+        <input type="number" id="turnTimerSeconds" min="10" max="60" step="5" value="30">
+      </div>
+    </div>
+    <p class="hint" id="gameStyleHint" style="display:none;">
+      Turn-Based: only one faction can act at a time - everyone else is frozen until their turn comes back around. Control passes automatically when the timer runs out. Mark any computer player below as "Human (hot-seat)" to let a real person take its turn instead of AI; resource income and research keep running for everyone regardless of whose turn it is.
+    </p>
     <div class="field">
       <label>Map background art (optional)</label>
       <div class="upload-slot" data-slot="backgroundImage">
@@ -905,7 +921,26 @@ document.getElementById('addUnitBtn').addEventListener('click', () => addUnitRow
 addUnitRow({ name: 'Cruiser', hp: 300, attack: 200, range: 500, speed: 2, cost: 400 });
 
 // ---------------------------------------------------------------------
-// Computer players: 1-5 AI-controlled factions. At play time, the human
+// Game style: Real-Time (default, unchanged) vs Turn-Based hot-seat.
+// The turn-timer field and each computer player's "Controlled by"
+// toggle only matter (and are only shown) in Turn-Based mode - in
+// Real-Time mode every computer player is always AI, exactly as before
+// this style existed.
+// ---------------------------------------------------------------------
+const gameStyleSelect = document.getElementById('gameStyle');
+const turnTimerField = document.getElementById('turnTimerField');
+const gameStyleHint = document.getElementById('gameStyleHint');
+function updateGameStyleUI() {
+  const turnBased = gameStyleSelect.value === 'turnbased';
+  turnTimerField.style.display = turnBased ? 'block' : 'none';
+  gameStyleHint.style.display = turnBased ? 'block' : 'none';
+  document.querySelectorAll('.controlled-by-field').forEach((el) => { el.style.display = turnBased ? 'block' : 'none'; });
+}
+gameStyleSelect.addEventListener('change', updateGameStyleUI);
+
+// ---------------------------------------------------------------------
+// Computer players: 1-5 factions (AI by default; Turn-Based mode can
+// flag any of them "Human (hot-seat)" instead). At play time, the human
 // picks which of these join their team (e.g. 3v3 or 2v4 out of 5) - see
 // play.html's team-select screen. Reuses the same upload-slot pattern as
 // combat units above.
@@ -930,6 +965,13 @@ function addComputerRow(data = {}) {
     <div class="row">
       <div class="field"><label>Faction name</label><input type="text" class="c-name" value="${escapeAttr(data.name || `Hostile Forces ${idx + 1}`)}"></div>
       <div class="field narrow"><label>Color</label><input type="color" class="c-color" value="${data.color || COMPUTER_COLORS[idx % COMPUTER_COLORS.length]}"></div>
+      <div class="field narrow controlled-by-field" style="display:none;">
+        <label>Controlled by</label>
+        <select class="c-controlledby">
+          <option value="ai" ${data.controlledBy !== 'human' ? 'selected' : ''}>&#129302; AI</option>
+          <option value="human" ${data.controlledBy === 'human' ? 'selected' : ''}>&#129489; Human (hot-seat)</option>
+        </select>
+      </div>
     </div>
     <div class="field">
       <label>Homeworld art</label>
@@ -957,8 +999,9 @@ function renumberComputerRows() {
     row.querySelector('h3').textContent = `Computer Player ${i + 1}`;
   });
 }
-addComputerBtn.addEventListener('click', () => addComputerRow());
+addComputerBtn.addEventListener('click', () => { addComputerRow(); updateGameStyleUI(); });
 addComputerRow({ name: 'Hostile Forces' });
+updateGameStyleUI();
 
 function escapeAttr(s) {
   return String(s).replace(/"/g, '&quot;');
@@ -987,6 +1030,10 @@ function collectComputers(uploadResults) {
       name: row.querySelector('.c-name').value.trim() || 'Hostile Forces',
       color: row.querySelector('.c-color').value,
       baseImage: uploadResults[id] || null,
+      // Only meaningful in Turn-Based mode - see play.html's faction
+      // setup. Stored regardless of current gameStyle so switching a
+      // saved map from Real-Time to Turn-Based later doesn't lose it.
+      controlledBy: row.querySelector('.c-controlledby').value,
     };
   });
 }
@@ -1019,6 +1066,8 @@ async function buildMapDoc(status) {
     name: document.getElementById('mapName').value.trim() || 'Untitled Map',
     baseLabel: document.getElementById('baseLabel').value.trim() || 'Planet',
     mapSize: document.getElementById('mapSize').value || 'medium',
+    gameStyle: document.getElementById('gameStyle').value || 'realtime',
+    turnTimerSeconds: Math.max(10, Math.min(60, Number(document.getElementById('turnTimerSeconds').value) || 30)),
     backgroundImage: uploadResults.backgroundImage,
     player: {
       name: document.getElementById('goodName').value.trim() || 'Allied Forces',
@@ -1165,6 +1214,8 @@ async function loadExistingMap() {
   document.getElementById('mapName').value = m.name || '';
   document.getElementById('baseLabel').value = m.baseLabel || 'Planet';
   document.getElementById('mapSize').value = m.mapSize || 'medium';
+  document.getElementById('gameStyle').value = m.gameStyle || 'realtime';
+  document.getElementById('turnTimerSeconds').value = m.turnTimerSeconds || 30;
   if (m.backgroundImage) showExistingAsset('backgroundImage', m.backgroundImage);
 
   if (m.player) {
@@ -1177,6 +1228,7 @@ async function loadExistingMap() {
     addComputerBtn.disabled = false;
     m.computers.forEach((c) => addComputerRow(c));
   }
+  updateGameStyleUI();
 
   if (m.resource) {
     document.getElementById('resourceName').value = m.resource.name || 'Gold Mine';
