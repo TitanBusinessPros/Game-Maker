@@ -225,7 +225,14 @@ entirely by one map's saved data:
   both jumps the camera there on click AND, if units are selected, issues
   them a move order to that point. Also: fog of war (toggle - minimap-only
   reveal radius around your own units), sound on/off, pause (freezes the
-  whole simulation), Save/Load to a JSON file.
+  whole simulation), Save/Load to a JSON file. The camera can't pan past
+  the world's own edges any more - it used to be unclamped everywhere
+  (right-drag, the minimap-click jump, scroll-zoom's cursor-pivot), so
+  drifting past where the background image actually covers (see below)
+  showed nothing but the render loop's own solid fallback color forever -
+  reported as "the map is surrounded by black and I can scroll off into
+  it" on maps whose background art was already sized correctly, since the
+  black had nothing to do with the image itself.
 - Background art is a **single image, cover-fit once** over the whole
   world's bounding box (scale = the larger of width/height ratio,
   uncapped, so it always fully covers with no gaps) - not tiled. A tiled

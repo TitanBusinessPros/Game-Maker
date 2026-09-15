@@ -893,6 +893,7 @@ async function main() {
     if (round > lastGoldRound) { lastGoldRound = round; applyGoldPerRound(); }
     const center = factionViewCenter(activeFaction);
     camera.x = center.x; camera.y = center.y;
+    clampCamera();
     // Zoom OUT (never in past the normal default) just enough that the
     // whole spread - homeworld plus every unit, however far they've
     // advanced - actually fits on screen with some breathing room, so
@@ -1135,6 +1136,20 @@ async function main() {
   // empty space. camera.zoom scales everything around that center point.
   const camera = { x: player.x, y: player.y, zoom: 1 };
   const ZOOM_MIN = 0.35, ZOOM_MAX = 2.5;
+  // Nothing ever clamped camera.x/y before this - right-drag, the
+  // minimap-click jump, and scroll-zoom's cursor-pivot math could all
+  // push the camera arbitrarily far past the world's own edges, and
+  // since the background image is cover-fit to exactly that bounding box
+  // (see bgDraw below) and never bigger, drifting past it just showed
+  // raw canvas - the render() fallback fill, #06121f, reads as "solid
+  // black surrounding the map that you can scroll off into forever."
+  // Reported as exactly that, on maps whose background art was already
+  // sized correctly - the black wasn't an image-quality problem, the
+  // camera itself had nowhere it was supposed to stop.
+  function clampCamera() {
+    camera.x = Math.min(worldMaxX, Math.max(worldMinX, camera.x));
+    camera.y = Math.min(worldMaxY, Math.max(worldMinY, camera.y));
+  }
   function toScreen(x, y) {
     return { x: (x - camera.x) * camera.zoom + canvas.width / 2, y: (y - camera.y) * camera.zoom + canvas.height / 2 };
   }
@@ -1392,6 +1407,7 @@ async function main() {
     const worldX = mx / (180 / worldW) + worldMinX, worldY = my / (180 / worldH) + worldMinY;
     camera.x = worldX;
     camera.y = worldY;
+    clampCamera();
     if (matchStarted && !gameOver && !paused) {
       const sel = selectedUnits();
       if (sel.length) {
@@ -1426,6 +1442,7 @@ async function main() {
     const worldAfter = toWorld(mx, my);
     camera.x += worldBefore.x - worldAfter.x;
     camera.y += worldBefore.y - worldAfter.y;
+    clampCamera();
   }, { passive: false });
   canvas.addEventListener('mousedown', (evt) => {
     if (gameOver || paused || !matchStarted) return;
@@ -1439,6 +1456,7 @@ async function main() {
     if (Math.hypot(dx, dy) > 4) dragMoved = true;
     if (isRightDrag) {
       camera.x -= dx / camera.zoom; camera.y -= dy / camera.zoom;
+      clampCamera();
       dragStart = { x: evt.clientX, y: evt.clientY };
     } else if (dragMoved) {
       const x0 = Math.min(dragStart.x, evt.clientX), y0 = Math.min(dragStart.y, evt.clientY);
