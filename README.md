@@ -433,13 +433,16 @@ entirely by one map's saved data:
   who owns it or whether it's AI- or human-controlled, rather than
   waiting for a click the way a normal unit does - though clicking it
   and giving it an explicit target still overrides that, same as
-  commanding any other unit. Exempt from both of the rules that apply to
-  every other unit: it's never frozen by Turn-Based mode even during
-  another faction's turn (a defense that only worked on its owner's own
-  turn wouldn't defend anything), and it uses its own short real-time
-  cooldown instead of "one attack per turn" (that rule is a
-  player-command balance thing, not meant for something firing on its
-  own). It's a full combat entity in the normal
+  commanding any other unit. Follows the exact same rules every other
+  unit does now: frozen during another faction's turn in Turn-Based mode
+  (its own faction's turn only), and one attack per turn (Turn-Based) or
+  per 90s clock-turn (Real-Time), then locked until the next one, same
+  `isLocked()`/`lockUnit()` every other unit goes through. This used to
+  be the opposite - always-on, firing continuously on its own short
+  real-time cooldown regardless of whose turn it was, specifically so it
+  wouldn't sit idle defending nothing outside its owner's own turn - but
+  was changed to the once-per-turn rule at the map-maker's own request.
+  It's a full combat entity in the normal
   `units` array (not a decorative marker like the buildings above), so
   it can be selected, destroyed, and targeted by enemies like anything
   else. AI factions place them too, picking a random valid spot in the
