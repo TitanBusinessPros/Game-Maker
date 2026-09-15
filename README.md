@@ -77,13 +77,16 @@ appear) — a genuinely separate, self-contained game per map.
    Give it a name (defaults to "Air Base"), its own **art**, **HP**
    (1000-5000, same range/field as Home Base's), and a build cost, then
    add units under it (name/art/hp/attack/range/speed/**costs**/
-   **weapon** - costs is the per-resource checkbox+amount system from
-   item 3 above, replacing what used to be a single flat Cost number;
-   Weapon is a dropdown - Laser/Bullet/Explosion/Missile/Arrow/Melee
-   Slash/Flamethrower/Lightning Bolt/Poison Spray/Ice Shard/Railgun/
-   Grenade Toss/Shockwave/Cannonball/Javelin/Whip, purely cosmetic,
-   defaults to Laser - see `play.html`'s weapon-effects bullet below),
-   plus one more field each: **production time**
+   **weapon**/**rotate to face movement** - costs is the per-resource
+   checkbox+amount system from item 3 above, replacing what used to be a
+   single flat Cost number; Weapon is a dropdown - Laser/Bullet/
+   Explosion/Missile/Arrow/Melee Slash/Flamethrower/Lightning Bolt/
+   Poison Spray/Ice Shard/Railgun/Grenade Toss/Shockwave/Cannonball/
+   Javelin/Whip, purely cosmetic, defaults to Laser - see `play.html`'s
+   weapon-effects bullet below; "Rotate to face movement direction" is a
+   checkbox, on by default, that turns off a unit's sprite always
+   turning to face where it's headed - see `play.html`'s own bullet on
+   this further down), plus one more field each: **production time**
    (10-100s) - `play.html` won't let anyone build those specific units
    until they've actually built this first, and each one then takes
    that many real seconds to produce instead of appearing instantly.
@@ -308,8 +311,20 @@ entirely by one map's saved data:
   on arrival), Javelin (like Arrow but a longer shaft and a diamond
   head, reading as a heavier thrown weapon), Whip (a quadratic curve
   bowed sideways rather than upward - a lash, not a lob).
-- Units rotate to face their actual direction of travel. A faction's
-  home base art itself slowly spins in place, but only when the map's
+- Units rotate to face their actual direction of travel - per-unit now,
+  via a "Rotate to face movement direction" checkbox on every combat
+  unit row in `index.html` (on by default, so existing maps look
+  unchanged). Turning it off for a given unit skips the rotation at
+  draw time only - it still tracks a real facing angle underneath, the
+  sprite just never turns to match - for art drawn facing one fixed way
+  (infantry/army-men sprites) that otherwise looks like it's flying
+  sideways instead of walking once rotated toward diagonal movement.
+  Only combat units (the legacy list and all four gated-building unit
+  lists) got this checkbox - turrets (which rotate to face whatever
+  they're aiming at, not movement, since they never move) and the
+  Mining Ship weren't part of what was reported and still always rotate.
+  A faction's home base art itself slowly spins in place, but only when
+  the map's
   `baseLabel` field (checklist item 1's "Home Base is called a...")
   contains the word "planet" - not for Island/Base/whatever else someone
   typed there.

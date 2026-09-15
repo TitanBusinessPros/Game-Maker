@@ -696,6 +696,9 @@ async function main() {
       img: unitImages[defIndex], x, y, alive: true, selected: false,
       orderType: null, moveTarget: null, target: null,
       lockedUntilTurn: 0, facingAngle: 0, weapon: def.weapon || 'laser',
+      // index.html's "Rotate to face movement direction" checkbox -
+      // defaults true for a unit saved before this field existed.
+      rotateToFace: def.rotateToFace !== false,
     };
     units.push(u);
     return u;
@@ -1402,12 +1405,17 @@ async function main() {
     // (same as After Earth's own Unit.draw()) - the HP bar/lock icon below
     // stay screen-aligned, same as the real game keeps them too. A
     // building's facingAngle never changes from 0 (it never moves), so
-    // this rotate is a harmless no-op for those.
+    // this rotate is a harmless no-op for those. u.rotateToFace === false
+    // (index.html's per-unit checkbox, default on) skips the rotation
+    // entirely instead - facingAngle still updates normally underneath,
+    // just never applied to the draw, for sprites drawn facing one fixed
+    // way (infantry/army-men art) that look like they're flying sideways
+    // instead of walking once rotated toward diagonal movement.
     if (u.img) {
       const fit = fittedSize(u.img, size);
       ctx.save();
       ctx.translate(p.x, p.y);
-      ctx.rotate(u.facingAngle || 0);
+      if (u.rotateToFace !== false) ctx.rotate(u.facingAngle || 0);
       ctx.drawImage(u.img, -fit.w / 2, -fit.h / 2, fit.w, fit.h);
       ctx.restore();
     } else if (u.isGatedBuilding) {

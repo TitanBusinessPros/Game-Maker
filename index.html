@@ -1154,6 +1154,11 @@ function makeUnitRow(list, idPrefix, counterState, data = {}, gated = false) {
       ${gated ? `<div class="field narrow"><label>Production time (s)</label><input type="number" class="u-prodtime" value="${data.prodTime ?? 30}" min="10" max="100" step="5"></div>` : ''}
       <div class="field narrow"><label>Weapon</label><select class="u-weapon">${weaponOptionsHtml(data.weapon)}</select></div>
     </div>
+    <label style="display:flex; align-items:center; gap:6px; font-weight:normal; margin:8px 0 0;">
+      <input type="checkbox" class="u-rotate" ${data.rotateToFace !== false ? 'checked' : ''} style="width:auto;">
+      Rotate to face movement direction
+    </label>
+    <p class="hint" style="margin:2px 0 0;">On by default. Turn off for sprites drawn facing one fixed way (like army men/infantry) - rotating those to face diagonal movement makes them look like they're flying sideways instead of walking.</p>
     <div class="field" style="margin-top:6px;">
       <label>Cost</label>
       <div class="u-costs"></div>
@@ -1527,6 +1532,7 @@ function collectUnitRows(list, uploadResults) {
       speed: Number(row.querySelector('.u-speed').value) || 0,
       costs: currentCostsFromRow(row),
       weapon: row.querySelector('.u-weapon').value || 'laser',
+      rotateToFace: row.querySelector('.u-rotate').checked,
     };
     // Only Air Base/War Factory rows have the production-time field at
     // all (see makeUnitRow's `gated` flag) - clamp it the same way
