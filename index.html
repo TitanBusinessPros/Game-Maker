@@ -429,6 +429,75 @@
     <button type="button" class="btn-add" id="addWarUnitBtn">+ Add a war factory unit</button>
   </section>
 
+  <!-- 4b. Infantry Post -->
+  <section class="section" id="sec-infantrypost">
+    <h2><span class="num">4b</span> Infantry Post (optional)</h2>
+    <p class="hint">A building for foot soldiers/infantry/etc. Works exactly like Air Base and War Factory above: name it whatever fits (Infantry Post, Barracks, Garrison&hellip;), give it its own art, HP, and build cost. The units you add below it can't be built until a player actually builds this first, and each one takes real time to produce (set per unit, 10-100s) instead of appearing instantly. Leave the unit list empty and this whole feature just doesn't show up in-game.</p>
+    <div class="row">
+      <div class="field"><label>Building name</label><input type="text" id="infantryPostName" value="Infantry Post"></div>
+      <div class="field narrow"><label>Building HP</label><input type="number" id="infantryPostHp" value="2000" min="1000" max="5000" step="100"></div>
+      <div class="field narrow"><label>Build cost</label><input type="number" id="infantryPostCost" value="150" min="0" step="10"></div>
+    </div>
+    <div class="field">
+      <label>Infantry Post art</label>
+      <div class="upload-slot" data-slot="infantryPostImage">
+        <div class="thumb">none</div>
+        <div class="meta"><div class="name">No file chosen</div><div class="status">required if you add any infantry units below</div></div>
+        <input type="file" accept="image/*" style="width:auto">
+      </div>
+    </div>
+    <div id="infantryUnitList"></div>
+    <button type="button" class="btn-add" id="addInfantryUnitBtn">+ Add an infantry unit</button>
+  </section>
+
+  <!-- 4c. Helicopter Facility -->
+  <section class="section" id="sec-helifacility">
+    <h2><span class="num">4c</span> Helicopter Facility (optional)</h2>
+    <p class="hint">A building for helicopters. Works exactly like Air Base and War Factory above: name it whatever fits (Helicopter Facility, Helipad, Chopper Base&hellip;), give it its own art, HP, and build cost. The units you add below it can't be built until a player actually builds this first, and each one takes real time to produce (set per unit, 10-100s) instead of appearing instantly. Leave the unit list empty and this whole feature just doesn't show up in-game.</p>
+    <div class="row">
+      <div class="field"><label>Building name</label><input type="text" id="heliFacilityName" value="Helicopter Facility"></div>
+      <div class="field narrow"><label>Building HP</label><input type="number" id="heliFacilityHp" value="2000" min="1000" max="5000" step="100"></div>
+      <div class="field narrow"><label>Build cost</label><input type="number" id="heliFacilityCost" value="150" min="0" step="10"></div>
+    </div>
+    <div class="field">
+      <label>Helicopter Facility art</label>
+      <div class="upload-slot" data-slot="heliFacilityImage">
+        <div class="thumb">none</div>
+        <div class="meta"><div class="name">No file chosen</div><div class="status">required if you add any helicopter units below</div></div>
+        <input type="file" accept="image/*" style="width:auto">
+      </div>
+    </div>
+    <div id="heliUnitList"></div>
+    <button type="button" class="btn-add" id="addHeliUnitBtn">+ Add a helicopter unit</button>
+  </section>
+
+  <!-- 4d. Research Facility -->
+  <section class="section" id="sec-researchfacility">
+    <h2><span class="num">4d</span> Research Facility</h2>
+    <p class="hint">Not optional like the buildings above - every map has a research tree (see the Research tab in-game), so this is the one building every player has to build before they can start researching ANYTHING at all. Name it whatever fits (Research Facility, Lab, Observatory&hellip;) and give it its own art, HP, and build cost.</p>
+    <div class="row">
+      <div class="field"><label>Building name</label><input type="text" id="researchFacilityName" value="Research Facility"></div>
+      <div class="field narrow"><label>Building HP</label><input type="number" id="researchFacilityHp" value="2000" min="1000" max="5000" step="100"></div>
+      <div class="field narrow"><label>Build cost</label><input type="number" id="researchFacilityCost" value="150" min="0" step="10"></div>
+    </div>
+    <div class="field">
+      <label>Research Facility art</label>
+      <div class="upload-slot" data-slot="researchFacilityImage">
+        <div class="thumb">none</div>
+        <div class="meta"><div class="name">No file chosen</div><div class="status">required to finish</div></div>
+        <input type="file" accept="image/*" style="width:auto">
+      </div>
+    </div>
+  </section>
+
+  <!-- 4e. Gun Turrets -->
+  <section class="section" id="sec-turrets">
+    <h2><span class="num">4e</span> Gun Turrets (optional)</h2>
+    <p class="hint">Stationary defenses - not built next to your Home Base automatically like other units. Instead, in-game, building one puts you into a placement mode: click anywhere between 50 and 300 range of your Home Base to place it there. It never moves once placed (Speed is ignored for these), and fires on its own at whatever enemy comes into range. Add as many turret types as you want; leave the list empty and this feature just doesn't show up in-game.</p>
+    <div id="turretList"></div>
+    <button type="button" class="btn-add" id="addTurretBtn">+ Add a turret</button>
+  </section>
+
   <!-- 5. Audio -->
   <section class="section" id="sec-audio">
     <h2><span class="num">5</span> Sounds</h2>
@@ -699,7 +768,9 @@ const CATEGORY_LABELS = {
   'structures/war_factory': 'War Factory',
   'structures/airport': 'Airport',
   'structures/infantry_post': 'Infantry Post',
+  'structures/helicopter_facility': 'Helicopter Facility',
   'structures/research_facility': 'Research Facility',
+  'structures/gun_turret': 'Gun Turret',
   'sounds/music': 'Background Music',
   'sounds/intro': 'Intro Music',
   'sounds/attack': 'Attack',
@@ -712,7 +783,7 @@ const CATEGORY_ORDER = [
   'maps',
   'characters/space_ships', 'characters/navy_ships', 'characters/jets', 'characters/helicopters', 'characters/army_men', 'characters/infantry', 'characters/artillery',
   'worlds', 'bases', 'resources',
-  'structures/war_factory', 'structures/airport', 'structures/infantry_post', 'structures/research_facility',
+  'structures/war_factory', 'structures/airport', 'structures/infantry_post', 'structures/helicopter_facility', 'structures/research_facility', 'structures/gun_turret',
   'sounds/music', 'sounds/intro', 'sounds/attack', 'sounds/building_destroyed', 'sounds/home_under_attack', 'sounds/endgame', 'sounds',
 ];
 
@@ -975,9 +1046,15 @@ async function uploadSlotsWithLimit(slotKeys) {
 const unitList = document.getElementById('unitList');
 const airUnitList = document.getElementById('airUnitList');
 const warUnitList = document.getElementById('warUnitList');
+const infantryUnitList = document.getElementById('infantryUnitList');
+const heliUnitList = document.getElementById('heliUnitList');
+const turretList = document.getElementById('turretList');
 const unitCounterState = { n: 0 };
 const airUnitCounterState = { n: 0 };
 const warUnitCounterState = { n: 0 };
+const infantryUnitCounterState = { n: 0 };
+const heliUnitCounterState = { n: 0 };
+const turretCounterState = { n: 0 };
 
 // gated: true for Air Base/War Factory units only - adds the per-unit
 // Production time field (10-100s, play.html queues these instead of
@@ -1019,6 +1096,8 @@ function makeUnitRow(list, idPrefix, counterState, data = {}, gated = false) {
 function addUnitRow(data = {}) { return makeUnitRow(unitList, 'unit', unitCounterState, data, false); }
 function addAirUnitRow(data = {}) { return makeUnitRow(airUnitList, 'airunit', airUnitCounterState, data, true); }
 function addWarUnitRow(data = {}) { return makeUnitRow(warUnitList, 'warunit', warUnitCounterState, data, true); }
+function addInfantryUnitRow(data = {}) { return makeUnitRow(infantryUnitList, 'infunit', infantryUnitCounterState, data, true); }
+function addHeliUnitRow(data = {}) { return makeUnitRow(heliUnitList, 'heliunit', heliUnitCounterState, data, true); }
 
 // addUnitBtn/addUnitRow have no visible way to be reached any more (see
 // #sec-units above) - the listener and default-Cruiser auto-add are
@@ -1027,10 +1106,53 @@ function addWarUnitRow(data = {}) { return makeUnitRow(warUnitList, 'warunit', w
 // loadExistingMap to call when opening an old map that still has units.
 
 document.getElementById('addAirUnitBtn').addEventListener('click', () => addAirUnitRow());
-// Both start empty on purpose - Air Base and War Factory are opt-in
-// (see checklistGaps: neither building nor its units are ever required
-// to Finish & Save unless the map-maker actually adds a unit to it).
+// All start empty on purpose - Air Base/War Factory/Infantry Post/
+// Helicopter Facility are all opt-in (see checklistGaps: none of these
+// buildings or their units are ever required to Finish & Save unless
+// the map-maker actually adds a unit to that one).
 document.getElementById('addWarUnitBtn').addEventListener('click', () => addWarUnitRow());
+document.getElementById('addInfantryUnitBtn').addEventListener('click', () => addInfantryUnitRow());
+document.getElementById('addHeliUnitBtn').addEventListener('click', () => addHeliUnitRow());
+
+// ---------------------------------------------------------------------
+// Gun Turrets: a repeatable row like the unit lists above, but no art-
+// gated building, no production timer - just name/art/hp/attack/range/
+// cost. No Speed field at all (not "speed 0", the field just doesn't
+// exist here) since turrets are stationary by design - see the section
+// hint above.
+// ---------------------------------------------------------------------
+function addTurretRow(data = {}) {
+  const id = 'turret_' + (turretCounterState.n++);
+  const row = document.createElement('div');
+  row.className = 'unit-row';
+  row.dataset.unitId = id;
+  row.innerHTML = `
+    <button type="button" class="remove-unit" title="Remove turret">&times;</button>
+    <div class="row">
+      <div class="field"><label>Turret name</label><input type="text" class="u-name" value="${escapeAttr(data.name || '')}" placeholder="e.g. Flak Cannon"></div>
+    </div>
+    <div class="upload-slot" data-slot="${id}">
+      <div class="thumb">none</div>
+      <div class="meta"><div class="name">No file chosen</div><div class="status">turret sprite</div></div>
+      <input type="file" accept="image/*" style="width:auto">
+    </div>
+    <div class="row" style="margin-top:10px;">
+      <div class="field narrow"><label>HP</label><input type="number" class="u-hp" value="${data.hp ?? 300}" min="1"></div>
+      <div class="field narrow"><label>Attack</label><input type="number" class="u-attack" value="${data.attack ?? 200}" min="0"></div>
+      <div class="field narrow"><label>Range</label><input type="number" class="u-range" value="${data.range ?? 500}" min="0"></div>
+      <div class="field narrow"><label>Cost</label><input type="number" class="u-cost" value="${data.cost ?? 400}" min="0" step="10"></div>
+    </div>
+  `;
+  row.querySelector('.remove-unit').addEventListener('click', () => {
+    delete existingAssetUrls[id];
+    row.remove();
+  });
+  wireUploadSlot(row.querySelector('.upload-slot'));
+  turretList.appendChild(row);
+  if (data.imageUrl) showExistingAsset(id, data.imageUrl);
+  return row;
+}
+document.getElementById('addTurretBtn').addEventListener('click', () => addTurretRow());
 
 // ---------------------------------------------------------------------
 // Game style: Real-Time (default, unchanged) vs Turn-Based hot-seat.
@@ -1131,7 +1253,8 @@ function setSaveStatus(text, cls) {
 }
 
 const FIXED_UPLOAD_SLOTS = [
-  'backgroundImage', 'goodBaseImage', 'resourceImage', 'miningUnitImage', 'airBaseImage', 'warFactoryImage',
+  'backgroundImage', 'goodBaseImage', 'resourceImage', 'miningUnitImage',
+  'airBaseImage', 'warFactoryImage', 'infantryPostImage', 'heliFacilityImage', 'researchFacilityImage',
   'soundMusic', 'soundIntro', 'soundAttack', 'soundBuildingDestroyed', 'soundHomeUnderAttack', 'soundEndgame',
 ];
 
@@ -1186,16 +1309,41 @@ function collectUnitRows(list, uploadResults) {
 function collectUnits(uploadResults) { return collectUnitRows(unitList, uploadResults); }
 function collectAirUnits(uploadResults) { return collectUnitRows(airUnitList, uploadResults); }
 function collectWarUnits(uploadResults) { return collectUnitRows(warUnitList, uploadResults); }
+function collectInfantryUnits(uploadResults) { return collectUnitRows(infantryUnitList, uploadResults); }
+function collectHeliUnits(uploadResults) { return collectUnitRows(heliUnitList, uploadResults); }
+// Not collectUnitRows - turret rows have no .u-speed input at all (see
+// addTurretRow), so reusing the same reader would throw on a null
+// querySelector result instead of just reading a real 0.
+function collectTurrets(uploadResults) {
+  const rows = Array.from(turretList.querySelectorAll('.unit-row'));
+  return rows.map((row) => {
+    const id = row.dataset.unitId;
+    return {
+      name: row.querySelector('.u-name').value.trim() || 'Unnamed Turret',
+      imageUrl: uploadResults[id] || null,
+      hp: Number(row.querySelector('.u-hp').value) || 0,
+      attack: Number(row.querySelector('.u-attack').value) || 0,
+      range: Number(row.querySelector('.u-range').value) || 0,
+      cost: Number(row.querySelector('.u-cost').value) || 0,
+    };
+  });
+}
 
 async function buildMapDoc(status) {
   const unitSlots = Array.from(unitList.querySelectorAll('.unit-row')).map((row) => row.dataset.unitId);
   const airUnitSlots = Array.from(airUnitList.querySelectorAll('.unit-row')).map((row) => row.dataset.unitId);
   const warUnitSlots = Array.from(warUnitList.querySelectorAll('.unit-row')).map((row) => row.dataset.unitId);
+  const infantryUnitSlots = Array.from(infantryUnitList.querySelectorAll('.unit-row')).map((row) => row.dataset.unitId);
+  const heliUnitSlots = Array.from(heliUnitList.querySelectorAll('.unit-row')).map((row) => row.dataset.unitId);
+  const turretSlots = Array.from(turretList.querySelectorAll('.unit-row')).map((row) => row.dataset.unitId);
   const computerSlots = Array.from(computerList.querySelectorAll('.computer-row')).map((row) => row.dataset.computerId);
-  const uploadResults = await uploadSlotsWithLimit([...FIXED_UPLOAD_SLOTS, ...unitSlots, ...airUnitSlots, ...warUnitSlots, ...computerSlots]);
+  const uploadResults = await uploadSlotsWithLimit([...FIXED_UPLOAD_SLOTS, ...unitSlots, ...airUnitSlots, ...warUnitSlots, ...infantryUnitSlots, ...heliUnitSlots, ...turretSlots, ...computerSlots]);
   const units = collectUnits(uploadResults);
   const airUnits = collectAirUnits(uploadResults);
   const warUnits = collectWarUnits(uploadResults);
+  const infantryUnits = collectInfantryUnits(uploadResults);
+  const heliUnits = collectHeliUnits(uploadResults);
+  const gunTurrets = collectTurrets(uploadResults);
   const computers = collectComputers(uploadResults);
   return {
     ownerId: currentUser.uid,
@@ -1242,6 +1390,37 @@ async function buildMapDoc(status) {
       image: uploadResults.warFactoryImage,
     },
     warUnits,
+    infantryPost: {
+      name: document.getElementById('infantryPostName').value.trim() || 'Infantry Post',
+      hp: clampHomeworldHp(document.getElementById('infantryPostHp').value),
+      cost: Number(document.getElementById('infantryPostCost').value) || 150,
+      image: uploadResults.infantryPostImage,
+    },
+    infantryUnits,
+    heliFacility: {
+      name: document.getElementById('heliFacilityName').value.trim() || 'Helicopter Facility',
+      hp: clampHomeworldHp(document.getElementById('heliFacilityHp').value),
+      cost: Number(document.getElementById('heliFacilityCost').value) || 150,
+      image: uploadResults.heliFacilityImage,
+    },
+    heliUnits,
+    // NOT optional - see its section hint. Research is a built-in
+    // mechanic on every map (the Research tab / TECH_TREE, not
+    // map-maker-defined data like the buildings above), so unlike Air
+    // Base/War Factory/Infantry Post/Helicopter Facility this building
+    // has no unit list and no "only if non-empty" gate - it's required
+    // to Finish & Save the same way Home Base/resource/mining art are.
+    researchFacility: {
+      name: document.getElementById('researchFacilityName').value.trim() || 'Research Facility',
+      hp: clampHomeworldHp(document.getElementById('researchFacilityHp').value),
+      cost: Number(document.getElementById('researchFacilityCost').value) || 150,
+      image: uploadResults.researchFacilityImage,
+    },
+    // Optional, and structured differently from the buildings above -
+    // no gating building of its own, no production timer, just a flat
+    // list of placeable turret types (see checklistGaps and
+    // play.html's placement-mode click handling).
+    gunTurrets,
     sounds: {
       music: uploadResults.soundMusic,
       intro: uploadResults.soundIntro,
@@ -1268,18 +1447,29 @@ function checklistGaps(mapDoc) {
   // same as always). What replaces "at least one combat unit" is "at
   // least one buildable unit somewhere" - Air Base and War Factory
   // count now too.
-  if (mapDoc.units.length === 0 && mapDoc.airUnits.length === 0 && mapDoc.warUnits.length === 0) {
-    gaps.push('at least one unit (Air Base or War Factory - Combat Units is no longer used)');
+  if ([mapDoc.units, mapDoc.airUnits, mapDoc.warUnits, mapDoc.infantryUnits, mapDoc.heliUnits].every((list) => list.length === 0)) {
+    gaps.push('at least one unit (Air Base / War Factory / Infantry Post / Helicopter Facility - Combat Units is no longer used)');
   }
   mapDoc.units.forEach((u, i) => { if (!u.imageUrl) gaps.push(`unit #${i + 1} (${u.name}) art`); });
-  if (mapDoc.airUnits.length) {
-    if (!mapDoc.airBase.image) gaps.push(`${mapDoc.airBase.name} art`);
-    mapDoc.airUnits.forEach((u, i) => { if (!u.imageUrl) gaps.push(`${mapDoc.airBase.name} unit #${i + 1} (${u.name}) art`); });
-  }
-  if (mapDoc.warUnits.length) {
-    if (!mapDoc.warFactory.image) gaps.push(`${mapDoc.warFactory.name} art`);
-    mapDoc.warUnits.forEach((u, i) => { if (!u.imageUrl) gaps.push(`${mapDoc.warFactory.name} unit #${i + 1} (${u.name}) art`); });
-  }
+  // Same pattern 4 times: a gated building's own art (and each of its
+  // units' art) is only required if that building's unit list actually
+  // has something in it - an empty list means the whole feature is
+  // absent from the map, so there's nothing to require art for.
+  [
+    ['airBase', 'airUnits'], ['warFactory', 'warUnits'],
+    ['infantryPost', 'infantryUnits'], ['heliFacility', 'heliUnits'],
+  ].forEach(([buildingKey, unitsKey]) => {
+    const units = mapDoc[unitsKey];
+    if (!units.length) return;
+    const building = mapDoc[buildingKey];
+    if (!building.image) gaps.push(`${building.name} art`);
+    units.forEach((u, i) => { if (!u.imageUrl) gaps.push(`${building.name} unit #${i + 1} (${u.name}) art`); });
+  });
+  // Research Facility is never optional - see buildMapDoc's comment.
+  if (!mapDoc.researchFacility.image) gaps.push(`${mapDoc.researchFacility.name} art`);
+  // Gun Turrets: optional, but each turret type still needs its own art
+  // once it exists, same reasoning as the gated-building units above.
+  mapDoc.gunTurrets.forEach((t, i) => { if (!t.imageUrl) gaps.push(`turret #${i + 1} (${t.name}) art`); });
   return gaps;
 }
 
@@ -1438,6 +1628,36 @@ async function loadExistingMap() {
   if (Array.isArray(m.warUnits) && m.warUnits.length) {
     warUnitList.innerHTML = '';
     m.warUnits.forEach((u) => addWarUnitRow(u));
+  }
+  if (m.infantryPost) {
+    document.getElementById('infantryPostName').value = m.infantryPost.name || 'Infantry Post';
+    document.getElementById('infantryPostHp').value = m.infantryPost.hp || 2000;
+    document.getElementById('infantryPostCost').value = m.infantryPost.cost || 150;
+    if (m.infantryPost.image) showExistingAsset('infantryPostImage', m.infantryPost.image);
+  }
+  if (Array.isArray(m.infantryUnits) && m.infantryUnits.length) {
+    infantryUnitList.innerHTML = '';
+    m.infantryUnits.forEach((u) => addInfantryUnitRow(u));
+  }
+  if (m.heliFacility) {
+    document.getElementById('heliFacilityName').value = m.heliFacility.name || 'Helicopter Facility';
+    document.getElementById('heliFacilityHp').value = m.heliFacility.hp || 2000;
+    document.getElementById('heliFacilityCost').value = m.heliFacility.cost || 150;
+    if (m.heliFacility.image) showExistingAsset('heliFacilityImage', m.heliFacility.image);
+  }
+  if (Array.isArray(m.heliUnits) && m.heliUnits.length) {
+    heliUnitList.innerHTML = '';
+    m.heliUnits.forEach((u) => addHeliUnitRow(u));
+  }
+  if (m.researchFacility) {
+    document.getElementById('researchFacilityName').value = m.researchFacility.name || 'Research Facility';
+    document.getElementById('researchFacilityHp').value = m.researchFacility.hp || 2000;
+    document.getElementById('researchFacilityCost').value = m.researchFacility.cost || 150;
+    if (m.researchFacility.image) showExistingAsset('researchFacilityImage', m.researchFacility.image);
+  }
+  if (Array.isArray(m.gunTurrets) && m.gunTurrets.length) {
+    turretList.innerHTML = '';
+    m.gunTurrets.forEach((t) => addTurretRow(t));
   }
 
   if (m.sounds) {

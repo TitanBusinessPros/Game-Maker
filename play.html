@@ -280,6 +280,9 @@
         <strong>Click the minimap</strong> to jump the camera there - with units selected, it also sends them there.<br>
         A unit that attacks locks in place (can't take a new move order, still keeps firing) until the next turn.<br>
         A <strong>Mining Ship</strong> parked on your deposit earns resources automatically.<br>
+        Air Base / War Factory / Infantry Post / Helicopter Facility units queue for production once you've built that building - they don't appear instantly.<br>
+        You can't research anything until you've built your Research Facility.<br>
+        <strong>Gun Turrets</strong> don't build next to your base like other units - building one puts you in placement mode, then click anywhere in its range ring around your Home Base to place it there (Esc to cancel). Once placed it never moves and fires on its own at anything that comes into range.<br>
         The match ends when a home base's HP reaches 0 - your whole team wins together.
       </p>
       <p id="turnModeHelp" style="display:none; font-size:12px; color:var(--dim); line-height:1.6; border-top:1px solid var(--border); padding-top:8px; margin-top:8px;"></p>
@@ -424,6 +427,7 @@ const DEPOSIT_SIZE = 56;
 const GATED_BUILDING_SIZE = 56;
 const AI_TICK_SECONDS = 6;
 const MINING_RANGE = 80; // how close a Mining Ship has to be to its deposit to actually earn resources
+const TURRET_MIN_RANGE = 50, TURRET_MAX_RANGE = 300; // valid placement ring around a faction's own Home Base
 const MAP_SIZE_MULTIPLIER = { tiny: 1, small: 3, medium: 6, large: 12 };
 const BASE_HOME_RADIUS = 420;
 
@@ -485,16 +489,24 @@ async function main() {
   // 'warFactory') is read by the build panel below to gate them behind
   // that faction actually having built the matching building, and by
   // update()'s production-queue processing.
-  const [airBaseImg, warFactoryImg] = await Promise.all([
-    loadImage(cfg.airBase?.image), loadImage(cfg.warFactory?.image),
+  const [airBaseImg, warFactoryImg, infantryPostImg, heliFacilityImg, researchFacilityImg] = await Promise.all([
+    loadImage(cfg.airBase?.image), loadImage(cfg.warFactory?.image), loadImage(cfg.infantryPost?.image),
+    loadImage(cfg.heliFacility?.image), loadImage(cfg.researchFacility?.image),
   ]);
   // offsetX/offsetY: where each building's art is drawn relative to its
-  // faction's homeworld once built (see drawGatedBuildings below) -
-  // opposite sides so Air Base and War Factory never overlap each other
-  // or the resource deposit (which sits at y-100, straight above home).
+  // faction's homeworld once built (see drawGatedBuildings below) - laid
+  // out so none of the five ever overlap each other or the resource
+  // deposit (which sits at y-100, straight above home).
+  // gatesResearch: only Research Facility sets this - read by
+  // startResearch()/renderResearchPanel()/aiThink below. It also has no
+  // unitCfgs (it doesn't unlock units, it unlocks research entirely) and
+  // is never hidden even with an empty unit list - see alwaysShow.
   const GATED_BUILDINGS = [
     { key: 'airBase', cfg: cfg.airBase || { name: 'Air Base', cost: 150, hp: 2000 }, unitCfgs: cfg.airUnits || [], icon: '✈️', img: airBaseImg, offsetX: 110, offsetY: 60 },
     { key: 'warFactory', cfg: cfg.warFactory || { name: 'War Factory', cost: 150, hp: 2000 }, unitCfgs: cfg.warUnits || [], icon: '🛡️', img: warFactoryImg, offsetX: -110, offsetY: 60 },
+    { key: 'infantryPost', cfg: cfg.infantryPost || { name: 'Infantry Post', cost: 150, hp: 2000 }, unitCfgs: cfg.infantryUnits || [], icon: '🪖', img: infantryPostImg, offsetX: 110, offsetY: -60 },
+    { key: 'helicopterFacility', cfg: cfg.heliFacility || { name: 'Helicopter Facility', cost: 150, hp: 2000 }, unitCfgs: cfg.heliUnits || [], icon: '🚁', img: heliFacilityImg, offsetX: -110, offsetY: -60 },
+    { key: 'researchFacility', cfg: cfg.researchFacility || { name: 'Research Facility', cost: 150, hp: 2000 }, unitCfgs: [], icon: '🔬', img: researchFacilityImg, offsetX: 0, offsetY: 140, alwaysShow: true, gatesResearch: true },
   ];
   const buildingCfgByKey = Object.fromEntries(GATED_BUILDINGS.map((b) => [b.key, b.cfg]));
   const unitDefs = [
@@ -502,6 +514,14 @@ async function main() {
     ...GATED_BUILDINGS.flatMap((b) => b.unitCfgs.map((u) => ({ ...u, buildingKey: b.key }))),
   ];
   const unitImages = await Promise.all(unitDefs.map((u) => loadImage(u.imageUrl)));
+
+  // Gun Turrets: deliberately NOT merged into unitDefs like the gated-
+  // building units above - they don't move, don't get a normal build
+  // click (see the placement-mode handling further down), and always
+  // auto-target regardless of who controls them, so they need their own
+  // spawn path rather than fitting spawnUnit's assumptions.
+  const turretDefs = cfg.gunTurrets || [];
+  const turretImages = await Promise.all(turretDefs.map((t) => loadImage(t.imageUrl)));
 
   const sounds = {
     music: loadAudio(cfg.sounds?.music),
@@ -611,6 +631,25 @@ async function main() {
     units.push(u);
     return u;
   }
+  // Deliberately separate from spawnUnit/unitDefs - see the note by
+  // turretDefs' declaration above. isTurret is what the per-unit update
+  // loop and drawUnit's info readers check to route around unitDefs
+  // (which has no idea turretDefs even exists) instead of colliding on
+  // the same defIndex space.
+  function spawnTurret(factionId, defIndex, x, y) {
+    const fac = factionOf(factionId);
+    const def = turretDefs[defIndex];
+    const u = {
+      id: nextUnitId++, factionId, defIndex, isMiner: false, isTurret: true,
+      hp: Math.round(effectiveStat(fac, def.hp, 'hp')), maxHp: Math.round(effectiveStat(fac, def.hp, 'hp')),
+      attack: def.attack, range: def.range, speed: 0,
+      img: turretImages[defIndex], x, y, alive: true, selected: false,
+      orderType: null, moveTarget: null, target: null,
+      lockedUntilTurn: 0, facingAngle: 0,
+    };
+    units.push(u);
+    return u;
+  }
   // Regular Combat Units (buildingKey === null) still spawn the instant
   // they're paid for - unchanged. An Air Base/War Factory unit instead
   // joins that building's production queue and only actually spawns
@@ -665,6 +704,13 @@ async function main() {
   }
 
   let gameOver = false, paused = false, matchStarted = false;
+  // Turret placement mode - see the Gun Turrets build-panel row, the
+  // canvas click handler, and drawTurretRangeRing(). Holds { defIndex }
+  // (an index into turretDefs) while active, null otherwise. Always set
+  // through this helper (never assigned directly) so the cursor always
+  // stays in sync with it.
+  let placingTurret = null;
+  function setPlacingTurret(v) { placingTurret = v; canvas.style.cursor = v ? 'crosshair' : ''; }
 
   // Beam/laser visual effects - short-lived, purely cosmetic.
   const beams = [];
@@ -785,6 +831,7 @@ async function main() {
   }
 
   function startResearch(fac, id) {
+    if (!fac.built.researchFacility) return; // mandatory gate - see GATED_BUILDINGS' researchFacility entry
     const t = TECH_TREE[id];
     if (!t || fac.research.active || fac.research.researched.has(id)) return;
     if (t.prereq && !fac.research.researched.has(t.prereq)) return;
@@ -794,7 +841,10 @@ async function main() {
   }
 
   function aiThink(fac, dt) {
-    if (!fac.research.active) {
+    // Mandatory gate applies to AI too - startResearch() would just
+    // silently no-op without this check anyway, but skip the wasted
+    // Object.keys/filter work every tick until it's actually built.
+    if (!fac.research.active && fac.built.researchFacility) {
       const options = Object.keys(TECH_TREE).filter((k) => {
         const t = TECH_TREE[k];
         if (fac.research.researched.has(k)) return false;
@@ -805,11 +855,12 @@ async function main() {
     }
     const hasMiner = units.some((u) => u.alive && u.factionId === fac.id && u.isMiner);
     // Half the time it can afford one, an AI prioritizes an unbuilt
-    // gated building (Air Base / War Factory, whichever comes first
-    // below and still needs building) over a random unit - otherwise an
-    // AI that never happens to roll it could go the whole match without
-    // ever unlocking that building's units.
-    const neededBuilding = GATED_BUILDINGS.find((b) => b.unitCfgs.length && !fac.built[b.key] && fac.resources >= b.cfg.cost);
+    // gated building it actually needs (unitCfgs.length) or that's
+    // always relevant regardless of units (alwaysShow - Research
+    // Facility) over a random unit - otherwise an AI that never happens
+    // to roll it could go the whole match without ever unlocking that
+    // building's units, or never researching anything at all.
+    const neededBuilding = GATED_BUILDINGS.find((b) => (b.unitCfgs.length || b.alwaysShow) && !fac.built[b.key] && fac.resources >= b.cfg.cost);
     if (!hasMiner && fac.research.researched.has('mining_ops') && fac.resources >= 80) {
       spawnMiner(fac.id, fac.x - 40, fac.y); fac.resources -= 80;
     } else if (neededBuilding && Math.random() < 0.5) {
@@ -821,6 +872,19 @@ async function main() {
         fac.resources -= pick.d.cost;
         startProduction(fac, pick.i);
       }
+    }
+    // Turrets: no placement-mode UI for the AI, it just picks a random
+    // valid spot in the same ring a human has to click inside (see
+    // TURRET_MIN_RANGE/MAX_RANGE) and places one directly. Low, separate
+    // chance each tick so it doesn't crowd out the AI's other spending -
+    // this is a defensive extra, not its main economy.
+    const affordableTurret = turretDefs.map((d, i) => ({ d, i })).filter((x) => fac.resources >= x.d.cost);
+    if (affordableTurret.length && Math.random() < 0.15) {
+      const pick = affordableTurret[Math.floor(Math.random() * affordableTurret.length)];
+      const angle = Math.random() * Math.PI * 2;
+      const dist = TURRET_MIN_RANGE + Math.random() * (TURRET_MAX_RANGE - TURRET_MIN_RANGE);
+      fac.resources -= pick.d.cost;
+      spawnTurret(fac.id, pick.i, fac.x + Math.cos(angle) * dist, fac.y + Math.sin(angle) * dist);
     }
   }
 
@@ -893,6 +957,17 @@ async function main() {
       // exactly where they left off once their turn comes back around.
       // Real-Time mode: always true, so this never changes anything there.
       if (turnMode && fac.id !== activeIdx) continue;
+      if (u.isTurret) {
+        // Fire-and-forget, regardless of who owns it - never moves (its
+        // speed is 0, so combatTick's own out-of-range chase math always
+        // computes zero displacement - it never chases, it just can't
+        // fire until something comes within range on its own), and
+        // always auto-acquires a target instead of waiting on a human
+        // player's click the way a normal owned unit would.
+        if (!u.target || u.target.hp <= 0 || u.target.alive === false) u.target = nearestEnemy(u);
+        if (u.target) combatTick(u, dt);
+        continue;
+      }
       if (u.isMiner) {
         // Nothing moved a miner at all before this - it had orderType/
         // moveTarget fields but this loop only ever branched on
@@ -1049,6 +1124,20 @@ async function main() {
     const fit = fittedSize(b.img, size);
     ctx.drawImage(b.img, p.x - fit.w / 2, p.y - fit.h / 2, fit.w, fit.h);
   }
+  // The valid turret-placement zone (TURRET_MIN_RANGE-TURRET_MAX_RANGE
+  // around activeFaction's own Home Base) as two dashed circles, only
+  // while placement mode is actually active.
+  function drawTurretRangeRing() {
+    if (!placingTurret) return;
+    const p = toScreen(activeFaction.x, activeFaction.y);
+    ctx.save();
+    ctx.strokeStyle = 'rgba(79,220,143,0.85)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 6]);
+    ctx.beginPath(); ctx.arc(p.x, p.y, TURRET_MIN_RANGE * camera.zoom, 0, 7); ctx.stroke();
+    ctx.beginPath(); ctx.arc(p.x, p.y, TURRET_MAX_RANGE * camera.zoom, 0, 7); ctx.stroke();
+    ctx.restore();
+  }
   function drawBeams() {
     for (const b of beams) {
       const p1 = toScreen(b.x1, b.y1), p2 = toScreen(b.x2, b.y2);
@@ -1081,6 +1170,7 @@ async function main() {
     for (const f of factions) if (f.hp > 0) { drawFactionHome(f); GATED_BUILDINGS.forEach((b) => drawGatedBuilding(f, b)); }
     for (const u of units) if (u.alive) drawUnit(u);
     drawBeams();
+    drawTurretRangeRing();
 
     renderHud();
     renderMinimap();
@@ -1224,9 +1314,23 @@ async function main() {
 
   function selectedUnits() { return livingUnits(activeFaction.id).filter((u) => u.selected); }
 
+  // Outside the valid ring, the click is just ignored (stays in
+  // placement mode, no cost taken) rather than erroring - lets someone
+  // click around to find the right spot without being kicked out.
+  function tryPlaceTurret(p) {
+    const def = turretDefs[placingTurret.defIndex];
+    const dist = Math.hypot(p.x - activeFaction.x, p.y - activeFaction.y);
+    if (dist < TURRET_MIN_RANGE || dist > TURRET_MAX_RANGE) return;
+    if (!canAfford(activeFaction, def.cost)) { setPlacingTurret(null); renderBuildPanel(); return; }
+    activeFaction.resources -= def.cost;
+    spawnTurret(activeFaction.id, placingTurret.defIndex, p.x, p.y);
+    setPlacingTurret(null);
+    renderBuildPanel();
+  }
   function handleClick(evt) {
     const r = canvas.getBoundingClientRect();
     const p = toWorld(evt.clientX - r.left, evt.clientY - r.top);
+    if (placingTurret) { tryPlaceTurret(p); return; }
     const own = livingUnits(activeFaction.id).find((u) => !u.isMiner && Math.hypot(u.x - p.x, u.y - p.y) < UNIT_SIZE / 2 + 8);
     if (own) {
       livingUnits(activeFaction.id).forEach((u) => u.selected = false);
@@ -1266,9 +1370,10 @@ async function main() {
       if (count) textEl.innerHTML = `<strong>${count} units selected</strong>`;
       return;
     }
-    const def = u.isMiner ? { name: cfg.miningUnit?.name || 'Mining Ship' } : unitDefs[u.defIndex];
+    const def = u.isMiner ? { name: cfg.miningUnit?.name || 'Mining Ship' } : u.isTurret ? turretDefs[u.defIndex] : unitDefs[u.defIndex];
     box.style.display = 'block';
-    textEl.innerHTML = `<strong>${def.name}</strong><br>HP ${Math.round(u.hp)}/${u.maxHp}${u.isMiner ? '' : ` · ATK ${u.attack} · RNG ${u.range} · SPD ${u.speed.toFixed(1)}`}${isLocked(u) ? '<br><span style="color:var(--warn)">🔒 locked until next turn</span>' : ''}`;
+    const statsLine = u.isMiner ? '' : u.isTurret ? ` · ATK ${u.attack} · RNG ${u.range} · stationary` : ` · ATK ${u.attack} · RNG ${u.range} · SPD ${u.speed.toFixed(1)}`;
+    textEl.innerHTML = `<strong>${def.name}</strong><br>HP ${Math.round(u.hp)}/${u.maxHp}${statsLine}${isLocked(u) ? '<br><span style="color:var(--warn)">🔒 locked until next turn</span>' : ''}`;
   }
   function hideUnitInfo() { document.getElementById('unitInfoBox').style.display = 'none'; }
   function deselectAll() {
@@ -1276,7 +1381,11 @@ async function main() {
     hideUnitInfo();
   }
   document.getElementById('deselectBtn').addEventListener('click', deselectAll);
-  window.addEventListener('keydown', (e) => { if (e.key === 'Escape') deselectAll(); });
+  window.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (placingTurret) { setPlacingTurret(null); renderBuildPanel(); return; }
+    deselectAll();
+  });
 
   // ---------------------------------------------------------------------
   // Build / research panels. Act on activeFaction, not always "player" -
@@ -1317,7 +1426,8 @@ async function main() {
     if (built && queue.length) {
       return `Producing ${unitDefs[queue[0].defIndex].name}… ${Math.ceil(queue[0].remaining)}s left${queue.length > 1 ? ` · ${queue.length - 1} queued` : ''}`;
     }
-    return `Cost ${b.cfg.cost} · HP ${b.cfg.hp} · required before any of its units below can be built`;
+    const requires = b.gatesResearch ? 'required before you can research anything (see the Research tab)' : 'required before any of its units below can be built';
+    return `Cost ${b.cfg.cost} · HP ${b.cfg.hp} · ${requires}`;
   }
   function updateProductionStatus() {
     GATED_BUILDINGS.forEach((b) => {
@@ -1353,7 +1463,7 @@ async function main() {
     // gating the units below it, plus that building's own production
     // queue status.
     GATED_BUILDINGS.forEach((b) => {
-      if (!b.unitCfgs.length) return;
+      if (!b.unitCfgs.length && !b.alwaysShow) return;
       const built = activeFaction.built[b.key];
       const queue = activeFaction.buildQueue[b.key];
       const row = document.createElement('div');
@@ -1379,11 +1489,36 @@ async function main() {
       row.appendChild(btn);
       el.appendChild(row);
     });
+    // Gun Turrets - no gating building, no production queue, and
+    // "Build" doesn't spawn anything: it arms placement mode (see the
+    // canvas click handler and drawTurretRangeRing below), and cost is
+    // only actually deducted once a valid spot is clicked. Clicking the
+    // button again while already placing this same turret cancels it.
+    turretDefs.forEach((def, i) => {
+      const row = document.createElement('div');
+      row.className = 'buildRow';
+      const isPlacingThis = placingTurret && placingTurret.defIndex === i;
+      row.innerHTML = `<div class="name">${def.name} 🎯</div><div class="stats">HP ${def.hp} · ATK ${def.attack} · RNG ${def.range} · Cost ${def.cost} · place ${TURRET_MIN_RANGE}-${TURRET_MAX_RANGE} range of ${cfg.baseLabel || 'Home Base'}</div>`;
+      const btn = document.createElement('button');
+      btn.textContent = isPlacingThis ? 'Click the map… (or Esc)' : 'Place';
+      btn.disabled = !isPlacingThis && !canAfford(activeFaction, def.cost);
+      btn.onclick = () => { setPlacingTurret(isPlacingThis ? null : { defIndex: i }); renderBuildPanel(); };
+      row.appendChild(btn);
+      el.appendChild(row);
+    });
     updateProductionStatus(); // populate the buildStats-* text immediately, not just on the next frame
   }
   function renderResearchPanel() {
     const el = document.getElementById('tab-research');
     el.innerHTML = '';
+    const researchFacility = buildingCfgByKey.researchFacility;
+    const hasResearchFacility = activeFaction.built.researchFacility;
+    if (!hasResearchFacility) {
+      const notice = document.createElement('div');
+      notice.className = 'techRow';
+      notice.innerHTML = `<div class="name">🔒 Research locked</div><div class="desc">Build ${researchFacility.name} (Build tab) before researching anything.</div>`;
+      el.appendChild(notice);
+    }
     Object.entries(TECH_TREE).forEach(([id, t]) => {
       const row = document.createElement('div');
       const done = activeFaction.research.researched.has(id);
@@ -1392,8 +1527,8 @@ async function main() {
       const lockedByPrereq = t.prereq && !activeFaction.research.researched.has(t.prereq);
       row.innerHTML = `<div class="name">${t.name}</div><div class="desc">Cost ${t.cost} · ${t.timeSeconds}s${lockedByPrereq ? ' · requires ' + TECH_TREE[t.prereq].name : ''}${active ? ' · researching… ' + Math.ceil(activeFaction.research.active.remaining) + 's left' : ''}</div>`;
       const btn = document.createElement('button');
-      btn.textContent = done ? 'Done' : (active ? 'In progress' : 'Research');
-      btn.disabled = done || !!activeFaction.research.active || lockedByPrereq || activeFaction.resources < t.cost;
+      btn.textContent = !hasResearchFacility ? 'Locked' : (done ? 'Done' : (active ? 'In progress' : 'Research'));
+      btn.disabled = !hasResearchFacility || done || !!activeFaction.research.active || lockedByPrereq || activeFaction.resources < t.cost;
       btn.onclick = () => { startResearch(activeFaction, id); renderResearchPanel(); };
       row.appendChild(btn);
       el.appendChild(row);
@@ -1490,7 +1625,7 @@ async function main() {
     return {
       cfg, turnNumber, turnTimer, activeIdx, hotseatTimer, moveNumber,
       factions: factions.map((f) => ({ id: f.id, resources: f.resources, hp: f.hp, team: f.team, built: f.built, buildQueue: f.buildQueue, researched: [...f.research.researched], active: f.research.active })),
-      units: units.filter((u) => u.alive).map((u) => ({ factionId: u.factionId, defIndex: u.defIndex, isMiner: !!u.isMiner, x: u.x, y: u.y, hp: u.hp, maxHp: u.maxHp })),
+      units: units.filter((u) => u.alive).map((u) => ({ factionId: u.factionId, defIndex: u.defIndex, isMiner: !!u.isMiner, isTurret: !!u.isTurret, x: u.x, y: u.y, hp: u.hp, maxHp: u.maxHp })),
     };
   }
   document.getElementById('saveBtn').addEventListener('click', () => {
@@ -1513,7 +1648,7 @@ async function main() {
     });
     units.length = 0;
     data.units.forEach((u) => {
-      const spawned = u.isMiner ? spawnMiner(u.factionId, u.x, u.y) : spawnUnit(u.factionId, u.defIndex, u.x, u.y);
+      const spawned = u.isMiner ? spawnMiner(u.factionId, u.x, u.y) : u.isTurret ? spawnTurret(u.factionId, u.defIndex, u.x, u.y) : spawnUnit(u.factionId, u.defIndex, u.x, u.y);
       spawned.hp = u.hp; spawned.maxHp = u.maxHp;
     });
     if (turnMode && typeof data.activeIdx === 'number') {
@@ -1667,7 +1802,8 @@ async function main() {
   window.__GM_DEBUG = {
     factions, units, deposits, camera, get turnNumber() { return turnNumber; }, toScreen, beams,
     turnMode, get activeFaction() { return activeFaction; }, get hotseatTimer() { return hotseatTimer; },
-    get moveNumber() { return moveNumber; },
+    get moveNumber() { return moveNumber; }, GATED_BUILDINGS, turretDefs,
+    get placingTurret() { return placingTurret; },
   };
 
   const topbarEl = document.getElementById('topbar');

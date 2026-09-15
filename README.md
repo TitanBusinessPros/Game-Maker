@@ -54,16 +54,45 @@ appear) — a genuinely separate, self-contained game per map.
    Leave its unit list empty and the whole feature is simply absent from
    the map, same as never adding it.
 4a. **War Factory** (optional) — a second building, identical in every
-   way to Air Base above, for tanks/armored vehicles/etc. Its own name
-   (defaults to "War Factory"), art, HP, cost, and unit list with
-   per-unit production time - completely independent of Air Base (a
-   faction can have one, both, or neither; the two buildings produce in
-   parallel, not competing for the same production timer).
-   Air Base and War Factory replaced the old standalone "Combat Units"
-   checklist item entirely - a finished map now needs at least one unit
-   under one of these two instead (that old section still exists in
-   `index.html`'s code, hidden, purely so a map made before this change
-   keeps working).
+   way to Air Base above, for tanks/armored vehicles/etc.
+4b. **Infantry Post** (optional) — a third building, identical in every
+   way to Air Base/War Factory, for foot soldiers/infantry/etc.
+4c. **Helicopter Facility** (optional) — a fourth building, identical in
+   every way again, for helicopters.
+   All four of these (Air Base/War Factory/Infantry Post/Helicopter
+   Facility) share the exact same shape: own name (with its own
+   sensible default), own art, own HP, own build cost, and a unit list
+   with per-unit production time - fully independent of each other (a
+   faction can have any combination, including none; every building
+   with units queued produces in parallel, none of them compete for a
+   shared timer). Together they replaced the old standalone "Combat
+   Units" checklist item entirely - a finished map now needs at least
+   one unit under one of these four instead (that old section still
+   exists in `index.html`'s code, hidden, purely so a map made before
+   this change keeps working).
+4d. **Research Facility** — NOT optional, unlike the four buildings
+   above: every map has the same built-in research tree (the Research
+   tab in `play.html`), so this is the one building every player has to
+   construct before they can research anything there at all. Same
+   name/art/HP/cost fields as the others, but no unit list of its own
+   (it doesn't produce units, it gates research) and its art is always
+   required to Finish & Save, not just when some list has entries.
+4e. **Gun Turrets** (optional) — shaped differently from the buildings
+   above: no gating building of its own, no production timer, and no
+   Speed field (they're stationary by design - the field doesn't exist
+   for these rows at all). Add as many turret types as you want, each
+   with name/art/hp/attack/range/cost. In `play.html`, building one
+   doesn't spawn it next to your Home Base like every other unit -
+   instead it arms a placement mode, and you click anywhere between 50
+   and 300 range of your own Home Base (shown as a dashed ring while
+   placing) to put it there; cost is only actually deducted on a
+   successful placement, and Esc (or clicking the button again) cancels
+   for free. Once placed a turret never moves and auto-fires at
+   whatever enemy comes into its range on its own - no order needed,
+   though you can still click it and manually retarget it like a normal
+   unit if you want to override that. AI factions place turrets the
+   same way, just picking a random valid spot instead of needing a
+   click.
 5. **Sounds** — background music, intro music, attack/building-destroyed/
    home-base-under-attack/game-over sfx. All optional, all `.mp3`.
 6. **My Maps** — every map saved under your signed-in account, draft or
@@ -160,27 +189,28 @@ entirely by one map's saved data:
   (updated live every frame), not just the small one floating over its
   canvas sprite - and the resource counter up top is explicitly labeled
   "🪙 ... Gold" instead of a bare, unlabeled number.
-- **Air Base and War Factory** (both optional, set on the map): a
-  faction-owned buildable structure that has to be built before any of
-  its own units can be, exactly like the Mining Ship's "requires Mining
-  Operations research" pattern. In the Build panel each shows as a
-  one-time purchase ("Build" → "Already built"); its units show as
-  🔒 Locked with a "requires <building name>" note until that faction
-  actually builds it - even for AI factions, who prioritize building it
-  about half the time they can afford it rather than picking a random
-  unit. Once built, its units queue for production instead of spawning
+- **Air Base, War Factory, Infantry Post, Helicopter Facility** (all
+  optional, set on the map): a faction-owned buildable structure that
+  has to be built before any of its own units can be, exactly like the
+  Mining Ship's "requires Mining Operations research" pattern. In the
+  Build panel each shows as a one-time purchase ("Build" → "Already
+  built"); its units show as 🔒 Locked with a "requires <building
+  name>" note until that faction actually builds it - even for AI
+  factions, who prioritize building whichever one they still need about
+  half the time they can afford it rather than picking a random unit.
+  Once built, its units queue for production instead of spawning
   instantly: clicking one starts a real countdown (its own per-unit
   production time, 10-100s, set on the map) shown right on the
   building's own build-panel row ("Producing Tank… 24s left · 2
   queued"), and the unit only actually appears once that timer runs
   out. Only the front item of each building's queue ticks - so a
-  faction with both buildings produces one air unit and one war-factory
-  unit at the same time, not competing for one shared timer - and like
-  research/mining income, queues keep progressing regardless of whose
-  turn it is in Turn-Based mode. A map with no units defined under a
-  given building never shows any of it at all for that building. Once
-  built, the building's own art is drawn near its faction's homeworld
-  (a fixed offset either side, so Air Base and War Factory never
+  faction with several of these buildings produces one unit per
+  building at the same time, none of them competing for a shared timer
+  - and like research/mining income, queues keep progressing regardless
+  of whose turn it is in Turn-Based mode. A map with no units defined
+  under a given building never shows any of it at all for that
+  building. Once built, the building's own art is drawn near its
+  faction's homeworld (a fixed offset per building so none of them ever
   overlap each other or the resource deposit) - purely a visual marker,
   not a combat target (nothing in the game's targeting looks at these,
   same as the resource deposit). The production countdown shown in the
@@ -188,6 +218,35 @@ entirely by one map's saved data:
   something else happened to redraw the panel, so it looked frozen -
   reported as "no timer for troop production" even though production
   itself was always progressing correctly in the background).
+- **Research Facility** (mandatory, set on the map): same one-time-
+  purchase build-panel row as the buildings above, but it gates the
+  Research tab itself rather than a unit list - `startResearch()`
+  refuses outright (and every row in the Research tab shows 🔒 Locked,
+  with a banner explaining why) until that faction has actually built
+  it. No unit list, so it always shows in the Build panel regardless -
+  there's nothing that would make it optional the way an empty unit
+  list does for the other buildings.
+- **Gun Turrets** (optional, set on the map): stationary defenses,
+  structured differently from the buildings above entirely - no gating
+  building, no production queue, no Speed stat. Clicking "Place" in the
+  Build panel doesn't spawn one immediately; it arms placement mode
+  (cursor becomes a crosshair, a dashed range ring appears around your
+  Home Base) and the next click on the map - if it lands between 50 and
+  300 world units from your Home Base - spends the cost and places it
+  exactly there; a click outside that ring is just ignored (stays in
+  placement mode), and Esc or clicking the button again cancels for
+  free before you've spent anything. A placed turret has speed 0 (so
+  combatTick's own chase-toward-target math always computes zero
+  movement - it just can't fire until something wanders into range) and
+  auto-acquires the nearest enemy on its own every frame regardless of
+  who owns it or whether it's AI- or human-controlled, rather than
+  waiting for a click the way a normal unit does - though clicking it
+  and giving it an explicit target still overrides that, same as
+  commanding any other unit. It's a full combat entity in the normal
+  `units` array (not a decorative marker like the buildings above), so
+  it can be selected, destroyed, and targeted by enemies like anything
+  else. AI factions place them too, picking a random valid spot in the
+  same ring instead of needing a click.
 - **⬇ Download as index.html** - packages the map's data inline into a
   fully standalone copy of this page. Verified: opens and runs from
   `file://` with zero network calls.
@@ -216,8 +275,9 @@ Categories are hierarchical: **Maps**, **Characters** (sub-picker:
 **Space Ships**, **Navy Ships**, **Planes and Jets**, **Helicopters**,
 **Army Men**, **Infantry**, **Artillery** - stored as `characters/<type>`),
 **Worlds**, **Bases**, **Resources** (flat, no sub-picker), **Structures**
-(sub-picker: **War Factory**, **Airport**, **Infantry Post**, **Research
-Facility** - `structures/<type>`), **Sounds** (sub-picker: **Background
+(sub-picker: **War Factory**, **Airport**, **Infantry Post**,
+**Helicopter Facility**, **Research Facility**, **Gun Turret** -
+`structures/<type>`), **Sounds** (sub-picker: **Background
 Music**, **Intro Music**, **Attack**, **Building Destroyed**, **Home Base
 Under Attack**, **Game Over** - `sounds/<type>`). Any top-level category
 with `children` in `CATEGORY_TREE` gets this same sub-picker UI - it used
