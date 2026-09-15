@@ -82,9 +82,10 @@ entirely by one map's saved data:
     next faction automatically - "no continued [global] timer," just
     each faction's own window. The top bar shows whose turn it is and
     the seconds left; the camera snaps to their homeworld when it
-    becomes their turn. A unit that attacks here locks for a short
-    real-time cooldown instead of the 90s clock-turn, since this mode
-    has no such clock at all.
+    becomes their turn. A unit that attacks here locks for the rest of
+    that faction's turn (one attack per turn, not per 90s clock-turn -
+    this mode has no such clock at all) and clears again the moment its
+    turn comes back around.
 - **Team A / Team B** - shown before every match, for every player, with
   up to 5 computer opponents each getting an explicit A/B toggle (you're
   always A). At least one has to stay on B or Start Match refuses -

@@ -226,7 +226,6 @@ const UNIT_SIZE = 34;
 const HOMEWORLD_SIZE = 90;
 const DEPOSIT_SIZE = 56;
 const AI_TICK_SECONDS = 6;
-const ATTACK_COOLDOWN_SECONDS = 1.2; // per-shot cooldown used in Turn-Based mode instead of the Real-Time "once per 90s clock-turn" rule - see isLocked()/lockUnit() below
 const MINING_RANGE = 80; // how close a Mining Ship has to be to its deposit to actually earn resources
 const MAP_SIZE_MULTIPLIER = { tiny: 1, small: 3, medium: 6, large: 12 };
 const BASE_HOME_RADIUS = 420;
@@ -445,16 +444,16 @@ async function main() {
   // A unit that just attacked does nothing else at all - can't re-attack
   // or take a new move order - until it's allowed to again. What "until"
   // means depends on the mode: Real-Time uses the old 90-second cosmetic
-  // clock-turn (unchanged); Turn-Based has no such clock at all (that's
-  // the whole point of the mode), so it uses a short real-time cooldown
-  // instead - long enough to stop one unit deleting its target in a
-  // single frame, short enough that a 10-60s turn window still gets real
-  // combat done in it.
+  // clock-turn (unchanged). Turn-Based is one attack per (faction) turn,
+  // full stop - u.attackedThisTurn is cleared by advanceTurn() only for
+  // the faction that's newly becoming active, so it stays set for the
+  // whole time a unit sits frozen and clears the instant its own turn
+  // comes back around.
   function isLocked(u) {
-    return turnMode ? elapsed < (u.attackCooldownUntil || 0) : turnNumber < u.lockedUntilTurn;
+    return turnMode ? !!u.attackedThisTurn : turnNumber < u.lockedUntilTurn;
   }
   function lockUnit(u) {
-    if (turnMode) u.attackCooldownUntil = elapsed + ATTACK_COOLDOWN_SECONDS;
+    if (turnMode) u.attackedThisTurn = true;
     else u.lockedUntilTurn = turnNumber + 1;
   }
   function combatTick(u, dt) {
@@ -483,14 +482,16 @@ async function main() {
   factions.forEach((f) => { f.isFactionHome = true; });
 
   let turnTimer = TURN_SECONDS, turnNumber = 1, aiTimer = AI_TICK_SECONDS, fogOn = false;
-  let elapsed = 0; // real seconds since the match started - drives Turn-Based's attack cooldown (see isLocked/lockUnit above)
 
   // Turn-Based mode only: rotate control to the next living faction,
   // wrapping around, and reset everything that's specific to "whose turn
   // is it" - the hot-seat timer, the camera (so whoever's picking up the
   // device next actually sees their own side of the map), any leftover
-  // selection from the player who just finished, and the build/research
-  // panels (they render whatever activeFaction currently is).
+  // selection from the player who just finished, the build/research
+  // panels (they render whatever activeFaction currently is), and every
+  // one of the new active faction's units' attackedThisTurn flag - so
+  // "one attack per turn" means per THIS turn, not permanently locked
+  // the first time a unit ever fires.
   function advanceTurn() {
     const alive = factions.filter((f) => f.hp > 0);
     if (!alive.length) return;
@@ -501,6 +502,7 @@ async function main() {
     activeFaction = factions[activeIdx];
     hotseatTimer = TURN_TIMER_SECONDS;
     camera.x = activeFaction.x; camera.y = activeFaction.y;
+    livingUnits(activeFaction.id).forEach((u) => { u.attackedThisTurn = false; });
     renderBuildPanel();
     renderResearchPanel();
   }
@@ -539,7 +541,6 @@ async function main() {
 
   function update(dt) {
     if (paused || gameOver || !matchStarted) return;
-    elapsed += dt;
     if (turnMode) {
       // No continued/global clock in this mode - just each faction's own
       // hot-seat window, counting down in real time.
