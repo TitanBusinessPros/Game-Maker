@@ -421,6 +421,7 @@ const MOVE_PX_PER_SPEED = 20;
 const UNIT_SIZE = 34;
 const HOMEWORLD_SIZE = 90;
 const DEPOSIT_SIZE = 56;
+const GATED_BUILDING_SIZE = 56;
 const AI_TICK_SECONDS = 6;
 const MINING_RANGE = 80; // how close a Mining Ship has to be to its deposit to actually earn resources
 const MAP_SIZE_MULTIPLIER = { tiny: 1, small: 3, medium: 6, large: 12 };
@@ -484,9 +485,16 @@ async function main() {
   // 'warFactory') is read by the build panel below to gate them behind
   // that faction actually having built the matching building, and by
   // update()'s production-queue processing.
+  const [airBaseImg, warFactoryImg] = await Promise.all([
+    loadImage(cfg.airBase?.image), loadImage(cfg.warFactory?.image),
+  ]);
+  // offsetX/offsetY: where each building's art is drawn relative to its
+  // faction's homeworld once built (see drawGatedBuildings below) -
+  // opposite sides so Air Base and War Factory never overlap each other
+  // or the resource deposit (which sits at y-100, straight above home).
   const GATED_BUILDINGS = [
-    { key: 'airBase', cfg: cfg.airBase || { name: 'Air Base', cost: 150, hp: 2000 }, unitCfgs: cfg.airUnits || [], icon: '✈️' },
-    { key: 'warFactory', cfg: cfg.warFactory || { name: 'War Factory', cost: 150, hp: 2000 }, unitCfgs: cfg.warUnits || [], icon: '🛡️' },
+    { key: 'airBase', cfg: cfg.airBase || { name: 'Air Base', cost: 150, hp: 2000 }, unitCfgs: cfg.airUnits || [], icon: '✈️', img: airBaseImg, offsetX: 110, offsetY: 60 },
+    { key: 'warFactory', cfg: cfg.warFactory || { name: 'War Factory', cost: 150, hp: 2000 }, unitCfgs: cfg.warUnits || [], icon: '🛡️', img: warFactoryImg, offsetX: -110, offsetY: 60 },
   ];
   const buildingCfgByKey = Object.fromEntries(GATED_BUILDINGS.map((b) => [b.key, b.cfg]));
   const unitDefs = [
@@ -1029,6 +1037,18 @@ async function main() {
       ctx.drawImage(resourceImg, p.x - fit.w / 2, p.y - fit.h / 2, fit.w, fit.h);
     } else { ctx.fillStyle = '#e8b93a'; ctx.beginPath(); ctx.arc(p.x, p.y, size / 2, 0, 7); ctx.fill(); }
   }
+  // Air Base / War Factory: drawn near their faction's homeworld once
+  // that faction has actually built it (fac.built[key]) - purely
+  // decorative/informational, same as the resource deposit above (not a
+  // combat target: nothing in nearestEnemy/handleClick's target search
+  // looks at these, only at factions and units).
+  function drawGatedBuilding(f, b) {
+    if (!f.built[b.key] || !b.img) return;
+    const p = toScreen(f.x + b.offsetX, f.y + b.offsetY);
+    const size = GATED_BUILDING_SIZE * camera.zoom;
+    const fit = fittedSize(b.img, size);
+    ctx.drawImage(b.img, p.x - fit.w / 2, p.y - fit.h / 2, fit.w, fit.h);
+  }
   function drawBeams() {
     for (const b of beams) {
       const p1 = toScreen(b.x1, b.y1), p2 = toScreen(b.x2, b.y2);
@@ -1058,13 +1078,14 @@ async function main() {
     }
 
     for (const d of deposits) drawDeposit(d);
-    for (const f of factions) if (f.hp > 0) drawFactionHome(f);
+    for (const f of factions) if (f.hp > 0) { drawFactionHome(f); GATED_BUILDINGS.forEach((b) => drawGatedBuilding(f, b)); }
     for (const u of units) if (u.alive) drawUnit(u);
     drawBeams();
 
     renderHud();
     renderMinimap();
     updateHomeHpBar();
+    updateProductionStatus();
   }
 
   function renderHud() {
@@ -1281,6 +1302,29 @@ async function main() {
     fill.style.width = pct * 100 + '%';
     fill.classList.toggle('low', pct < 0.3);
   }
+  // Same "cheap text tweak every frame, not a full rebuild" treatment as
+  // updateHomeHpBar - renderBuildPanel() only runs on discrete events
+  // (a button click, a turn change, research finishing), so a countdown
+  // computed once at row-creation time and never touched again just sat
+  // frozen on screen until something else happened to trigger a
+  // rebuild. That's what "no timer for troop production" was actually
+  // describing: production WAS progressing correctly in the background
+  // (update()'s queue-processing loop never had this problem), the
+  // on-screen seconds just never visibly ticked down.
+  function buildingStatsText(b) {
+    const built = activeFaction.built[b.key];
+    const queue = activeFaction.buildQueue[b.key];
+    if (built && queue.length) {
+      return `Producing ${unitDefs[queue[0].defIndex].name}… ${Math.ceil(queue[0].remaining)}s left${queue.length > 1 ? ` · ${queue.length - 1} queued` : ''}`;
+    }
+    return `Cost ${b.cfg.cost} · HP ${b.cfg.hp} · required before any of its units below can be built`;
+  }
+  function updateProductionStatus() {
+    GATED_BUILDINGS.forEach((b) => {
+      const statsEl = document.getElementById(`buildStats-${b.key}`);
+      if (statsEl) statsEl.textContent = buildingStatsText(b);
+    });
+  }
   function renderBuildPanel() {
     const el = document.getElementById('tab-build');
     el.innerHTML = '';
@@ -1314,11 +1358,7 @@ async function main() {
       const queue = activeFaction.buildQueue[b.key];
       const row = document.createElement('div');
       row.className = 'buildRow';
-      let stats = `Cost ${b.cfg.cost} · HP ${b.cfg.hp} · required before any of its units below can be built`;
-      if (built && queue.length) {
-        stats = `Producing ${unitDefs[queue[0].defIndex].name}… ${Math.ceil(queue[0].remaining)}s left${queue.length > 1 ? ` · ${queue.length - 1} queued` : ''}`;
-      }
-      row.innerHTML = `<div class="name">${b.icon} ${b.cfg.name}</div><div class="stats">${stats}</div>`;
+      row.innerHTML = `<div class="name">${b.icon} ${b.cfg.name}</div><div class="stats" id="buildStats-${b.key}"></div>`;
       const btn = document.createElement('button');
       btn.textContent = built ? 'Already built' : 'Build';
       btn.disabled = built || !canAfford(activeFaction, b.cfg.cost);
@@ -1339,6 +1379,7 @@ async function main() {
       row.appendChild(btn);
       el.appendChild(row);
     });
+    updateProductionStatus(); // populate the buildStats-* text immediately, not just on the next frame
   }
   function renderResearchPanel() {
     const el = document.getElementById('tab-research');

@@ -43,24 +43,27 @@ appear) — a genuinely separate, self-contained game per map.
 3. **Resource & mining** — the deposit every home base gets nearby (name,
    size, art - a real "mine" image, separate from the vessel that works
    it) and the mining unit that drains it (name, income/hour, art).
-4. **Combat units** — add as many as you want, each with hp/attack/range/
-   speed/cost - the exact fields `play.html`'s engine reads.
-4a. **Air Base** (optional) — a second building, separate from Combat
-   Units, for planes/jets/spaceships/etc. Give it a name (defaults to
-   "Air Base"), its own **HP** (1000-5000, same range/field as Home
-   Base's) and a build cost, then add units under it the same way as
-   Combat Units, plus one more field each: **production time**
+4. **Air Base** (optional) — a building for planes/jets/spaceships/etc.
+   Give it a name (defaults to "Air Base"), its own **art**, **HP**
+   (1000-5000, same range/field as Home Base's), and a build cost, then
+   add units under it (name/art/hp/attack/range/speed/cost, same fields
+   the engine always used), plus one more field each: **production time**
    (10-100s) - `play.html` won't let anyone build those specific units
    until they've actually built this first, and each one then takes
    that many real seconds to produce instead of appearing instantly.
    Leave its unit list empty and the whole feature is simply absent from
    the map, same as never adding it.
-4b. **War Factory** (optional) — a third building, identical in every
+4a. **War Factory** (optional) — a second building, identical in every
    way to Air Base above, for tanks/armored vehicles/etc. Its own name
-   (defaults to "War Factory"), HP, cost, and unit list with per-unit
-   production time - completely independent of Air Base (a faction can
-   have one, both, or neither; the two buildings produce in parallel,
-   not competing for the same production timer).
+   (defaults to "War Factory"), art, HP, cost, and unit list with
+   per-unit production time - completely independent of Air Base (a
+   faction can have one, both, or neither; the two buildings produce in
+   parallel, not competing for the same production timer).
+   Air Base and War Factory replaced the old standalone "Combat Units"
+   checklist item entirely - a finished map now needs at least one unit
+   under one of these two instead (that old section still exists in
+   `index.html`'s code, hidden, purely so a map made before this change
+   keeps working).
 5. **Sounds** — background music, intro music, attack/building-destroyed/
    home-base-under-attack/game-over sfx. All optional, all `.mp3`.
 6. **My Maps** — every map saved under your signed-in account, draft or
@@ -175,7 +178,16 @@ entirely by one map's saved data:
   unit at the same time, not competing for one shared timer - and like
   research/mining income, queues keep progressing regardless of whose
   turn it is in Turn-Based mode. A map with no units defined under a
-  given building never shows any of it at all for that building.
+  given building never shows any of it at all for that building. Once
+  built, the building's own art is drawn near its faction's homeworld
+  (a fixed offset either side, so Air Base and War Factory never
+  overlap each other or the resource deposit) - purely a visual marker,
+  not a combat target (nothing in the game's targeting looks at these,
+  same as the resource deposit). The production countdown shown in the
+  build panel updates live every frame (it used to only update when
+  something else happened to redraw the panel, so it looked frozen -
+  reported as "no timer for troop production" even though production
+  itself was always progressing correctly in the background).
 - **⬇ Download as index.html** - packages the map's data inline into a
   fully standalone copy of this page. Verified: opens and runs from
   `file://` with zero network calls.
@@ -187,7 +199,13 @@ guessing at screen coordinates.
 
 ## `admin.html`
 
-Google-sign-in-gated to one email (`ADMIN_EMAIL` constant). Lets that
+Google-sign-in-gated to one email (`ADMIN_EMAIL` constant - duplicated
+as a separate `ADMIN_EMAIL` in `index.html` too, since that page never
+linked to this one anywhere except a buried mention inside an empty-
+library placeholder message; signing into `index.html` as that account
+now shows a real "⚙️ Admin: manage the shared library" link right in the
+header, otherwise there was no visible way to discover this page at
+all beyond typing its URL by hand). Lets that
 account multi-select files (a whole folder at once) into a category,
 compresses them the same way `index.html` does, and writes to Firestore
 `libraryItems` + Storage `library/<category>/...`. Enforced server-side

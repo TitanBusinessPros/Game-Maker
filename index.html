@@ -253,6 +253,7 @@
 <header>
   <h1>Game Maker</h1>
   <p>Build one map's worth of art, sound, and units. Nothing here changes the combat math &mdash; it just tells the engine what to call things and what to draw.</p>
+  <div id="userBar" style="display:none; font-size:12px; color:var(--text-dim); margin-top:8px;"></div>
 </header>
 
 <main style="display:none;">
@@ -373,35 +374,54 @@
     </div>
   </section>
 
-  <!-- 4. Combat units -->
-  <section class="section" id="sec-units">
-    <h2><span class="num">4</span> Combat Units</h2>
-    <p class="hint">Add as many as you want. Stats work exactly like the original engine: HP, attack, range, speed, build cost. Swap a "Cruiser" sprite for a "Navy Destroyer" sprite and it still fights the same way.</p>
+  <!-- Combat Units: replaced by Air Base / War Factory below as the way
+       to add buildable units. Kept in the DOM (hidden, empty, nothing
+       auto-added to it) purely so old maps that still have units saved
+       under it keep working - see collectUnits/buildMapDoc/
+       loadExistingMap, all untouched. Nothing here is reachable from the
+       UI any more. -->
+  <section class="section" id="sec-units" style="display:none;" aria-hidden="true">
     <div id="unitList"></div>
     <button type="button" class="btn-add" id="addUnitBtn">+ Add another unit</button>
   </section>
 
-  <!-- 4a. Air Base -->
+  <!-- 4. Air Base -->
   <section class="section" id="sec-airbase">
-    <h2><span class="num">4a</span> Air Base (optional)</h2>
-    <p class="hint">A second building, separate from the Combat Units above, for planes/jets/spaceships/etc. Name it whatever fits (Air Base, Hangar, Spaceport&hellip;), give it its own HP and build cost. The units you add below it can't be built until a player actually builds this first, and each one takes real time to produce (set per unit, 10-100s) instead of appearing instantly. Leave the unit list empty and this whole feature just doesn't show up in-game.</p>
+    <h2><span class="num">4</span> Air Base (optional)</h2>
+    <p class="hint">A building for planes/jets/spaceships/etc. Name it whatever fits (Air Base, Hangar, Spaceport&hellip;), give it its own art, HP, and build cost. The units you add below it can't be built until a player actually builds this first, and each one takes real time to produce (set per unit, 10-100s) instead of appearing instantly. Leave the unit list empty and this whole feature just doesn't show up in-game.</p>
     <div class="row">
       <div class="field"><label>Building name</label><input type="text" id="airBaseName" value="Air Base"></div>
       <div class="field narrow"><label>Building HP</label><input type="number" id="airBaseHp" value="2000" min="1000" max="5000" step="100"></div>
       <div class="field narrow"><label>Build cost</label><input type="number" id="airBaseCost" value="150" min="0" step="10"></div>
     </div>
+    <div class="field">
+      <label>Air Base art</label>
+      <div class="upload-slot" data-slot="airBaseImage">
+        <div class="thumb">none</div>
+        <div class="meta"><div class="name">No file chosen</div><div class="status">required if you add any air units below</div></div>
+        <input type="file" accept="image/*" style="width:auto">
+      </div>
+    </div>
     <div id="airUnitList"></div>
     <button type="button" class="btn-add" id="addAirUnitBtn">+ Add an air unit</button>
   </section>
 
-  <!-- 4b. War Factory -->
+  <!-- 4a. War Factory -->
   <section class="section" id="sec-warfactory">
-    <h2><span class="num">4b</span> War Factory (optional)</h2>
-    <p class="hint">A third building, for tanks/armored vehicles/etc. Works exactly like Air Base above: name it whatever fits (War Factory, Motor Pool, Armory&hellip;), give it its own HP and build cost. The units you add below it can't be built until a player actually builds this first, and each one takes real time to produce (set per unit, 10-100s) instead of appearing instantly. Leave the unit list empty and this whole feature just doesn't show up in-game.</p>
+    <h2><span class="num">4a</span> War Factory (optional)</h2>
+    <p class="hint">A building for tanks/armored vehicles/etc. Works exactly like Air Base above: name it whatever fits (War Factory, Motor Pool, Armory&hellip;), give it its own art, HP, and build cost. The units you add below it can't be built until a player actually builds this first, and each one takes real time to produce (set per unit, 10-100s) instead of appearing instantly. Leave the unit list empty and this whole feature just doesn't show up in-game.</p>
     <div class="row">
       <div class="field"><label>Building name</label><input type="text" id="warFactoryName" value="War Factory"></div>
       <div class="field narrow"><label>Building HP</label><input type="number" id="warFactoryHp" value="2000" min="1000" max="5000" step="100"></div>
       <div class="field narrow"><label>Build cost</label><input type="number" id="warFactoryCost" value="150" min="0" step="10"></div>
+    </div>
+    <div class="field">
+      <label>War Factory art</label>
+      <div class="upload-slot" data-slot="warFactoryImage">
+        <div class="thumb">none</div>
+        <div class="meta"><div class="name">No file chosen</div><div class="status">required if you add any war factory units below</div></div>
+        <input type="file" accept="image/*" style="width:auto">
+      </div>
     </div>
     <div id="warUnitList"></div>
     <button type="button" class="btn-add" id="addWarUnitBtn">+ Add a war factory unit</button>
@@ -512,6 +532,13 @@ const googleSignInBtn = document.getElementById('googleSignInBtn');
 const mainEl = document.querySelector('main');
 const saveBarEl = document.getElementById('saveBar');
 let currentUser = null;
+// Matches admin.html's own ADMIN_EMAIL constant - this page only uses it
+// to decide whether to show a link to admin.html at all. It's not a
+// security boundary (admin.html enforces the real check itself, and
+// Firestore/Storage rules enforce it server-side regardless of what any
+// page shows) - just so the admin account isn't left guessing that
+// admin.html exists or has to be found by URL.
+const ADMIN_EMAIL = 'adonai4you@gmail.com';
 
 // Google sign-in is required before the page unlocks at all.
 //
@@ -540,6 +567,11 @@ onAuthStateChanged(auth, (user) => {
     authGate.style.display = 'none';
     mainEl.style.display = '';
     saveBarEl.style.display = '';
+    const userBar = document.getElementById('userBar');
+    userBar.style.display = 'block';
+    userBar.innerHTML = `Signed in as ${user.email}` + (user.email === ADMIN_EMAIL
+      ? ` &middot; <a href="admin.html" style="color:var(--accent);">&#9881;&#65039; Admin: manage the shared library</a>`
+      : '');
     refreshMyMaps();
   } else {
     authGate.style.display = 'flex';
@@ -960,13 +992,16 @@ function addUnitRow(data = {}) { return makeUnitRow(unitList, 'unit', unitCounte
 function addAirUnitRow(data = {}) { return makeUnitRow(airUnitList, 'airunit', airUnitCounterState, data, true); }
 function addWarUnitRow(data = {}) { return makeUnitRow(warUnitList, 'warunit', warUnitCounterState, data, true); }
 
-document.getElementById('addUnitBtn').addEventListener('click', () => addUnitRow());
-addUnitRow({ name: 'Cruiser', hp: 300, attack: 200, range: 500, speed: 2, cost: 400 });
+// addUnitBtn/addUnitRow have no visible way to be reached any more (see
+// #sec-units above) - the listener and default-Cruiser auto-add are
+// both gone so a new map can't silently pick up a unit the map-maker
+// never saw or asked for. The functions themselves stay, only for
+// loadExistingMap to call when opening an old map that still has units.
 
 document.getElementById('addAirUnitBtn').addEventListener('click', () => addAirUnitRow());
-// Starts empty on purpose - unlike Combat Units, Air Base and War
-// Factory are opt-in (see checklistGaps: neither is ever required to
-// Finish & Save).
+// Both start empty on purpose - Air Base and War Factory are opt-in
+// (see checklistGaps: neither building nor its units are ever required
+// to Finish & Save unless the map-maker actually adds a unit to it).
 document.getElementById('addWarUnitBtn').addEventListener('click', () => addWarUnitRow());
 
 // ---------------------------------------------------------------------
@@ -1068,7 +1103,7 @@ function setSaveStatus(text, cls) {
 }
 
 const FIXED_UPLOAD_SLOTS = [
-  'backgroundImage', 'goodBaseImage', 'resourceImage', 'miningUnitImage',
+  'backgroundImage', 'goodBaseImage', 'resourceImage', 'miningUnitImage', 'airBaseImage', 'warFactoryImage',
   'soundMusic', 'soundIntro', 'soundAttack', 'soundBuildingDestroyed', 'soundHomeUnderAttack', 'soundEndgame',
 ];
 
@@ -1169,12 +1204,14 @@ async function buildMapDoc(status) {
       name: document.getElementById('airBaseName').value.trim() || 'Air Base',
       hp: clampHomeworldHp(document.getElementById('airBaseHp').value),
       cost: Number(document.getElementById('airBaseCost').value) || 150,
+      image: uploadResults.airBaseImage,
     },
     airUnits,
     warFactory: {
       name: document.getElementById('warFactoryName').value.trim() || 'War Factory',
       hp: clampHomeworldHp(document.getElementById('warFactoryHp').value),
       cost: Number(document.getElementById('warFactoryCost').value) || 150,
+      image: uploadResults.warFactoryImage,
     },
     warUnits,
     sounds: {
@@ -1197,8 +1234,24 @@ function checklistGaps(mapDoc) {
   mapDoc.computers.forEach((c, i) => { if (!c.baseImage) gaps.push(`computer player #${i + 1} (${c.name}) home base art`); });
   if (!mapDoc.resource.image) gaps.push('resource deposit art');
   if (!mapDoc.miningUnit.image) gaps.push('mining unit art');
-  if (mapDoc.units.length === 0) gaps.push('at least one combat unit');
+  // Combat Units (mapDoc.units) has no UI to add to any more - see
+  // #sec-units - so it's not checked here at all except for old maps
+  // that already have some (their art requirement below still applies,
+  // same as always). What replaces "at least one combat unit" is "at
+  // least one buildable unit somewhere" - Air Base and War Factory
+  // count now too.
+  if (mapDoc.units.length === 0 && mapDoc.airUnits.length === 0 && mapDoc.warUnits.length === 0) {
+    gaps.push('at least one unit (Air Base or War Factory - Combat Units is no longer used)');
+  }
   mapDoc.units.forEach((u, i) => { if (!u.imageUrl) gaps.push(`unit #${i + 1} (${u.name}) art`); });
+  if (mapDoc.airUnits.length) {
+    if (!mapDoc.airBase.image) gaps.push(`${mapDoc.airBase.name} art`);
+    mapDoc.airUnits.forEach((u, i) => { if (!u.imageUrl) gaps.push(`${mapDoc.airBase.name} unit #${i + 1} (${u.name}) art`); });
+  }
+  if (mapDoc.warUnits.length) {
+    if (!mapDoc.warFactory.image) gaps.push(`${mapDoc.warFactory.name} art`);
+    mapDoc.warUnits.forEach((u, i) => { if (!u.imageUrl) gaps.push(`${mapDoc.warFactory.name} unit #${i + 1} (${u.name}) art`); });
+  }
   return gaps;
 }
 
@@ -1342,6 +1395,7 @@ async function loadExistingMap() {
     document.getElementById('airBaseName').value = m.airBase.name || 'Air Base';
     document.getElementById('airBaseHp').value = m.airBase.hp || 2000;
     document.getElementById('airBaseCost').value = m.airBase.cost || 150;
+    if (m.airBase.image) showExistingAsset('airBaseImage', m.airBase.image);
   }
   if (Array.isArray(m.airUnits) && m.airUnits.length) {
     airUnitList.innerHTML = '';
@@ -1351,6 +1405,7 @@ async function loadExistingMap() {
     document.getElementById('warFactoryName').value = m.warFactory.name || 'War Factory';
     document.getElementById('warFactoryHp').value = m.warFactory.hp || 2000;
     document.getElementById('warFactoryCost').value = m.warFactory.cost || 150;
+    if (m.warFactory.image) showExistingAsset('warFactoryImage', m.warFactory.image);
   }
   if (Array.isArray(m.warUnits) && m.warUnits.length) {
     warUnitList.innerHTML = '';
