@@ -1494,7 +1494,17 @@ async function main() {
       const btn = document.createElement('button');
       btn.textContent = built ? 'Already built' : 'Build';
       btn.disabled = built || !canAfford(activeFaction, b.cfg.cost);
-      btn.onclick = () => { activeFaction.resources -= b.cfg.cost; activeFaction.built[b.key] = true; renderBuildPanel(); };
+      // renderResearchPanel() too, not just renderBuildPanel() - the
+      // Research tab is a separate DOM subtree that only gets rebuilt on
+      // its own specific triggers (boot, a turn change, starting/
+      // finishing a research item); switching tabs only toggles CSS
+      // visibility, it doesn't re-render. Building the Research Facility
+      // here without this left the Research tab showing whatever it
+      // last rendered (everything Locked, from before it was built)
+      // until something else happened to refresh it - reported as
+      // "mining is still locked on the research page" even though the
+      // gate itself (fac.built.researchFacility) was already lifted.
+      btn.onclick = () => { activeFaction.resources -= b.cfg.cost; activeFaction.built[b.key] = true; renderBuildPanel(); renderResearchPanel(); };
       row.appendChild(btn);
       el.appendChild(row);
     });
