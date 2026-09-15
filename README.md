@@ -29,7 +29,16 @@ appear) — a genuinely separate, self-contained game per map.
 1. **Map basics** — name, what to call a home base (Home Base/Planet/
    Island/etc, defaults to "Home Base"), and a **map size** (Tiny /
    Small = 3× Tiny / Medium = 2× Small / Large = 2× Medium — actually
-   scales home base spacing in `play.html`, not just a label).
+   scales home base spacing in `play.html`, not just a label). A
+   "ⓘ recommended sizes" hover link next to the size picker explains what
+   this means for background art specifically: every image is compressed
+   to 768px max regardless of what's uploaded (see item 5's upload
+   compression), then stretched to cover the whole map, so the same image
+   looks sharp on Tiny (~2× stretch) and progressively softer on Small
+   (~4×), Medium (~8×), and Large (~14×) - simpler, lower-detail
+   background art holds up better on bigger maps. Character/unit/building
+   art isn't affected by map size at all, since those always render at a
+   fixed pixel size regardless of world scale.
 2. **Your faction & computer players** — you're always the human player;
    add 1-5 computer-controlled opponents, each with its own name, color,
    home base art, and **Home Base HP** (1000-5000, per faction - not one
@@ -85,7 +94,18 @@ appear) — a genuinely separate, self-contained game per map.
    construct before they can research anything there at all. Same
    name/art/HP/cost fields as the others, but no unit list of its own
    (it doesn't produce units, it gates research) and its art is always
-   required to Finish & Save, not just when some list has entries.
+   required to Finish & Save, not just when some list has entries. It's
+   also the one thing every faction can always afford to build with
+   nothing else built first - in `play.html`, it gates everything else on
+   this list: Air Base/War Factory/Infantry Post/Helicopter Facility,
+   every unit under them, Gun Turrets, and the Mining Ship are all locked
+   (Build/Place buttons disabled, a "requires Research Facility first"
+   note in their stats line) until a faction's own Research Facility is
+   standing - not just research itself like before. AI factions follow
+   the same rule (an unbuilt Research Facility is the only thing an AI
+   will spend on until it's built), and destroying a faction's Research
+   Facility re-locks everything else again, same as destroying any other
+   gated building re-locks its own units.
 4e. **Gun Turrets** (optional) — shaped differently from the buildings
    above: no gating building of its own, no production timer, and no
    Speed field (they're stationary by design - the field doesn't exist
@@ -216,7 +236,12 @@ entirely by one map's saved data:
 - The home base's HP is also a real bar at the top of the Build panel
   (updated live every frame), not just the small one floating over its
   canvas sprite - and the resource counter up top is explicitly labeled
-  "🪙 ... Gold" instead of a bare, unlabeled number.
+  "🪙 ... Gold" instead of a bare, unlabeled number. Clicking directly on
+  any home base (your own or an enemy's) now shows its HP in the same
+  info box a clicked unit uses - home bases live in their own `factions`
+  array rather than the `units` array everything else is clickable
+  through, so this never worked before; the click still issues an attack
+  order too if you have units selected and it's an enemy's.
 - **Air Base, War Factory, Infantry Post, Helicopter Facility** (all
   optional, set on the map): a faction-owned buildable structure that
   has to be built before any of its own units can be, exactly like the
@@ -267,7 +292,16 @@ entirely by one map's saved data:
   the same way destroying a War Factory re-locks its units. No unit
   list, so it always shows in the Build panel regardless - there's
   nothing that would make it optional the way an empty unit list does
-  for the other buildings.
+  for the other buildings. Beyond gating research, it's now also the
+  prerequisite for everything else buildable in the game: Air Base/War
+  Factory/Infantry Post/Helicopter Facility and their units, Gun
+  Turrets, and the Mining Ship are all disabled with a "requires
+  Research Facility first" note until a faction's own Research Facility
+  is standing - previously any of those could be built with nothing
+  else in place. It's exempt from its own rule (always buildable
+  immediately, or nothing could ever get built), and AI factions treat
+  an unbuilt Research Facility as the only thing worth spending on until
+  it exists.
 - **Gun Turrets** (optional, set on the map): stationary defenses,
   structured differently from the buildings above entirely - no gating
   building, no production queue, no Speed stat. Clicking "Place" in the
@@ -347,9 +381,20 @@ compresses them the same way `index.html` does, and writes to Firestore
 by the rules below (checked directly: an unauthorized session's write is
 actually rejected, not just hidden in the UI), not just a client check.
 
-Categories are hierarchical: **Maps**, **Characters** (sub-picker:
+Categories are hierarchical: **Maps** (sub-picker: **Tiny**, **Small**,
+**Medium**, **Large** - `maps/<size>`, so background art actually gets
+filed under the map size it was meant for instead of one flat bucket;
+items uploaded under the old flat `maps` category before this change
+still show up, just under "Other" rather than being sorted into a size -
+they were never tagged with one), **Characters** (sub-picker:
 **Space Ships**, **Navy Ships**, **Planes and Jets**, **Helicopters**,
 **Army Men**, **Infantry**, **Artillery** - stored as `characters/<type>`),
+Picking a Maps sub-category also shows a hint line with that size's
+recommended-art note (same "capped at 768px, stretched ~N× to cover the
+world" info as `index.html`'s own map-size hover tooltip, just phrased
+per-size instead of as a comparison table), so whoever's curating the
+library sees it right where they're about to upload, not only where a
+map creator sets the size.
 **Worlds**, **Bases**, **Resources** (flat, no sub-picker), **Structures**
 (sub-picker: **War Factory**, **Airport**, **Infantry Post**,
 **Helicopter Facility**, **Research Facility**, **Gun Turret** -
