@@ -154,6 +154,19 @@
     display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
     gap: 10px; padding: 16px; overflow-y: auto;
   }
+  /* Without these, setting .hidden = true on either element via JS
+     (openLibraryPicker/renderCategory, when switching between an image
+     slot and a sound slot) did nothing visually: #libraryGrid's own
+     `display: grid` above is an ID selector, which outranks the
+     browser's default `[hidden] { display: none }` (a lower-specificity
+     attribute selector) the same way #libraryModal's own display:flex
+     would if [hidden] weren't already overridden for it below. The
+     practical symptom was picking a sound showing the (stale, never
+     actually cleared for the same reason) image grid still visibly
+     sitting above the real sound list, making the sounds "hard to see
+     at the bottom" - they weren't broken, the leftover image grid above
+     them just was never really hidden. */
+  #libraryGrid[hidden], #libraryList[hidden] { display: none; }
   #libraryList { padding: 8px 16px 16px; overflow-y: auto; }
   .library-item {
     background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
@@ -836,6 +849,7 @@ function openLibraryPicker(slotKey, mediaType) {
       libraryGrid.hidden = false;
       libraryList.hidden = true;
       libraryGrid.innerHTML = '';
+      libraryList.innerHTML = '';
       catItems.forEach((it) => {
         const el = document.createElement('div');
         el.className = 'library-item';
@@ -850,6 +864,7 @@ function openLibraryPicker(slotKey, mediaType) {
     } else {
       libraryGrid.hidden = true;
       libraryList.hidden = false;
+      libraryGrid.innerHTML = '';
       libraryList.innerHTML = '';
       // No name shown here either - just "Sound 1", "Sound 2"... within
       // whatever category tab is open, instead of the uploaded name.
