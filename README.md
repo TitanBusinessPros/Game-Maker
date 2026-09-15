@@ -46,12 +46,21 @@ appear) — a genuinely separate, self-contained game per map.
 4. **Combat units** — add as many as you want, each with hp/attack/range/
    speed/cost - the exact fields `play.html`'s engine reads.
 4a. **Air Base** (optional) — a second building, separate from Combat
-   Units. Give it a name (defaults to "Air Base") and a build cost, then
-   add units under it the same way as Combat Units (planes, jets,
-   spaceships, whatever fits) - `play.html` won't let anyone build those
-   specific units until they've actually built this first. Leave its
-   unit list empty and the whole feature is simply absent from the map,
-   same as never adding it.
+   Units, for planes/jets/spaceships/etc. Give it a name (defaults to
+   "Air Base"), its own **HP** (1000-5000, same range/field as Home
+   Base's) and a build cost, then add units under it the same way as
+   Combat Units, plus one more field each: **production time**
+   (10-100s) - `play.html` won't let anyone build those specific units
+   until they've actually built this first, and each one then takes
+   that many real seconds to produce instead of appearing instantly.
+   Leave its unit list empty and the whole feature is simply absent from
+   the map, same as never adding it.
+4b. **War Factory** (optional) — a third building, identical in every
+   way to Air Base above, for tanks/armored vehicles/etc. Its own name
+   (defaults to "War Factory"), HP, cost, and unit list with per-unit
+   production time - completely independent of Air Base (a faction can
+   have one, both, or neither; the two buildings produce in parallel,
+   not competing for the same production timer).
 5. **Sounds** — background music, intro music, attack/building-destroyed/
    home-base-under-attack/game-over sfx. All optional, all `.mp3`.
 6. **My Maps** — every map saved under your signed-in account, draft or
@@ -148,15 +157,25 @@ entirely by one map's saved data:
   (updated live every frame), not just the small one floating over its
   canvas sprite - and the resource counter up top is explicitly labeled
   "🪙 ... Gold" instead of a bare, unlabeled number.
-- **Air Base** (optional, set on the map): a second buildable structure,
-  separate from the regular unit list, that has to be built before any
-  of its own units can be. In the Build panel it shows as a one-time
-  purchase ("Build" → "Already built", same pattern as the Mining Ship);
-  its units show as 🔒 Locked with a "requires <Air Base name>" note
-  until that faction actually builds it - even for AI factions, who
-  prioritize building it about half the time they can afford it rather
-  than picking a random unit. A map with no air units defined never
-  shows any of this at all.
+- **Air Base and War Factory** (both optional, set on the map): a
+  faction-owned buildable structure that has to be built before any of
+  its own units can be, exactly like the Mining Ship's "requires Mining
+  Operations research" pattern. In the Build panel each shows as a
+  one-time purchase ("Build" → "Already built"); its units show as
+  🔒 Locked with a "requires <building name>" note until that faction
+  actually builds it - even for AI factions, who prioritize building it
+  about half the time they can afford it rather than picking a random
+  unit. Once built, its units queue for production instead of spawning
+  instantly: clicking one starts a real countdown (its own per-unit
+  production time, 10-100s, set on the map) shown right on the
+  building's own build-panel row ("Producing Tank… 24s left · 2
+  queued"), and the unit only actually appears once that timer runs
+  out. Only the front item of each building's queue ticks - so a
+  faction with both buildings produces one air unit and one war-factory
+  unit at the same time, not competing for one shared timer - and like
+  research/mining income, queues keep progressing regardless of whose
+  turn it is in Turn-Based mode. A map with no units defined under a
+  given building never shows any of it at all for that building.
 - **⬇ Download as index.html** - packages the map's data inline into a
   fully standalone copy of this page. Verified: opens and runs from
   `file://` with zero network calls.

@@ -384,13 +384,27 @@
   <!-- 4a. Air Base -->
   <section class="section" id="sec-airbase">
     <h2><span class="num">4a</span> Air Base (optional)</h2>
-    <p class="hint">A second building, separate from the Combat Units above. Name it whatever fits (Air Base, Hangar, Spaceport&hellip;) and give it a build cost. The units you add below it - planes, jets, spaceships, whatever - can't be built until a player actually builds this first. Leave the unit list empty and this whole feature just doesn't show up in-game.</p>
+    <p class="hint">A second building, separate from the Combat Units above, for planes/jets/spaceships/etc. Name it whatever fits (Air Base, Hangar, Spaceport&hellip;), give it its own HP and build cost. The units you add below it can't be built until a player actually builds this first, and each one takes real time to produce (set per unit, 10-100s) instead of appearing instantly. Leave the unit list empty and this whole feature just doesn't show up in-game.</p>
     <div class="row">
       <div class="field"><label>Building name</label><input type="text" id="airBaseName" value="Air Base"></div>
+      <div class="field narrow"><label>Building HP</label><input type="number" id="airBaseHp" value="2000" min="1000" max="5000" step="100"></div>
       <div class="field narrow"><label>Build cost</label><input type="number" id="airBaseCost" value="150" min="0" step="10"></div>
     </div>
     <div id="airUnitList"></div>
     <button type="button" class="btn-add" id="addAirUnitBtn">+ Add an air unit</button>
+  </section>
+
+  <!-- 4b. War Factory -->
+  <section class="section" id="sec-warfactory">
+    <h2><span class="num">4b</span> War Factory (optional)</h2>
+    <p class="hint">A third building, for tanks/armored vehicles/etc. Works exactly like Air Base above: name it whatever fits (War Factory, Motor Pool, Armory&hellip;), give it its own HP and build cost. The units you add below it can't be built until a player actually builds this first, and each one takes real time to produce (set per unit, 10-100s) instead of appearing instantly. Leave the unit list empty and this whole feature just doesn't show up in-game.</p>
+    <div class="row">
+      <div class="field"><label>Building name</label><input type="text" id="warFactoryName" value="War Factory"></div>
+      <div class="field narrow"><label>Building HP</label><input type="number" id="warFactoryHp" value="2000" min="1000" max="5000" step="100"></div>
+      <div class="field narrow"><label>Build cost</label><input type="number" id="warFactoryCost" value="150" min="0" step="10"></div>
+    </div>
+    <div id="warUnitList"></div>
+    <button type="button" class="btn-add" id="addWarUnitBtn">+ Add a war factory unit</button>
   </section>
 
   <!-- 5. Audio -->
@@ -900,10 +914,16 @@ async function uploadSlotsWithLimit(slotKeys) {
 // ---------------------------------------------------------------------
 const unitList = document.getElementById('unitList');
 const airUnitList = document.getElementById('airUnitList');
+const warUnitList = document.getElementById('warUnitList');
 const unitCounterState = { n: 0 };
 const airUnitCounterState = { n: 0 };
+const warUnitCounterState = { n: 0 };
 
-function makeUnitRow(list, idPrefix, counterState, data = {}) {
+// gated: true for Air Base/War Factory units only - adds the per-unit
+// Production time field (10-100s, play.html queues these instead of
+// spawning them instantly). Regular Combat Units stay instant-build, so
+// they never get this field at all.
+function makeUnitRow(list, idPrefix, counterState, data = {}, gated = false) {
   const id = idPrefix + '_' + (counterState.n++);
   const row = document.createElement('div');
   row.className = 'unit-row';
@@ -924,6 +944,7 @@ function makeUnitRow(list, idPrefix, counterState, data = {}) {
       <div class="field narrow"><label>Range</label><input type="number" class="u-range" value="${data.range ?? 500}" min="0"></div>
       <div class="field narrow"><label>Speed</label><input type="number" class="u-speed" value="${data.speed ?? 2}" min="0" step="0.1"></div>
       <div class="field narrow"><label>Cost</label><input type="number" class="u-cost" value="${data.cost ?? 400}" min="0" step="10"></div>
+      ${gated ? `<div class="field narrow"><label>Production time (s)</label><input type="number" class="u-prodtime" value="${data.prodTime ?? 30}" min="10" max="100" step="5"></div>` : ''}
     </div>
   `;
   row.querySelector('.remove-unit').addEventListener('click', () => {
@@ -935,15 +956,18 @@ function makeUnitRow(list, idPrefix, counterState, data = {}) {
   if (data.imageUrl) showExistingAsset(id, data.imageUrl);
   return row;
 }
-function addUnitRow(data = {}) { return makeUnitRow(unitList, 'unit', unitCounterState, data); }
-function addAirUnitRow(data = {}) { return makeUnitRow(airUnitList, 'airunit', airUnitCounterState, data); }
+function addUnitRow(data = {}) { return makeUnitRow(unitList, 'unit', unitCounterState, data, false); }
+function addAirUnitRow(data = {}) { return makeUnitRow(airUnitList, 'airunit', airUnitCounterState, data, true); }
+function addWarUnitRow(data = {}) { return makeUnitRow(warUnitList, 'warunit', warUnitCounterState, data, true); }
 
 document.getElementById('addUnitBtn').addEventListener('click', () => addUnitRow());
 addUnitRow({ name: 'Cruiser', hp: 300, attack: 200, range: 500, speed: 2, cost: 400 });
 
 document.getElementById('addAirUnitBtn').addEventListener('click', () => addAirUnitRow());
-// Starts empty on purpose - unlike Combat Units, Air Base is opt-in
-// (see checklistGaps: it's never required to Finish & Save).
+// Starts empty on purpose - unlike Combat Units, Air Base and War
+// Factory are opt-in (see checklistGaps: neither is ever required to
+// Finish & Save).
+document.getElementById('addWarUnitBtn').addEventListener('click', () => addWarUnitRow());
 
 // ---------------------------------------------------------------------
 // Game style: Real-Time (default, unchanged) vs Turn-Based hot-seat.
@@ -1077,7 +1101,8 @@ function collectUnitRows(list, uploadResults) {
   const rows = Array.from(list.querySelectorAll('.unit-row'));
   return rows.map((row) => {
     const id = row.dataset.unitId;
-    return {
+    const prodEl = row.querySelector('.u-prodtime');
+    const base = {
       name: row.querySelector('.u-name').value.trim() || 'Unnamed Unit',
       imageUrl: uploadResults[id] || null,
       hp: Number(row.querySelector('.u-hp').value) || 0,
@@ -1086,18 +1111,28 @@ function collectUnitRows(list, uploadResults) {
       speed: Number(row.querySelector('.u-speed').value) || 0,
       cost: Number(row.querySelector('.u-cost').value) || 0,
     };
+    // Only Air Base/War Factory rows have the production-time field at
+    // all (see makeUnitRow's `gated` flag) - clamp it the same way
+    // clampHomeworldHp clamps HP, so an out-of-range value typed in
+    // can't silently produce a unit that builds faster/slower than the
+    // 10-100s the field promises.
+    if (prodEl) base.prodTime = Math.max(10, Math.min(100, Number(prodEl.value) || 30));
+    return base;
   });
 }
 function collectUnits(uploadResults) { return collectUnitRows(unitList, uploadResults); }
 function collectAirUnits(uploadResults) { return collectUnitRows(airUnitList, uploadResults); }
+function collectWarUnits(uploadResults) { return collectUnitRows(warUnitList, uploadResults); }
 
 async function buildMapDoc(status) {
   const unitSlots = Array.from(unitList.querySelectorAll('.unit-row')).map((row) => row.dataset.unitId);
   const airUnitSlots = Array.from(airUnitList.querySelectorAll('.unit-row')).map((row) => row.dataset.unitId);
+  const warUnitSlots = Array.from(warUnitList.querySelectorAll('.unit-row')).map((row) => row.dataset.unitId);
   const computerSlots = Array.from(computerList.querySelectorAll('.computer-row')).map((row) => row.dataset.computerId);
-  const uploadResults = await uploadSlotsWithLimit([...FIXED_UPLOAD_SLOTS, ...unitSlots, ...airUnitSlots, ...computerSlots]);
+  const uploadResults = await uploadSlotsWithLimit([...FIXED_UPLOAD_SLOTS, ...unitSlots, ...airUnitSlots, ...warUnitSlots, ...computerSlots]);
   const units = collectUnits(uploadResults);
   const airUnits = collectAirUnits(uploadResults);
+  const warUnits = collectWarUnits(uploadResults);
   const computers = collectComputers(uploadResults);
   return {
     ownerId: currentUser.uid,
@@ -1126,15 +1161,22 @@ async function buildMapDoc(status) {
       image: uploadResults.miningUnitImage,
     },
     units,
-    // Optional - see index.html's Air Base section hint. play.html only
-    // shows the "build the Air Base" gate at all when airUnits actually
-    // has entries; an empty list here means the feature is simply
-    // absent from this map, same as never having added it.
+    // Both optional - see their section hints. play.html only shows a
+    // "build this first" gate at all when the matching unit list
+    // actually has entries; an empty list means that whole feature is
+    // simply absent from this map, same as never having added it.
     airBase: {
       name: document.getElementById('airBaseName').value.trim() || 'Air Base',
+      hp: clampHomeworldHp(document.getElementById('airBaseHp').value),
       cost: Number(document.getElementById('airBaseCost').value) || 150,
     },
     airUnits,
+    warFactory: {
+      name: document.getElementById('warFactoryName').value.trim() || 'War Factory',
+      hp: clampHomeworldHp(document.getElementById('warFactoryHp').value),
+      cost: Number(document.getElementById('warFactoryCost').value) || 150,
+    },
+    warUnits,
     sounds: {
       music: uploadResults.soundMusic,
       intro: uploadResults.soundIntro,
@@ -1298,11 +1340,21 @@ async function loadExistingMap() {
 
   if (m.airBase) {
     document.getElementById('airBaseName').value = m.airBase.name || 'Air Base';
+    document.getElementById('airBaseHp').value = m.airBase.hp || 2000;
     document.getElementById('airBaseCost').value = m.airBase.cost || 150;
   }
   if (Array.isArray(m.airUnits) && m.airUnits.length) {
     airUnitList.innerHTML = '';
     m.airUnits.forEach((u) => addAirUnitRow(u));
+  }
+  if (m.warFactory) {
+    document.getElementById('warFactoryName').value = m.warFactory.name || 'War Factory';
+    document.getElementById('warFactoryHp').value = m.warFactory.hp || 2000;
+    document.getElementById('warFactoryCost').value = m.warFactory.cost || 150;
+  }
+  if (Array.isArray(m.warUnits) && m.warUnits.length) {
+    warUnitList.innerHTML = '';
+    m.warUnits.forEach((u) => addWarUnitRow(u));
   }
 
   if (m.sounds) {

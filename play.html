@@ -476,16 +476,22 @@ async function main() {
   const playerImg = await loadImage(cfg.player?.baseImage);
   const computerCfgs = cfg.computers || [];
   const computerImgs = await Promise.all(computerCfgs.map((c) => loadImage(c.baseImage)));
-  // Air Base units (index.html's optional 4a section) are merged into
-  // the same unitDefs/unitImages arrays as regular Combat Units - same
-  // defIndex space, so spawnUnit/combatTick/drawUnit/etc. all handle
-  // them with zero extra code. Only isAir distinguishes them, read by
-  // the build panel below to gate them behind hasAirBase.
-  const airBaseCfg = cfg.airBase || { name: 'Air Base', cost: 150 };
-  const airUnitDefs = cfg.airUnits || [];
+  // Air Base and War Factory units (index.html's optional 4a/4b
+  // sections) are merged into the same unitDefs/unitImages arrays as
+  // regular Combat Units - same defIndex space, so
+  // spawnUnit/combatTick/drawUnit/etc. all handle them with zero extra
+  // code. buildingKey (null for a regular unit, else 'airBase' or
+  // 'warFactory') is read by the build panel below to gate them behind
+  // that faction actually having built the matching building, and by
+  // update()'s production-queue processing.
+  const GATED_BUILDINGS = [
+    { key: 'airBase', cfg: cfg.airBase || { name: 'Air Base', cost: 150, hp: 2000 }, unitCfgs: cfg.airUnits || [], icon: '✈️' },
+    { key: 'warFactory', cfg: cfg.warFactory || { name: 'War Factory', cost: 150, hp: 2000 }, unitCfgs: cfg.warUnits || [], icon: '🛡️' },
+  ];
+  const buildingCfgByKey = Object.fromEntries(GATED_BUILDINGS.map((b) => [b.key, b.cfg]));
   const unitDefs = [
-    ...(cfg.units || []).map((u) => ({ ...u, isAir: false })),
-    ...airUnitDefs.map((u) => ({ ...u, isAir: true })),
+    ...(cfg.units || []).map((u) => ({ ...u, buildingKey: null })),
+    ...GATED_BUILDINGS.flatMap((b) => b.unitCfgs.map((u) => ({ ...u, buildingKey: b.key }))),
   ];
   const unitImages = await Promise.all(unitDefs.map((u) => loadImage(u.imageUrl)));
 
@@ -537,7 +543,14 @@ async function main() {
       // (undefined -> HOMEWORLD_HP_DEFAULT) or was ever hand-edited outside it.
       hp: clampHomeworldHp(src?.hp), maxHp: clampHomeworldHp(src?.hp),
       resources: 1000, research: freshResearch(),
-      hasAirBase: false, // see the Air Base build-panel row / aiThink below
+      // built.airBase / built.warFactory: whether this faction has
+      // purchased that gated building yet (see the build-panel rows /
+      // aiThink below). buildQueue.airBase / buildQueue.warFactory: a
+      // FIFO of { defIndex, remaining } - only the front item's timer
+      // ticks (update() below), so each building produces one unit at a
+      // time but the two buildings run independently of each other.
+      built: Object.fromEntries(GATED_BUILDINGS.map((b) => [b.key, false])),
+      buildQueue: Object.fromEntries(GATED_BUILDINGS.map((b) => [b.key, []])),
       team: null, // assigned on the team-select screen before the match starts
     });
   }
@@ -589,6 +602,21 @@ async function main() {
     };
     units.push(u);
     return u;
+  }
+  // Regular Combat Units (buildingKey === null) still spawn the instant
+  // they're paid for - unchanged. An Air Base/War Factory unit instead
+  // joins that building's production queue and only actually spawns
+  // once its own prodTime (10-100s, set per unit on the map) runs out -
+  // see the queue-processing loop in update() below. One helper used by
+  // both the build panel's button handler and aiThink, so player- and
+  // AI-built units go through the exact same path.
+  function startProduction(fac, defIndex) {
+    const def = unitDefs[defIndex];
+    if (def.buildingKey) {
+      fac.buildQueue[def.buildingKey].push({ defIndex, remaining: Math.max(1, Number(def.prodTime) || 30) });
+    } else {
+      spawnUnit(fac.id, defIndex, fac.x + 40 + (Math.random() - 0.5) * 60, fac.y + (Math.random() - 0.5) * 60);
+    }
   }
   function spawnMiner(factionId, x, y) {
     // Auto-orders itself to its own faction's deposit the moment it's
@@ -768,19 +796,22 @@ async function main() {
       if (options.length) startResearch(fac, options.includes('mining_ops') && !fac.research.researched.has('mining_ops') ? 'mining_ops' : options[Math.floor(Math.random() * options.length)]);
     }
     const hasMiner = units.some((u) => u.alive && u.factionId === fac.id && u.isMiner);
+    // Half the time it can afford one, an AI prioritizes an unbuilt
+    // gated building (Air Base / War Factory, whichever comes first
+    // below and still needs building) over a random unit - otherwise an
+    // AI that never happens to roll it could go the whole match without
+    // ever unlocking that building's units.
+    const neededBuilding = GATED_BUILDINGS.find((b) => b.unitCfgs.length && !fac.built[b.key] && fac.resources >= b.cfg.cost);
     if (!hasMiner && fac.research.researched.has('mining_ops') && fac.resources >= 80) {
       spawnMiner(fac.id, fac.x - 40, fac.y); fac.resources -= 80;
-    } else if (airUnitDefs.length && !fac.hasAirBase && fac.resources >= airBaseCfg.cost && Math.random() < 0.5) {
-      // Half the time it can afford one, prioritize the Air Base over a
-      // random unit - otherwise an AI that never happens to roll it
-      // could go the whole match without ever unlocking its air units.
-      fac.resources -= airBaseCfg.cost; fac.hasAirBase = true;
+    } else if (neededBuilding && Math.random() < 0.5) {
+      fac.resources -= neededBuilding.cfg.cost; fac.built[neededBuilding.key] = true;
     } else if (unitDefs.length) {
-      const affordable = unitDefs.map((d, i) => ({ d, i })).filter((x) => fac.resources >= x.d.cost && (!x.d.isAir || fac.hasAirBase));
+      const affordable = unitDefs.map((d, i) => ({ d, i })).filter((x) => fac.resources >= x.d.cost && (!x.d.buildingKey || fac.built[x.d.buildingKey]));
       if (affordable.length) {
         const pick = affordable[Math.floor(Math.random() * affordable.length)];
         fac.resources -= pick.d.cost;
-        spawnUnit(fac.id, pick.i, fac.x - 40 + (Math.random() - 0.5) * 60, fac.y + (Math.random() - 0.5) * 60);
+        startProduction(fac, pick.i);
       }
     }
   }
@@ -801,6 +832,22 @@ async function main() {
       if (f.research.active) {
         f.research.active.remaining -= dt;
         if (f.research.active.remaining <= 0) { f.research.researched.add(f.research.active.id); f.research.active = null; renderBuildPanel(); renderResearchPanel(); }
+      }
+      // Air Base / War Factory production queues - same "keeps running
+      // regardless of whose turn it is" treatment as research/mining
+      // above, not gated by turnMode. Only the FRONT item of each
+      // building's own queue ticks down, so one building produces one
+      // unit at a time, but the two buildings' queues run independently
+      // of each other and of anything turn-related.
+      for (const key of Object.keys(f.buildQueue)) {
+        const q = f.buildQueue[key];
+        if (!q.length) continue;
+        q[0].remaining -= dt;
+        if (q[0].remaining <= 0) {
+          const item = q.shift();
+          spawnUnit(f.id, item.defIndex, f.x + 40 + (Math.random() - 0.5) * 60, f.y + (Math.random() - 0.5) * 60);
+          if (f === activeFaction) renderBuildPanel();
+        }
       }
       // Income only flows while the miner is actually parked within range
       // of its faction's own deposit - matching "a Mining Ship parked
@@ -1253,32 +1300,42 @@ async function main() {
     minerBtn.onclick = () => { activeFaction.resources -= 80; spawnMiner(activeFaction.id, activeFaction.x + 40, activeFaction.y); renderBuildPanel(); };
     minerRow.appendChild(minerBtn);
     el.appendChild(minerRow);
-    // Air Base row - only shown at all if the map actually defines air
-    // units (index.html's optional 4a section left empty means this
-    // whole feature is absent, same as before it existed). A one-time
-    // building purchase, same "Build once, then Already built" pattern
-    // as the Mining Ship above - not a placed/attackable world object,
-    // just a per-faction unlock flag (hasAirBase) gating the units below.
-    if (airUnitDefs.length) {
-      const airBaseRow = document.createElement('div');
-      airBaseRow.className = 'buildRow';
-      airBaseRow.innerHTML = `<div class="name">${airBaseCfg.name}</div><div class="stats">Cost ${airBaseCfg.cost} · required before any of its units below can be built</div>`;
-      const airBaseBtn = document.createElement('button');
-      airBaseBtn.textContent = activeFaction.hasAirBase ? 'Already built' : 'Build';
-      airBaseBtn.disabled = activeFaction.hasAirBase || !canAfford(activeFaction, airBaseCfg.cost);
-      airBaseBtn.onclick = () => { activeFaction.resources -= airBaseCfg.cost; activeFaction.hasAirBase = true; renderBuildPanel(); };
-      airBaseRow.appendChild(airBaseBtn);
-      el.appendChild(airBaseRow);
-    }
+    // A row per gated building (Air Base, War Factory) - only shown at
+    // all if the map actually defines units for it (an empty list in
+    // index.html means that whole feature is absent, same as before it
+    // existed). A one-time purchase, same "Build once, then Already
+    // built" pattern as the Mining Ship above - not a placed/attackable
+    // world object, just a per-faction unlock flag (fac.built[key])
+    // gating the units below it, plus that building's own production
+    // queue status.
+    GATED_BUILDINGS.forEach((b) => {
+      if (!b.unitCfgs.length) return;
+      const built = activeFaction.built[b.key];
+      const queue = activeFaction.buildQueue[b.key];
+      const row = document.createElement('div');
+      row.className = 'buildRow';
+      let stats = `Cost ${b.cfg.cost} · HP ${b.cfg.hp} · required before any of its units below can be built`;
+      if (built && queue.length) {
+        stats = `Producing ${unitDefs[queue[0].defIndex].name}… ${Math.ceil(queue[0].remaining)}s left${queue.length > 1 ? ` · ${queue.length - 1} queued` : ''}`;
+      }
+      row.innerHTML = `<div class="name">${b.icon} ${b.cfg.name}</div><div class="stats">${stats}</div>`;
+      const btn = document.createElement('button');
+      btn.textContent = built ? 'Already built' : 'Build';
+      btn.disabled = built || !canAfford(activeFaction, b.cfg.cost);
+      btn.onclick = () => { activeFaction.resources -= b.cfg.cost; activeFaction.built[b.key] = true; renderBuildPanel(); };
+      row.appendChild(btn);
+      el.appendChild(row);
+    });
     unitDefs.forEach((def, i) => {
       const row = document.createElement('div');
       row.className = 'buildRow';
-      const locked = def.isAir && !activeFaction.hasAirBase;
-      row.innerHTML = `<div class="name">${def.name}${def.isAir ? ' ✈️' : ''}</div><div class="stats">HP ${def.hp} · ATK ${def.attack} · RNG ${def.range} · SPD ${def.speed} · Cost ${def.cost}${locked ? ` · requires ${airBaseCfg.name}` : ''}</div>`;
+      const building = def.buildingKey && GATED_BUILDINGS.find((b) => b.key === def.buildingKey);
+      const locked = building && !activeFaction.built[building.key];
+      row.innerHTML = `<div class="name">${def.name}${building ? ' ' + building.icon : ''}</div><div class="stats">HP ${def.hp} · ATK ${def.attack} · RNG ${def.range} · SPD ${def.speed} · Cost ${def.cost}${building ? ` · builds in ${def.prodTime}s` : ''}${locked ? ` · requires ${building.cfg.name}` : ''}</div>`;
       const btn = document.createElement('button');
-      btn.textContent = locked ? 'Locked' : 'Build';
+      btn.textContent = locked ? 'Locked' : (building ? 'Queue' : 'Build');
       btn.disabled = locked || !canAfford(activeFaction, def.cost);
-      btn.onclick = () => { activeFaction.resources -= def.cost; spawnUnit(activeFaction.id, i, activeFaction.x + 40 + (Math.random() - 0.5) * 60, activeFaction.y + (Math.random() - 0.5) * 60); renderBuildPanel(); };
+      btn.onclick = () => { activeFaction.resources -= def.cost; startProduction(activeFaction, i); renderBuildPanel(); };
       row.appendChild(btn);
       el.appendChild(row);
     });
@@ -1391,7 +1448,7 @@ async function main() {
   function serializeState() {
     return {
       cfg, turnNumber, turnTimer, activeIdx, hotseatTimer, moveNumber,
-      factions: factions.map((f) => ({ id: f.id, resources: f.resources, hp: f.hp, team: f.team, hasAirBase: f.hasAirBase, researched: [...f.research.researched], active: f.research.active })),
+      factions: factions.map((f) => ({ id: f.id, resources: f.resources, hp: f.hp, team: f.team, built: f.built, buildQueue: f.buildQueue, researched: [...f.research.researched], active: f.research.active })),
       units: units.filter((u) => u.alive).map((u) => ({ factionId: u.factionId, defIndex: u.defIndex, isMiner: !!u.isMiner, x: u.x, y: u.y, hp: u.hp, maxHp: u.maxHp })),
     };
   }
@@ -1409,7 +1466,8 @@ async function main() {
     data.factions.forEach((fd) => {
       const f = factions[fd.id];
       f.resources = fd.resources; f.hp = fd.hp; f.team = fd.team;
-      f.hasAirBase = !!fd.hasAirBase;
+      if (fd.built) f.built = fd.built;
+      if (fd.buildQueue) f.buildQueue = fd.buildQueue;
       f.research.researched = new Set(fd.researched); f.research.active = fd.active;
     });
     units.length = 0;
