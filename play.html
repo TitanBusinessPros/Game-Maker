@@ -524,6 +524,42 @@ async function main() {
   const turretDefs = cfg.gunTurrets || [];
   const turretImages = await Promise.all(turretDefs.map((t) => loadImage(t.imageUrl)));
 
+  // Multiple named resources (index.html's "+ Add resource" under
+  // Resource & Mining) - Gold always exists (it's what mining produces,
+  // and every pre-existing map already assumes it), cfg.resources adds
+  // any others a map-maker defined (e.g. Oil). Extra resources have no
+  // deposit/mining unit of their own - the only way to earn them is the
+  // per-resource "free each round" grant below (cfg.resourceGrants),
+  // same as Gold Per Round always worked, just generalized to N
+  // resources instead of exactly one.
+  const EXTRA_RESOURCES = cfg.resources || [];
+  const ALL_RESOURCE_IDS = ['gold', ...EXTRA_RESOURCES.map((r) => r.id)];
+  const RESOURCE_NAMES = Object.fromEntries([['gold', 'Gold'], ...EXTRA_RESOURCES.map((r) => [r.id, r.name || 'Resource'])]);
+  function freshWallet() {
+    // Gold starts at 1000 (unchanged from before this feature existed);
+    // every other resource starts at 0 - it only exists to be spent, an
+    // extra resource never had a starting stockpile the way Gold does.
+    return Object.fromEntries(ALL_RESOURCE_IDS.map((id) => [id, id === 'gold' ? 1000 : 0]));
+  }
+  // Every unit/turret def has a `costs` object ({resourceId: amount},
+  // index.html's per-resource checkboxes) as of this feature - `cost`
+  // (a lone number) is what a map saved before it existed still has,
+  // and always meant Gold.
+  function getCosts(def) { return def.costs || (def.cost != null ? { gold: def.cost } : {}); }
+  function canAffordCosts(fac, costs) { return Object.entries(costs).every(([id, amt]) => (fac.resources[id] || 0) >= amt); }
+  function spendCosts(fac, costs) { Object.entries(costs).forEach(([id, amt]) => { fac.resources[id] = (fac.resources[id] || 0) - amt; }); }
+  function costsText(costs) {
+    const parts = Object.entries(costs).filter(([, amt]) => amt > 0).map(([id, amt]) => `${amt} ${RESOURCE_NAMES[id] || id}`);
+    return parts.length ? parts.join(', ') : 'Free';
+  }
+  // Gated buildings, research, and the Mining Ship all still cost a
+  // flat, single Gold amount - not exposed to the new per-unit
+  // multi-resource checkboxes at all (see index.html - only combat
+  // units and turrets got that), so they keep their own plain-number
+  // helpers instead of going through getCosts()/canAffordCosts().
+  function canAffordGold(fac, amount) { return fac.resources.gold >= amount; }
+  function spendGold(fac, amount) { fac.resources.gold -= amount; }
+
   const sounds = {
     music: loadAudio(cfg.sounds?.music),
     attack: cfg.sounds?.attack, buildingDestroyed: cfg.sounds?.buildingDestroyed,
@@ -571,7 +607,7 @@ async function main() {
       // clamps it before saving, in case a map predates this field
       // (undefined -> HOMEWORLD_HP_DEFAULT) or was ever hand-edited outside it.
       hp: clampHomeworldHp(src?.hp), maxHp: clampHomeworldHp(src?.hp),
-      resources: 1000, research: freshResearch(),
+      resources: freshWallet(), research: freshResearch(),
       // built.airBase / built.warFactory: whether this faction has
       // purchased that gated building yet (see the build-panel rows /
       // aiThink below). buildQueue.airBase / buildQueue.warFactory: a
@@ -592,15 +628,23 @@ async function main() {
   let activeFaction = player;
   let hotseatTimer = TURN_TIMER_SECONDS;
   let moveNumber = 1; // counts every individual turn taken by anyone, starting at the first player's first turn
-  let lastGoldRound = 0; // see applyGoldPerRound() - which round it was last paid out for, so it fires exactly once per round
-  // Optional (index.html's "Give everyone free gold each round"
-  // checkbox) - a flat handout to every living faction, on top of
-  // normal mining income. Called once per Real-Time "turn" (the
-  // 90s cosmetic clock - there's no separate concept of a "round" in
-  // this mode) or once per Turn-Based round (see advanceTurn below).
-  function applyGoldPerRound() {
-    if (!cfg.goldPerRound) return;
-    factions.forEach((f) => { if (f.hp > 0) f.resources += cfg.goldPerRound; });
+  let lastGoldRound = 0; // see applyResourceGrants() - which round it was last paid out for, so it fires exactly once per round
+  // index.html's "Free resources each round" section (bottom of
+  // Resource & Mining) - a flat handout of each checked resource to
+  // every living faction, on top of normal Gold mining income. Called
+  // once per Real-Time "turn" (the 90s cosmetic clock - there's no
+  // separate concept of a "round" in this mode) or once per Turn-Based
+  // round (see advanceTurn below). cfg.goldPerRound is a fallback for a
+  // map saved before this was generalized to multiple resources - it
+  // only ever meant a flat Gold amount.
+  const RESOURCE_GRANTS = cfg.resourceGrants || (cfg.goldPerRound ? { gold: cfg.goldPerRound } : {});
+  function applyResourceGrants() {
+    const entries = Object.entries(RESOURCE_GRANTS);
+    if (!entries.length) return;
+    factions.forEach((f) => {
+      if (f.hp <= 0) return;
+      entries.forEach(([id, amt]) => { f.resources[id] = (f.resources[id] || 0) + amt; });
+    });
   }
 
   const worldMinX = Math.min(...factions.map((f) => f.x)) - 400;
@@ -968,10 +1012,10 @@ async function main() {
     hotseatTimer = TURN_TIMER_SECONDS;
     moveNumber++;
     // Same "Round N" the top-bar label already computes from
-    // moveNumber - fires applyGoldPerRound() exactly once each time
+    // moveNumber - fires applyResourceGrants() exactly once each time
     // that number goes up, not once per individual move.
     const round = Math.ceil(moveNumber / factions.length);
-    if (round > lastGoldRound) { lastGoldRound = round; applyGoldPerRound(); }
+    if (round > lastGoldRound) { lastGoldRound = round; applyResourceGrants(); }
     const center = factionViewCenter(activeFaction);
     camera.x = center.x; camera.y = center.y;
     clampCamera();
@@ -1011,8 +1055,8 @@ async function main() {
     const t = TECH_TREE[id];
     if (!t || fac.research.active || fac.research.researched.has(id)) return;
     if (t.prereq && !fac.research.researched.has(t.prereq)) return;
-    if (fac.resources < t.cost) return;
-    fac.resources -= t.cost;
+    if (!canAffordGold(fac, t.cost)) return;
+    spendGold(fac, t.cost);
     fac.research.active = { id, remaining: t.timeSeconds };
   }
 
@@ -1024,8 +1068,8 @@ async function main() {
     // decision below is skipped entirely until it exists.
     if (!fac.built.researchFacility) {
       const rf = buildingCfgByKey.researchFacility;
-      if (fac.resources >= rf.cost) {
-        fac.resources -= rf.cost; fac.built.researchFacility = true;
+      if (canAffordGold(fac, rf.cost)) {
+        spendGold(fac, rf.cost); fac.built.researchFacility = true;
         spawnGatedBuildingEntity(fac, 'researchFacility');
       }
       return;
@@ -1038,7 +1082,7 @@ async function main() {
         const t = TECH_TREE[k];
         if (fac.research.researched.has(k)) return false;
         if (t.prereq && !fac.research.researched.has(t.prereq)) return false;
-        return fac.resources >= t.cost;
+        return canAffordGold(fac, t.cost);
       });
       if (options.length) startResearch(fac, options.includes('mining_ops') && !fac.research.researched.has('mining_ops') ? 'mining_ops' : options[Math.floor(Math.random() * options.length)]);
     }
@@ -1053,25 +1097,25 @@ async function main() {
     // its other spending, capped at 3 so it doesn't over-invest there
     // instead of fielding an army.
     const minerCount = units.filter((u) => u.alive && u.factionId === fac.id && u.isMiner).length;
-    const wantsFirstMiner = minerCount === 0 && fac.research.researched.has('mining_ops') && fac.resources >= 80;
-    const wantsAnotherMiner = minerCount > 0 && minerCount < 3 && fac.research.researched.has('mining_ops') && fac.resources >= 80 && Math.random() < 0.1;
+    const wantsFirstMiner = minerCount === 0 && fac.research.researched.has('mining_ops') && canAffordGold(fac, 80);
+    const wantsAnotherMiner = minerCount > 0 && minerCount < 3 && fac.research.researched.has('mining_ops') && canAffordGold(fac, 80) && Math.random() < 0.1;
     // Half the time it can afford one, an AI prioritizes an unbuilt
     // gated building it actually needs (unitCfgs.length) or that's
     // always relevant regardless of units (alwaysShow - Research
     // Facility) over a random unit - otherwise an AI that never happens
     // to roll it could go the whole match without ever unlocking that
     // building's units, or never researching anything at all.
-    const neededBuilding = GATED_BUILDINGS.find((b) => (b.unitCfgs.length || b.alwaysShow) && !fac.built[b.key] && fac.resources >= b.cfg.cost);
+    const neededBuilding = GATED_BUILDINGS.find((b) => (b.unitCfgs.length || b.alwaysShow) && !fac.built[b.key] && canAffordGold(fac, b.cfg.cost));
     if (wantsFirstMiner || wantsAnotherMiner) {
-      spawnMiner(fac.id, fac.x - 40, fac.y); fac.resources -= 80;
+      spawnMiner(fac.id, fac.x - 40, fac.y); spendGold(fac, 80);
     } else if (neededBuilding && Math.random() < 0.5) {
-      fac.resources -= neededBuilding.cfg.cost; fac.built[neededBuilding.key] = true;
+      spendGold(fac, neededBuilding.cfg.cost); fac.built[neededBuilding.key] = true;
       spawnGatedBuildingEntity(fac, neededBuilding.key);
     } else if (unitDefs.length) {
-      const affordable = unitDefs.map((d, i) => ({ d, i })).filter((x) => fac.resources >= x.d.cost && (!x.d.buildingKey || fac.built[x.d.buildingKey]));
+      const affordable = unitDefs.map((d, i) => ({ d, i })).filter((x) => canAffordCosts(fac, getCosts(x.d)) && (!x.d.buildingKey || fac.built[x.d.buildingKey]));
       if (affordable.length) {
         const pick = affordable[Math.floor(Math.random() * affordable.length)];
-        fac.resources -= pick.d.cost;
+        spendCosts(fac, getCosts(pick.d));
         startProduction(fac, pick.i);
       }
     }
@@ -1080,12 +1124,12 @@ async function main() {
     // TURRET_MIN_RANGE/MAX_RANGE) and places one directly. Low, separate
     // chance each tick so it doesn't crowd out the AI's other spending -
     // this is a defensive extra, not its main economy.
-    const affordableTurret = turretDefs.map((d, i) => ({ d, i })).filter((x) => fac.resources >= x.d.cost);
+    const affordableTurret = turretDefs.map((d, i) => ({ d, i })).filter((x) => canAffordCosts(fac, getCosts(x.d)));
     if (affordableTurret.length && Math.random() < 0.15) {
       const pick = affordableTurret[Math.floor(Math.random() * affordableTurret.length)];
       const angle = Math.random() * Math.PI * 2;
       const dist = TURRET_MIN_RANGE + Math.random() * (TURRET_MAX_RANGE - TURRET_MIN_RANGE);
-      fac.resources -= pick.d.cost;
+      spendCosts(fac, getCosts(pick.d));
       spawnTurret(fac.id, pick.i, fac.x + Math.cos(angle) * dist, fac.y + Math.sin(angle) * dist);
     }
   }
@@ -1100,7 +1144,7 @@ async function main() {
       if (hotseatTimer <= 0) advanceTurn();
     } else {
       turnTimer -= dt;
-      if (turnTimer <= 0) { turnTimer = TURN_SECONDS; turnNumber++; applyGoldPerRound(); }
+      if (turnTimer <= 0) { turnTimer = TURN_SECONDS; turnNumber++; applyResourceGrants(); }
     }
 
     for (const f of factions) {
@@ -1147,7 +1191,7 @@ async function main() {
         u.activelyMining = inRange; // read by drawUnit for the live income label
         if (inRange) minersInRange++;
       });
-      if (minersInRange > 0) f.resources += (miningRate(f) / 3600) * dt * minersInRange;
+      if (minersInRange > 0) f.resources.gold += (miningRate(f) / 3600) * dt * minersInRange;
       // AI factions only get to act (build/research decisions) during
       // their own turn in Turn-Based mode - frozen the rest of the time,
       // same as a human faction would be. In Real-Time mode this is
@@ -1618,10 +1662,17 @@ async function main() {
     const row = document.getElementById('hudRow');
     // "🪙 ... Gold" - the ticking number up top had no label at all before
     // this, so there was nothing on screen saying what it actually was.
+    // Now one chip per resource that actually exists on this map (Gold
+    // always, plus any extras from index.html's "+ Add resource") - 🪙
+    // stays Gold's own icon, every other resource gets a plain 🔹 marker
+    // since map-makers don't pick an icon per resource, just a name.
     // Turn-Based mode: no fixed "you" to show a 🤝 relative to, so name
     // each faction's team instead - true regardless of viewpoint - and
     // point at whoever's turn it currently is.
-    row.innerHTML = factions.map((f) => `<span style="color:${f.color}">${turnMode && f.id === activeIdx ? '👉 ' : ''}${f.name}: ${Math.round(f.hp)} HP · 🪙 ${Math.round(f.resources)} Gold${turnMode ? ` [Team ${f.team}]` : (f.team === player.team ? ' 🤝' : '')}</span>`).join(' ');
+    row.innerHTML = factions.map((f) => {
+      const resourceText = ALL_RESOURCE_IDS.map((id) => `${id === 'gold' ? '🪙' : '🔹'} ${Math.round(f.resources[id] || 0)} ${RESOURCE_NAMES[id]}`).join(' · ');
+      return `<span style="color:${f.color}">${turnMode && f.id === activeIdx ? '👉 ' : ''}${f.name}: ${Math.round(f.hp)} HP · ${resourceText}${turnMode ? ` [Team ${f.team}]` : (f.team === player.team ? ' 🤝' : '')}</span>`;
+    }).join(' ');
     if (turnMode) {
       const secs = Math.max(0, Math.ceil(hotseatTimer));
       const round = Math.ceil(moveNumber / factions.length);
@@ -1760,8 +1811,9 @@ async function main() {
     const def = turretDefs[placingTurret.defIndex];
     const dist = Math.hypot(p.x - activeFaction.x, p.y - activeFaction.y);
     if (dist < TURRET_MIN_RANGE || dist > TURRET_MAX_RANGE) return;
-    if (!canAfford(activeFaction, def.cost)) { setPlacingTurret(null); renderBuildPanel(); return; }
-    activeFaction.resources -= def.cost;
+    const costs = getCosts(def);
+    if (!canAffordCosts(activeFaction, costs)) { setPlacingTurret(null); renderBuildPanel(); return; }
+    spendCosts(activeFaction, costs);
     spawnTurret(activeFaction.id, placingTurret.defIndex, p.x, p.y);
     setPlacingTurret(null);
     renderBuildPanel();
@@ -1856,7 +1908,9 @@ async function main() {
   // advanceTurn() re-renders both panels every time the active faction
   // changes.
   // ---------------------------------------------------------------------
-  function canAfford(fac, cost) { return fac.resources >= cost; }
+  // canAffordGold/canAffordCosts (and their spend counterparts) are
+  // defined up near ALL_RESOURCE_IDS, alongside freshWallet() -
+  // everything below just calls those now.
   // The active faction's homeworld HP as an actual bar at the top of the
   // build panel - before this, the only way to see it was the small
   // floating bar over its sprite on the canvas, easy to lose track of
@@ -1929,8 +1983,8 @@ async function main() {
     minerRow.innerHTML = `<div class="name">${cfg.miningUnit?.name || 'Mining Ship'}${minerCount ? ` (${minerCount} built)` : ''}</div><div class="stats">HP ${cfg.miningUnit?.hp || 40} · Cost 80 · ${minerUnlocked ? 'earns resources parked on your deposit - build as many as you want' : minerReq}</div>`;
     const minerBtn = document.createElement('button');
     minerBtn.textContent = minerUnlocked ? 'Build' : 'Locked';
-    minerBtn.disabled = !minerUnlocked || !canAfford(activeFaction, 80);
-    minerBtn.onclick = () => { activeFaction.resources -= 80; spawnMiner(activeFaction.id, activeFaction.x + 40, activeFaction.y); renderBuildPanel(); };
+    minerBtn.disabled = !minerUnlocked || !canAffordGold(activeFaction, 80);
+    minerBtn.onclick = () => { spendGold(activeFaction, 80); spawnMiner(activeFaction.id, activeFaction.x + 40, activeFaction.y); renderBuildPanel(); };
     minerRow.appendChild(minerBtn);
     el.appendChild(minerRow);
     // A row per gated building (Air Base, War Factory) - only shown at
@@ -1950,7 +2004,7 @@ async function main() {
       row.innerHTML = `<div class="name">${b.icon} ${b.cfg.name}</div><div class="stats" id="buildStats-${b.key}"></div>`;
       const btn = document.createElement('button');
       btn.textContent = built ? 'Already built' : 'Build';
-      btn.disabled = built || (b.key !== 'researchFacility' && !hasRF) || !canAfford(activeFaction, b.cfg.cost);
+      btn.disabled = built || (b.key !== 'researchFacility' && !hasRF) || !canAffordGold(activeFaction, b.cfg.cost);
       // renderResearchPanel() too, not just renderBuildPanel() - the
       // Research tab is a separate DOM subtree that only gets rebuilt on
       // its own specific triggers (boot, a turn change, starting/
@@ -1962,7 +2016,7 @@ async function main() {
       // "mining is still locked on the research page" even though the
       // gate itself (fac.built.researchFacility) was already lifted.
       btn.onclick = () => {
-        activeFaction.resources -= b.cfg.cost;
+        spendGold(activeFaction, b.cfg.cost);
         activeFaction.built[b.key] = true;
         spawnGatedBuildingEntity(activeFaction, b.key);
         renderBuildPanel(); renderResearchPanel();
@@ -1979,11 +2033,12 @@ async function main() {
       // "Build" units below used to skip this check entirely.
       const locked = !hasRF || (building && !activeFaction.built[building.key]);
       const lockReason = !hasRF ? buildingCfgByKey.researchFacility.name : (building ? building.cfg.name : '');
-      row.innerHTML = `<div class="name">${def.name}${building ? ' ' + building.icon : ''}</div><div class="stats">HP ${def.hp} · ATK ${def.attack} · RNG ${def.range} · SPD ${def.speed} · Cost ${def.cost}${building ? ` · builds in ${def.prodTime}s` : ''}${locked ? ` · requires ${lockReason}` : ''}</div>`;
+      const unitCosts = getCosts(def);
+      row.innerHTML = `<div class="name">${def.name}${building ? ' ' + building.icon : ''}</div><div class="stats">HP ${def.hp} · ATK ${def.attack} · RNG ${def.range} · SPD ${def.speed} · Cost ${costsText(unitCosts)}${building ? ` · builds in ${def.prodTime}s` : ''}${locked ? ` · requires ${lockReason}` : ''}</div>`;
       const btn = document.createElement('button');
       btn.textContent = locked ? 'Locked' : (building ? 'Queue' : 'Build');
-      btn.disabled = locked || !canAfford(activeFaction, def.cost);
-      btn.onclick = () => { activeFaction.resources -= def.cost; startProduction(activeFaction, i); renderBuildPanel(); };
+      btn.disabled = locked || !canAffordCosts(activeFaction, unitCosts);
+      btn.onclick = () => { spendCosts(activeFaction, unitCosts); startProduction(activeFaction, i); renderBuildPanel(); };
       row.appendChild(btn);
       el.appendChild(row);
     });
@@ -1996,10 +2051,11 @@ async function main() {
       const row = document.createElement('div');
       row.className = 'buildRow';
       const isPlacingThis = placingTurret && placingTurret.defIndex === i;
-      row.innerHTML = `<div class="name">${def.name} 🎯</div><div class="stats">HP ${def.hp} · ATK ${def.attack} · RNG ${def.range} · Cost ${def.cost} · place ${TURRET_MIN_RANGE}-${TURRET_MAX_RANGE} range of ${cfg.baseLabel || 'Home Base'}${!hasRF ? ` · requires ${buildingCfgByKey.researchFacility.name} first` : ''}</div>`;
+      const turretCosts = getCosts(def);
+      row.innerHTML = `<div class="name">${def.name} 🎯</div><div class="stats">HP ${def.hp} · ATK ${def.attack} · RNG ${def.range} · Cost ${costsText(turretCosts)} · place ${TURRET_MIN_RANGE}-${TURRET_MAX_RANGE} range of ${cfg.baseLabel || 'Home Base'}${!hasRF ? ` · requires ${buildingCfgByKey.researchFacility.name} first` : ''}</div>`;
       const btn = document.createElement('button');
       btn.textContent = isPlacingThis ? 'Click the map… (or Esc)' : 'Place';
-      btn.disabled = !hasRF || (!isPlacingThis && !canAfford(activeFaction, def.cost));
+      btn.disabled = !hasRF || (!isPlacingThis && !canAffordCosts(activeFaction, turretCosts));
       btn.onclick = () => { setPlacingTurret(isPlacingThis ? null : { defIndex: i }); renderBuildPanel(); };
       row.appendChild(btn);
       el.appendChild(row);
@@ -2026,7 +2082,7 @@ async function main() {
       row.innerHTML = `<div class="name">${t.name}</div><div class="desc">Cost ${t.cost} · ${t.timeSeconds}s${lockedByPrereq ? ' · requires ' + TECH_TREE[t.prereq].name : ''}${active ? ' · researching… ' + Math.ceil(activeFaction.research.active.remaining) + 's left' : ''}</div>`;
       const btn = document.createElement('button');
       btn.textContent = !hasResearchFacility ? 'Locked' : (done ? 'Done' : (active ? 'In progress' : 'Research'));
-      btn.disabled = !hasResearchFacility || done || !!activeFaction.research.active || lockedByPrereq || activeFaction.resources < t.cost;
+      btn.disabled = !hasResearchFacility || done || !!activeFaction.research.active || lockedByPrereq || !canAffordGold(activeFaction, t.cost);
       btn.onclick = () => { startResearch(activeFaction, id); renderResearchPanel(); };
       row.appendChild(btn);
       el.appendChild(row);
@@ -2139,7 +2195,13 @@ async function main() {
     const data = JSON.parse(await file.text());
     data.factions.forEach((fd) => {
       const f = factions[fd.id];
-      f.resources = fd.resources; f.hp = fd.hp; f.team = fd.team;
+      // A save from before multiple resources existed has fd.resources
+      // as a lone number (always meant Gold) instead of today's
+      // {gold, ...} wallet object - fall back to freshWallet() with that
+      // number substituted in for Gold so an older save file still loads
+      // instead of leaving every resource lookup below reading undefined.
+      f.resources = typeof fd.resources === 'object' && fd.resources ? fd.resources : { ...freshWallet(), gold: fd.resources ?? 1000 };
+      f.hp = fd.hp; f.team = fd.team;
       if (fd.built) f.built = fd.built;
       if (fd.buildQueue) f.buildQueue = fd.buildQueue;
       f.research.researched = new Set(fd.researched); f.research.active = fd.active;

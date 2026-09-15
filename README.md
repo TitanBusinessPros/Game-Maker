@@ -49,26 +49,45 @@ appear) — a genuinely separate, self-contained game per map.
    "Controlled by: 🤖 AI / 🧑 Human (hot-seat)" toggle - a human-flagged
    one takes a real turn instead of thinking on its own. Real-Time mode
    never shows either control; every computer player there is always AI.
-2b. **Gold per round** (optional, off by default) — a checkbox ("Give
-   everyone free gold each round") plus an amount. When on, every
-   faction (you and every computer player, alive ones only) gets handed
-   that much gold automatically at the start of each round - on top of
-   normal mining income, not instead of it. "Round" means the same
-   thing the top bar's "Round N" already means in Turn-Based mode
-   (once every faction has taken a turn); in Real-Time mode, which has
-   no separate round concept, it fires on the existing 90s cosmetic
-   turn-clock instead.
 3. **Resource & mining** — the deposit every home base gets nearby (name,
    size, art - a real "mine" image, separate from the vessel that works
    it) and the mining unit that drains it (name, income/hour, art).
+   Below that, two more subsections:
+   - **Additional resources** (optional) — a **+ Add resource** button
+     adds another named resource beyond Gold (e.g. Oil, Wood - just a
+     name, no deposit/mining unit of its own). Every unit/turret added
+     below (see item 4) gets a checkbox per resource that currently
+     exists here, with an amount for each one checked - a Tank could
+     read "50 Gold, 100 Oil" if both boxes are checked with those
+     amounts. Adding, removing, or renaming a resource here live-updates
+     every already-added unit/turret's checkboxes (existing checked
+     amounts are preserved; the new/renamed resource just shows up as
+     another row). A resource's id is assigned once when it's added and
+     never reused or derived from its name, same reasoning as
+     `admin.html`'s category ids - a unit's saved cost is keyed by that
+     id, so renaming the resource later must not orphan it.
+   - **Free resources each round** (optional, off by default for every
+     resource) — moved down from this section's old, singular "Gold per
+     round" spot at the top of the checklist and generalized: one
+     checkbox + amount row per resource that currently exists (Gold
+     included). Checking one hands every faction (you and every alive
+     computer player) that much of that resource automatically at the
+     start of each round, on top of Gold's normal mining income (not
+     instead of it). "Round" means the same thing the top bar's
+     "Round N" already means in Turn-Based mode (once every faction has
+     taken a turn); in Real-Time mode, which has no separate round
+     concept, it fires on the existing 90s cosmetic turn-clock instead.
 4. **Air Base** (optional) — a building for planes/jets/spaceships/etc.
    Give it a name (defaults to "Air Base"), its own **art**, **HP**
    (1000-5000, same range/field as Home Base's), and a build cost, then
-   add units under it (name/art/hp/attack/range/speed/cost/**weapon**,
-   same fields the engine always used plus a Weapon dropdown - Laser/
-   Bullet/Explosion/Missile/Arrow/Melee Slash, purely cosmetic, defaults
-   to Laser - see `play.html`'s weapon-effects bullet below), plus one
-   more field each: **production time**
+   add units under it (name/art/hp/attack/range/speed/**costs**/
+   **weapon** - costs is the per-resource checkbox+amount system from
+   item 3 above, replacing what used to be a single flat Cost number;
+   Weapon is a dropdown - Laser/Bullet/Explosion/Missile/Arrow/Melee
+   Slash/Flamethrower/Lightning Bolt/Poison Spray/Ice Shard/Railgun/
+   Grenade Toss/Shockwave/Cannonball/Javelin/Whip, purely cosmetic,
+   defaults to Laser - see `play.html`'s weapon-effects bullet below),
+   plus one more field each: **production time**
    (10-100s) - `play.html` won't let anyone build those specific units
    until they've actually built this first, and each one then takes
    that many real seconds to produce instead of appearing instantly.
@@ -113,8 +132,9 @@ appear) — a genuinely separate, self-contained game per map.
    above: no gating building of its own, no production timer, and no
    Speed field (they're stationary by design - the field doesn't exist
    for these rows at all). Add as many turret types as you want, each
-   with name/art/hp/attack/range/cost/**weapon** (same Weapon dropdown as
-   every other unit type). In `play.html`, building one
+   with name/art/hp/attack/range/**costs**/**weapon** (same per-resource
+   cost checkboxes and Weapon dropdown as every other unit type). In
+   `play.html`, building one
    doesn't spawn it next to your Home Base like every other unit -
    instead it arms a placement mode, and you click anywhere between 50
    and 300 range of your own Home Base (shown as a dashed ring while
@@ -152,6 +172,21 @@ entirely by one map's saved data:
   upgrades), a real build queue using every unit's actual stats. Income
   and research keep running for every faction regardless of game style
   or whose turn it is - never paused by anything except Pause itself.
+- **Multiple resources**: every faction has its own wallet per resource
+  that exists on the map (`fac.resources`, `{gold: N, ...}` - Gold plus
+  whatever `index.html`'s "+ Add resource" defined), shown in the top
+  HUD as one chip per resource (🪙 for Gold, 🔹 for everything else) and
+  spent per-unit against whatever `index.html`'s cost checkboxes set for
+  that unit/turret ("Cost 50 Gold, 100 Oil" in the Build panel). Only
+  combat units and Gun Turrets use this multi-resource system - Gated
+  buildings' own one-time unlock cost, the Mining Ship's flat cost, and
+  research costs are all still plain Gold, unchanged. Gold is the only
+  resource mining ever produces; every other resource only ever grows
+  through the "Free resources each round" grant (see item 3's `index.html`
+  bullet above) - there's no deposit/mining-unit mechanic for anything
+  but Gold. A map saved before multiple resources existed still loads
+  and plays identically (its one flat `cost` number is read as a Gold
+  cost, and its old single `goldPerRound` value becomes a Gold grant).
 - **Two game styles**, picked at map-creation time:
   - **Real-Time** (default) - a 90-second cosmetic turn clock; a unit
     that attacks fires exactly once, then locks (can't take a new move

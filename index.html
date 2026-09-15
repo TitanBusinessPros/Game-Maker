@@ -324,20 +324,6 @@
     <p class="hint" id="gameStyleHint" style="display:none;">
       Turn-Based: only one faction can act at a time - everyone else is frozen until their turn comes back around. Control passes automatically when the timer runs out. Mark any computer player below as "Human (hot-seat)" to let a real person take its turn instead of AI; resource income and research keep running for everyone regardless of whose turn it is.
     </p>
-    <div class="row">
-      <div class="field narrow" style="display:flex; align-items:flex-end; padding-bottom:9px;">
-        <label style="display:flex; align-items:center; gap:6px; font-weight:normal; margin:0;">
-          <input type="checkbox" id="goldPerRoundEnabled" style="width:auto;"> Give everyone free gold each round
-        </label>
-      </div>
-      <div class="field narrow" id="goldPerRoundField" style="display:none;">
-        <label for="goldPerRoundAmount">Gold per round</label>
-        <input type="number" id="goldPerRoundAmount" value="100" min="1" step="10">
-      </div>
-    </div>
-    <p class="hint" id="goldPerRoundHint" style="display:none;">
-      Every player (you and every computer player) automatically receives this much gold at the start of each round, on top of normal mining income - optional, off by default.
-    </p>
     <div class="field">
       <label>Map background art (optional)</label>
       <div class="upload-slot" data-slot="backgroundImage">
@@ -417,6 +403,17 @@
         <input type="file" accept="image/*" style="width:auto">
       </div>
     </div>
+    <div class="field" style="margin-top:18px; padding-top:14px; border-top:1px solid var(--border);">
+      <label>Additional resources (optional)</label>
+      <div id="extraResourcesList"></div>
+      <button type="button" class="btn-add" id="addResourceBtn">+ Add resource</button>
+    </div>
+    <p class="hint">Gold is always available - it's what the mining unit above produces, and every unit/turret can already cost it. Add more named resources (Oil, Wood, whatever fits your theme) if you want some units to also require them: each unit/turret below gets a checkbox per resource here, with how much of it that one costs.</p>
+    <div class="field" style="margin-top:18px; padding-top:14px; border-top:1px solid var(--border);">
+      <label>Free resources each round (optional)</label>
+      <div id="resourceGrantsList"></div>
+    </div>
+    <p class="hint">Check any resource above to have every player (you and every computer player) automatically receive that much of it at the start of each round, on top of normal Gold mining income - off by default for every resource.</p>
   </section>
 
   <!-- Combat Units: replaced by Air Base / War Factory below as the way
@@ -1152,11 +1149,18 @@ function makeUnitRow(list, idPrefix, counterState, data = {}, gated = false) {
       <div class="field narrow"><label>Attack</label><input type="number" class="u-attack" value="${data.attack ?? 200}" min="0"></div>
       <div class="field narrow"><label>Range</label><input type="number" class="u-range" value="${data.range ?? 500}" min="0"></div>
       <div class="field narrow"><label>Speed</label><input type="number" class="u-speed" value="${data.speed ?? 2}" min="0" step="0.1"></div>
-      <div class="field narrow"><label>Cost</label><input type="number" class="u-cost" value="${data.cost ?? 400}" min="0" step="10"></div>
       ${gated ? `<div class="field narrow"><label>Production time (s)</label><input type="number" class="u-prodtime" value="${data.prodTime ?? 30}" min="10" max="100" step="5"></div>` : ''}
       <div class="field narrow"><label>Weapon</label><select class="u-weapon">${weaponOptionsHtml(data.weapon)}</select></div>
     </div>
+    <div class="field" style="margin-top:6px;">
+      <label>Cost</label>
+      <div class="u-costs"></div>
+    </div>
   `;
+  // Legacy `data.cost` (a lone number, from a map saved before multiple
+  // resources existed) always meant Gold - `data.costs` is the current
+  // {resourceId: amount} shape.
+  renderCostFields(row, data.costs || (data.cost != null ? { gold: data.cost } : { gold: 400 }));
   row.querySelector('.remove-unit').addEventListener('click', () => {
     delete existingAssetUrls[id];
     row.remove();
@@ -1213,10 +1217,14 @@ function addTurretRow(data = {}) {
       <div class="field narrow"><label>HP</label><input type="number" class="u-hp" value="${data.hp ?? 300}" min="1"></div>
       <div class="field narrow"><label>Attack</label><input type="number" class="u-attack" value="${data.attack ?? 200}" min="0"></div>
       <div class="field narrow"><label>Range</label><input type="number" class="u-range" value="${data.range ?? 500}" min="0"></div>
-      <div class="field narrow"><label>Cost</label><input type="number" class="u-cost" value="${data.cost ?? 400}" min="0" step="10"></div>
       <div class="field narrow"><label>Weapon</label><select class="u-weapon">${weaponOptionsHtml(data.weapon)}</select></div>
     </div>
+    <div class="field" style="margin-top:6px;">
+      <label>Cost</label>
+      <div class="u-costs"></div>
+    </div>
   `;
+  renderCostFields(row, data.costs || (data.cost != null ? { gold: data.cost } : { gold: 400 }));
   row.querySelector('.remove-unit').addEventListener('click', () => {
     delete existingAssetUrls[id];
     row.remove();
@@ -1247,21 +1255,115 @@ function updateGameStyleUI() {
 gameStyleSelect.addEventListener('change', updateGameStyleUI);
 
 // ---------------------------------------------------------------------
-// Optional "gold per round" - a flat amount every faction gets handed
-// automatically at the start of each round, on top of normal mining
-// income. Off by default (the checkbox, not just a 0 amount, so it's a
-// real opt-in rather than something a map-maker could leave on by
-// accident with a stray number in an empty-looking field).
+// Resources: Gold always exists (it's what the mining unit above
+// produces, and every pre-existing map already assumes it) - extraResources
+// holds anything added on top of it via "+ Add resource" (just a name,
+// no deposit/mining unit of its own; the only way to earn one is the
+// "Free resources each round" grant below, generalized from what used
+// to be a single "gold per round" checkbox). Ids are assigned once at
+// creation time and never derived from the name text or reused, same
+// reasoning as admin.html's category ids - a saved unit's costs are
+// keyed by id, so renaming a resource later must not orphan them.
 // ---------------------------------------------------------------------
-const goldPerRoundEnabled = document.getElementById('goldPerRoundEnabled');
-const goldPerRoundField = document.getElementById('goldPerRoundField');
-const goldPerRoundHint = document.getElementById('goldPerRoundHint');
-function updateGoldPerRoundUI() {
-  const on = goldPerRoundEnabled.checked;
-  goldPerRoundField.style.display = on ? 'block' : 'none';
-  goldPerRoundHint.style.display = on ? 'block' : 'none';
+let extraResources = []; // [{id, name}]
+let resourceCounter = 0;
+function allResources() { return [{ id: 'gold', name: 'Gold', builtin: true }, ...extraResources]; }
+
+function renderExtraResourcesList() {
+  const el = document.getElementById('extraResourcesList');
+  el.innerHTML = extraResources.map((r, i) => `
+    <div class="row" style="align-items:center; gap:8px; margin-bottom:6px;">
+      <div class="field"><input type="text" class="resource-name" value="${escapeAttr(r.name)}" placeholder="e.g. Oil" data-idx="${i}"></div>
+      <button type="button" class="remove-unit resource-remove" data-idx="${i}" title="Remove resource">&times;</button>
+    </div>
+  `).join('');
+  el.querySelectorAll('.resource-name').forEach((input) => {
+    input.addEventListener('input', () => {
+      extraResources[Number(input.dataset.idx)].name = input.value;
+      refreshAllCostUI(); // every unit/turret checkbox label + the grants section show this resource's name live
+    });
+  });
+  el.querySelectorAll('.resource-remove').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      extraResources.splice(Number(btn.dataset.idx), 1);
+      renderExtraResourcesList();
+      refreshAllCostUI();
+    });
+  });
 }
-goldPerRoundEnabled.addEventListener('change', updateGoldPerRoundUI);
+document.getElementById('addResourceBtn').addEventListener('click', () => {
+  extraResources.push({ id: 'resource_' + (resourceCounter++), name: '' });
+  renderExtraResourcesList();
+  refreshAllCostUI();
+});
+
+// Free resources each round - one checkbox+amount row per resource that
+// currently exists (Gold included), replacing the old single "gold per
+// round" checkbox. currentGrantsFromDOM() reads back whatever's
+// currently checked before a re-render (add/remove/rename a resource)
+// rebuilds the row list, so existing amounts survive - same
+// read-then-rebuild pattern as the unit cost checkboxes below.
+function currentGrantsFromDOM() {
+  const out = {};
+  document.querySelectorAll('#resourceGrantsList .grant-check').forEach((cb) => {
+    if (cb.checked) out[cb.dataset.resourceId] = Number(cb.closest('label').querySelector('.grant-amount').value) || 100;
+  });
+  return out;
+}
+function renderResourceGrants(existingGrants) {
+  const grants = existingGrants || currentGrantsFromDOM();
+  const el = document.getElementById('resourceGrantsList');
+  el.innerHTML = allResources().map((r) => {
+    const has = Object.prototype.hasOwnProperty.call(grants, r.id);
+    return `<label style="display:flex; align-items:center; gap:8px; margin:6px 0; font-weight:normal;">
+      <input type="checkbox" class="grant-check" data-resource-id="${r.id}" ${has ? 'checked' : ''} style="width:auto;">
+      <span>Give everyone free ${escapeAttr(r.name || 'Resource')} each round</span>
+      <input type="number" class="grant-amount" value="${has ? grants[r.id] : 100}" min="1" step="10" style="width:90px; ${has ? '' : 'display:none;'}">
+    </label>`;
+  }).join('');
+  el.querySelectorAll('.grant-check').forEach((cb) => {
+    cb.addEventListener('change', () => {
+      cb.closest('label').querySelector('.grant-amount').style.display = cb.checked ? 'inline-block' : 'none';
+    });
+  });
+}
+renderResourceGrants({});
+
+// Unit/turret cost checkboxes: one row per resource that currently
+// exists, each a checkbox + amount - replaces the old single flat Cost
+// field. currentCostsFromRow() reads back a row's checked resources
+// before a rebuild (see refreshAllCostUI, called whenever the resource
+// list changes) so existing units don't lose their Gold amount just
+// because a new resource got added.
+function currentCostsFromRow(row) {
+  const out = {};
+  row.querySelectorAll('.u-costs .cost-item').forEach((item) => {
+    if (item.querySelector('.cost-check').checked) {
+      out[item.dataset.resourceId] = Number(item.querySelector('.cost-amount').value) || 0;
+    }
+  });
+  return out;
+}
+function renderCostFields(row, existingCosts) {
+  row.querySelector('.u-costs').innerHTML = allResources().map((r) => {
+    const has = Object.prototype.hasOwnProperty.call(existingCosts, r.id);
+    return `<label class="cost-item" data-resource-id="${r.id}" style="display:flex; align-items:center; gap:4px; font-weight:normal; margin:2px 10px 2px 0;">
+      <input type="checkbox" class="cost-check" ${has ? 'checked' : ''} style="width:auto;">
+      <input type="number" class="cost-amount" value="${has ? existingCosts[r.id] : 0}" min="0" step="10" style="width:70px;">
+      <span>${escapeAttr(r.name || 'Resource')}</span>
+    </label>`;
+  }).join('');
+}
+// Called whenever the resource list itself changes (add/remove/rename) -
+// re-renders every unit/turret row's cost checkboxes (preserving what
+// was already checked) and the grants section, across all six lists at
+// once via the shared .unit-row class.
+function refreshAllCostUI() {
+  document.querySelectorAll('.unit-row').forEach((row) => {
+    if (row.querySelector('.u-costs')) renderCostFields(row, currentCostsFromRow(row));
+  });
+  renderResourceGrants(currentGrantsFromDOM());
+}
 
 // ---------------------------------------------------------------------
 // Computer players: 1-10 factions (AI by default; Turn-Based mode can
@@ -1387,7 +1489,7 @@ function collectUnitRows(list, uploadResults) {
       attack: Number(row.querySelector('.u-attack').value) || 0,
       range: Number(row.querySelector('.u-range').value) || 0,
       speed: Number(row.querySelector('.u-speed').value) || 0,
-      cost: Number(row.querySelector('.u-cost').value) || 0,
+      costs: currentCostsFromRow(row),
       weapon: row.querySelector('.u-weapon').value || 'laser',
     };
     // Only Air Base/War Factory rows have the production-time field at
@@ -1417,7 +1519,7 @@ function collectTurrets(uploadResults) {
       hp: Number(row.querySelector('.u-hp').value) || 0,
       attack: Number(row.querySelector('.u-attack').value) || 0,
       range: Number(row.querySelector('.u-range').value) || 0,
-      cost: Number(row.querySelector('.u-cost').value) || 0,
+      costs: currentCostsFromRow(row),
       weapon: row.querySelector('.u-weapon').value || 'laser',
     };
   });
@@ -1447,10 +1549,15 @@ async function buildMapDoc(status) {
     mapSize: document.getElementById('mapSize').value || 'medium',
     gameStyle: document.getElementById('gameStyle').value || 'realtime',
     turnTimerSeconds: Math.max(10, Math.min(60, Number(document.getElementById('turnTimerSeconds').value) || 30)),
-    // 0 whenever the checkbox is off, regardless of whatever's typed in
-    // the amount field - play.html only needs to check "> 0", no
-    // separate enabled flag to keep in sync with it.
-    goldPerRound: goldPerRoundEnabled.checked ? Math.max(1, Number(document.getElementById('goldPerRoundAmount').value) || 100) : 0,
+    // Extra named resources beyond Gold (id/name only - see
+    // allResources()), and which ones (Gold included) hand out a free
+    // amount each round - only resources actually checked appear here,
+    // so play.html just needs Object.entries(...), no separate enabled
+    // flag to keep in sync with it. Replaces the old single goldPerRound
+    // number (still read as a fallback by play.html for a map saved
+    // before this was generalized).
+    resources: extraResources.map((r) => ({ id: r.id, name: r.name.trim() || 'Resource' })),
+    resourceGrants: currentGrantsFromDOM(),
     backgroundImage: uploadResults.backgroundImage,
     player: {
       name: document.getElementById('goodName').value.trim() || 'Allied Forces',
@@ -1677,9 +1784,24 @@ async function loadExistingMap() {
   document.getElementById('mapSize').value = m.mapSize || 'medium';
   document.getElementById('gameStyle').value = m.gameStyle || 'realtime';
   document.getElementById('turnTimerSeconds').value = m.turnTimerSeconds || 30;
-  goldPerRoundEnabled.checked = !!m.goldPerRound;
-  document.getElementById('goldPerRoundAmount').value = m.goldPerRound || 100;
-  updateGoldPerRoundUI();
+  // Must happen before any unit/turret row gets added below - each row's
+  // cost checkboxes are built from whatever allResources() returns at
+  // that moment (see makeUnitRow/addTurretRow), so extraResources needs
+  // to already reflect this map's saved resources first.
+  extraResources = Array.isArray(m.resources) ? m.resources.map((r) => ({ id: r.id, name: r.name || '' })) : [];
+  // Next counter picks up past the highest existing resource_N id
+  // (not just extraResources.length) - a map that had one removed
+  // before saving would otherwise hand out an id that collides with one
+  // still in use.
+  resourceCounter = extraResources.reduce((max, r) => {
+    const match = /^resource_(\d+)$/.exec(r.id);
+    return match ? Math.max(max, Number(match[1]) + 1) : max;
+  }, 0);
+  renderExtraResourcesList();
+  // m.resourceGrants is the current shape; m.goldPerRound is a fallback
+  // for a map saved before this was generalized to multiple resources
+  // (it only ever meant a flat Gold amount).
+  renderResourceGrants(m.resourceGrants || (m.goldPerRound ? { gold: m.goldPerRound } : {}));
   if (m.backgroundImage) showExistingAsset('backgroundImage', m.backgroundImage);
 
   if (m.player) {
