@@ -193,7 +193,11 @@ entirely by one map's saved data:
   an AI, a player just had no way to actually order an attack on one.
 - Laser beams on every attack, colored per unit type from an 8-color
   palette (colors repeat past 8 types).
-- Units rotate to face their actual direction of travel.
+- Units rotate to face their actual direction of travel. A faction's
+  home base art itself slowly spins in place, but only when the map's
+  `baseLabel` field (checklist item 1's "Home Base is called a...")
+  contains the word "planet" - not for Island/Base/whatever else someone
+  typed there.
 - A pannable camera (right-drag) with scroll-wheel zoom (centered on the
   cursor) over a world sized by the map's chosen size, and a minimap that
   both jumps the camera there on click AND, if units are selected, issues
@@ -235,7 +239,11 @@ entirely by one map's saved data:
   faction's homeworld (a fixed offset per building so none of them ever
   overlap each other or the resource deposit) - purely a visual marker,
   not a combat target (nothing in the game's targeting looks at these,
-  same as the resource deposit). The production countdown shown in the
+  same as the resource deposit). If no art was uploaded for that
+  building, it falls back to a faction-colored circle with the
+  building's own emoji icon on it instead of drawing nothing at all,
+  same as every other entity in the game already does when its image is
+  missing. The production countdown shown in the
   build panel updates live every frame (it used to only update when
   something else happened to redraw the panel, so it looked frozen -
   reported as "no timer for troop production" even though production
@@ -264,7 +272,13 @@ entirely by one map's saved data:
   who owns it or whether it's AI- or human-controlled, rather than
   waiting for a click the way a normal unit does - though clicking it
   and giving it an explicit target still overrides that, same as
-  commanding any other unit. It's a full combat entity in the normal
+  commanding any other unit. Exempt from both of the rules that apply to
+  every other unit: it's never frozen by Turn-Based mode even during
+  another faction's turn (a defense that only worked on its owner's own
+  turn wouldn't defend anything), and it uses its own short real-time
+  cooldown instead of "one attack per turn" (that rule is a
+  player-command balance thing, not meant for something firing on its
+  own). It's a full combat entity in the normal
   `units` array (not a decorative marker like the buildings above), so
   it can be selected, destroyed, and targeted by enemies like anything
   else. AI factions place them too, picking a random valid spot in the
@@ -272,6 +286,34 @@ entirely by one map's saved data:
 - **⬇ Download as index.html** - packages the map's data inline into a
   fully standalone copy of this page. Verified: opens and runs from
   `file://` with zero network calls.
+- **Titan Business Pros logo + hidden page** - a small clickable logo in
+  the top-left corner of the topbar, present in every game this maker
+  produces (it lives directly in `play.html`'s own markup, which is
+  exactly what "⬇ Download as index.html" packages, so it rides along
+  into every exported standalone game with zero extra work). Clicking it
+  opens a hidden overlay - reachable only from that click, linked nowhere
+  else, built as an in-page overlay rather than a real second-file
+  navigation so it works identically live or in a fully offline
+  downloaded copy. Content: a starfield backdrop (plain canvas, ~140
+  gently twinkling dots, only animates while the page is open) behind the
+  logo floating/spinning in a CSS 3D scene, a rotating galaxy and 3
+  rotating planets plus 2 tumbling asteroids and 5 flying ships (real art
+  from the After Earth game, see [[game-maker-references]] for the
+  source folder, resized way down before embedding), then three yes/no
+  pitch questions (a $25 website, Google Play/Steam publishing, turning
+  the game into a full RTS - "Yes" reveals a `mailto:` line to
+  `titanbusinesspros@gmail.com`), and the business's own site/phone as a
+  real link. Opening it pauses the match underneath.
+- The shared library's **📚 Library picker** (in `index.html`, not this
+  page) shows browsed items without their names now - bare thumbnails
+  for images, "Sound 1"/"Sound 2"/... for audio (which has no thumbnail
+  to browse by, so a fully blank row per item wouldn't be
+  distinguishable at all) - the real name still appears afterward in the
+  upload slot once something's actually been picked for your map.
+- `index.html` reminds map-makers that character/unit art should have a
+  **transparent background** for best results - a tip line in the page
+  header plus on every unit/turret art upload slot's own status text,
+  right at the point of upload.
 
 `window.__GM_DEBUG` (factions/units/camera/turnMode/activeFaction/etc,
 read-only) is left in deliberately - real automated tests throughout
