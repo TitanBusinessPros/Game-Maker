@@ -437,7 +437,7 @@ const BASE_HOME_RADIUS = 420;
 // type index; once every color's been used once, later types repeat/
 // overlap a color instead of failing or going blank, matching what was
 // asked for.
-const LASER_COLORS = ['#ffe45e', '#4fa8ff', '#ff5f6d', '#4fdc8f', '#c084fc', '#ff9d4f', '#60d3ff', '#f472b6'];
+const EFFECT_COLORS = ['#ffe45e', '#4fa8ff', '#ff5f6d', '#4fdc8f', '#c084fc', '#ff9d4f', '#60d3ff', '#f472b6'];
 
 function freshResearch() { return { researched: new Set(), active: null }; }
 
@@ -637,7 +637,7 @@ async function main() {
       attack: def.attack, range: def.range, speed: effectiveStat(fac, def.speed, 'speed'),
       img: unitImages[defIndex], x, y, alive: true, selected: false,
       orderType: null, moveTarget: null, target: null,
-      lockedUntilTurn: 0, facingAngle: 0,
+      lockedUntilTurn: 0, facingAngle: 0, weapon: def.weapon || 'laser',
     };
     units.push(u);
     return u;
@@ -656,7 +656,7 @@ async function main() {
       attack: def.attack, range: def.range, speed: 0,
       img: turretImages[defIndex], x, y, alive: true, selected: false,
       orderType: null, moveTarget: null, target: null,
-      lockedUntilTurn: 0, facingAngle: 0,
+      lockedUntilTurn: 0, facingAngle: 0, weapon: def.weapon || 'laser',
     };
     units.push(u);
     return u;
@@ -753,10 +753,38 @@ async function main() {
   let placingTurret = null;
   function setPlacingTurret(v) { placingTurret = v; canvas.style.cursor = v ? 'crosshair' : ''; }
 
-  // Beam/laser visual effects - short-lived, purely cosmetic.
-  const beams = [];
-  function fireBeam(u, t) {
-    beams.push({ x1: u.x, y1: u.y, x2: t.x, y2: t.y, color: LASER_COLORS[Math.max(0, u.defIndex) % LASER_COLORS.length], ttl: 0.18 });
+  // Weapon visual effects - short-lived, purely cosmetic (damage is
+  // already applied instantly by combatTick before this ever runs; the
+  // weapon type only changes what gets drawn, never timing or damage).
+  // Per-unit `weapon` (index.html's Weapon dropdown, defaults to 'laser'
+  // for any map saved before this field existed) picks the shape;
+  // `kind` on each pushed effect is what drawEffects() actually
+  // switches on, so an explosion/missile pair (missile leaves a trail
+  // AND bursts on impact) is just two effects pushed from one shot.
+  const effects = [];
+  function fireWeaponEffect(u, t) {
+    const color = EFFECT_COLORS[Math.max(0, u.defIndex) % EFFECT_COLORS.length];
+    const x1 = u.x, y1 = u.y, x2 = t.x, y2 = t.y;
+    switch (u.weapon) {
+      case 'bullet':
+        effects.push({ kind: 'bullet', x1, y1, x2, y2, color, ttl: 0.12, life: 0.12 });
+        break;
+      case 'explosion':
+        effects.push({ kind: 'explosion', x: x2, y: y2, color, ttl: 0.35, life: 0.35 });
+        break;
+      case 'missile':
+        effects.push({ kind: 'missile', x1, y1, x2, y2, color, ttl: 0.2, life: 0.2 });
+        effects.push({ kind: 'explosion', x: x2, y: y2, color, ttl: 0.3, life: 0.3 });
+        break;
+      case 'arrow':
+        effects.push({ kind: 'arrow', x1, y1, x2, y2, color, ttl: 0.22, life: 0.22 });
+        break;
+      case 'melee':
+        effects.push({ kind: 'melee', x: x2, y: y2, color, ttl: 0.2, life: 0.2 });
+        break;
+      default: // 'laser', or anything unrecognized
+        effects.push({ kind: 'laser', x1, y1, x2, y2, color, ttl: 0.18, life: 0.18 });
+    }
   }
 
   // Same convention the real After Earth engine uses to point a sprite at
@@ -814,7 +842,7 @@ async function main() {
       u.x += (t.x - u.x) / dist * sp * dt; u.y += (t.y - u.y) / dist * sp * dt;
     } else {
       t.hp -= u.attack;
-      fireBeam(u, t);
+      fireWeaponEffect(u, t);
       playSfx(sounds.attack);
       if (u.isTurret) u.turretCooldownUntil = elapsed + TURRET_ATTACK_COOLDOWN;
       else lockUnit(u);
@@ -1058,8 +1086,16 @@ async function main() {
       }
     }
 
-    for (const b of beams) b.ttl -= dt;
-    while (beams.length && beams[0].ttl <= 0) beams.shift();
+    // Plain shift-while-front (like the old single-kind `beams` array
+    // used) assumed every entry expired in push order - no longer true
+    // now that a missile pushes a short-lived trail alongside a
+    // longer-lived explosion burst in the same shot, so an in-place
+    // reverse-splice is used instead to actually remove whichever
+    // entries expired, regardless of position.
+    for (let i = effects.length - 1; i >= 0; i--) {
+      effects[i].ttl -= dt;
+      if (effects[i].ttl <= 0) effects.splice(i, 1);
+    }
 
     for (const u of units) {
       if (!u.alive) continue;
@@ -1312,11 +1348,61 @@ async function main() {
     ctx.beginPath(); ctx.arc(p.x, p.y, TURRET_MAX_RANGE * camera.zoom, 0, 7); ctx.stroke();
     ctx.restore();
   }
-  function drawBeams() {
-    for (const b of beams) {
-      const p1 = toScreen(b.x1, b.y1), p2 = toScreen(b.x2, b.y2);
-      ctx.strokeStyle = b.color; ctx.globalAlpha = Math.max(0, b.ttl / 0.18); ctx.lineWidth = 2.5;
-      ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+  // One draw call per effect kind - all still just canvas shapes fading
+  // out over their own `life`, same idea as the original laser-only
+  // drawBeams(). Line/point effects (laser, bullet, missile, arrow) carry
+  // x1,y1,x2,y2 (attacker -> target); impact-only effects (explosion,
+  // melee) carry a single x,y since nothing travels for those.
+  function drawEffects() {
+    for (const e of effects) {
+      ctx.globalAlpha = Math.max(0, e.ttl / e.life);
+      ctx.strokeStyle = e.color; ctx.fillStyle = e.color;
+      if (e.kind === 'laser') {
+        const p1 = toScreen(e.x1, e.y1), p2 = toScreen(e.x2, e.y2);
+        ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+      } else if (e.kind === 'bullet') {
+        // A short tracer near the target end only, instead of a full
+        // beam - reads as "fast and small" rather than "a laser."
+        const p1 = toScreen(e.x1, e.y1), p2 = toScreen(e.x2, e.y2);
+        const tx = p1.x + (p2.x - p1.x) * 0.7, ty = p1.y + (p2.y - p1.y) * 0.7;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+        ctx.beginPath(); ctx.arc(p2.x, p2.y, 2 * camera.zoom, 0, 7); ctx.fill();
+      } else if (e.kind === 'missile') {
+        const p1 = toScreen(e.x1, e.y1), p2 = toScreen(e.x2, e.y2);
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+        ctx.beginPath(); ctx.arc(p2.x, p2.y, 3 * camera.zoom, 0, 7); ctx.fill();
+      } else if (e.kind === 'arrow') {
+        const p1 = toScreen(e.x1, e.y1), p2 = toScreen(e.x2, e.y2);
+        const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+        const shaftStart = { x: p1.x + (p2.x - p1.x) * 0.55, y: p1.y + (p2.y - p1.y) * 0.55 };
+        ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(shaftStart.x, shaftStart.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+        ctx.save();
+        ctx.translate(p2.x, p2.y); ctx.rotate(angle);
+        ctx.beginPath(); ctx.moveTo(7, 0); ctx.lineTo(-4, 4); ctx.lineTo(-4, -4); ctx.closePath(); ctx.fill();
+        ctx.restore();
+      } else if (e.kind === 'melee') {
+        const p = toScreen(e.x, e.y);
+        ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.arc(p.x, p.y, 12 * camera.zoom, -0.9, 0.9); ctx.stroke();
+      } else if (e.kind === 'explosion') {
+        const p = toScreen(e.x, e.y);
+        const progress = 1 - e.ttl / e.life; // 0 -> 1 as the burst expands and fades
+        const radius = (6 + progress * 20) * camera.zoom;
+        ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.arc(p.x, p.y, radius, 0, 7); ctx.stroke();
+        ctx.lineWidth = 1.5;
+        for (let i = 0; i < 6; i++) {
+          const ang = (i / 6) * Math.PI * 2;
+          ctx.beginPath();
+          ctx.moveTo(p.x + Math.cos(ang) * radius * 0.4, p.y + Math.sin(ang) * radius * 0.4);
+          ctx.lineTo(p.x + Math.cos(ang) * radius, p.y + Math.sin(ang) * radius);
+          ctx.stroke();
+        }
+      }
       ctx.globalAlpha = 1;
     }
   }
@@ -1343,7 +1429,7 @@ async function main() {
     for (const d of deposits) drawDeposit(d);
     for (const f of factions) if (f.hp > 0) drawFactionHome(f);
     for (const u of units) if (u.alive) drawUnit(u);
-    drawBeams();
+    drawEffects();
     drawTurretRangeRing();
 
     renderHud();
@@ -2051,7 +2137,7 @@ async function main() {
   // (and just poking around in devtools) inspect real engine state instead
   // of guessing screen coordinates.
   window.__GM_DEBUG = {
-    factions, units, deposits, camera, get turnNumber() { return turnNumber; }, toScreen, beams,
+    factions, units, deposits, camera, get turnNumber() { return turnNumber; }, toScreen, effects,
     turnMode, get activeFaction() { return activeFaction; }, get hotseatTimer() { return hotseatTimer; },
     get moveNumber() { return moveNumber; }, GATED_BUILDINGS, turretDefs,
     get placingTurret() { return placingTurret; },

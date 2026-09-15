@@ -64,8 +64,11 @@ appear) — a genuinely separate, self-contained game per map.
 4. **Air Base** (optional) — a building for planes/jets/spaceships/etc.
    Give it a name (defaults to "Air Base"), its own **art**, **HP**
    (1000-5000, same range/field as Home Base's), and a build cost, then
-   add units under it (name/art/hp/attack/range/speed/cost, same fields
-   the engine always used), plus one more field each: **production time**
+   add units under it (name/art/hp/attack/range/speed/cost/**weapon**,
+   same fields the engine always used plus a Weapon dropdown - Laser/
+   Bullet/Explosion/Missile/Arrow/Melee Slash, purely cosmetic, defaults
+   to Laser - see `play.html`'s weapon-effects bullet below), plus one
+   more field each: **production time**
    (10-100s) - `play.html` won't let anyone build those specific units
    until they've actually built this first, and each one then takes
    that many real seconds to produce instead of appearing instantly.
@@ -110,7 +113,8 @@ appear) — a genuinely separate, self-contained game per map.
    above: no gating building of its own, no production timer, and no
    Speed field (they're stationary by design - the field doesn't exist
    for these rows at all). Add as many turret types as you want, each
-   with name/art/hp/attack/range/cost. In `play.html`, building one
+   with name/art/hp/attack/range/cost/**weapon** (same Weapon dropdown as
+   every other unit type). In `play.html`, building one
    doesn't spawn it next to your Home Base like every other unit -
    instead it arms a placement mode, and you click anywhere between 50
    and 300 range of your own Home Base (shown as a dashed ring while
@@ -214,8 +218,23 @@ entirely by one map's saved data:
   neglect its army. And an enemy's miner is a real click-to-attack
   target now too - it always had real HP and could always be killed by
   an AI, a player just had no way to actually order an attack on one.
-- Laser beams on every attack, colored per unit type from an 8-color
-  palette (colors repeat past 8 types).
+- Every attack draws a **weapon effect** picked per unit (a **Weapon**
+  dropdown on each unit/turret row in `index.html`: Laser, Bullet,
+  Explosion, Missile, Arrow, or Melee Slash - defaults to Laser, so any
+  map saved before this field existed keeps its original beam with no
+  change). Purely cosmetic - it only changes what gets drawn, never
+  damage, range, or attack timing, which all still happen the instant
+  the target's in range same as before. Laser is the original full beam;
+  Bullet is a short tracer near the target only; Explosion is a burst
+  drawn at the impact point with no travel line at all; Missile draws a
+  thicker trail plus an Explosion burst on arrival; Arrow draws a small
+  triangle "arrowhead" angled toward its direction of travel; Melee
+  Slash draws a short arc at the target instead of anything traveling.
+  All six are drawn entirely with canvas shapes (`drawEffects()` in
+  `play.html`) - none of them need or use an uploaded image, same as the
+  original laser never did; only the unit's own sprite is art you
+  provide. Every type still uses the same per-unit-type color as before
+  (an 8-color palette, repeating past 8 unit types).
 - Units rotate to face their actual direction of travel. A faction's
   home base art itself slowly spins in place, but only when the map's
   `baseLabel` field (checklist item 1's "Home Base is called a...")

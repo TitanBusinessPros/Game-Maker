@@ -1110,6 +1110,20 @@ const infantryUnitCounterState = { n: 0 };
 const heliUnitCounterState = { n: 0 };
 const turretCounterState = { n: 0 };
 
+// Weapon effect a unit's attack draws in play.html - purely cosmetic
+// (damage/range/etc. are unaffected), so it's just a dropdown here and a
+// `weapon` string saved on the unit, same shape as every other field.
+// Laser is first/default so old maps (saved before this field existed,
+// where `weapon` is undefined) fall back to the same beam they always
+// had - see fireWeaponEffect() in play.html.
+const WEAPON_OPTIONS = [
+  ['laser', '⚡ Laser'], ['bullet', '🔫 Bullet'], ['explosion', '💥 Explosion'],
+  ['missile', '🚀 Missile'], ['arrow', '🏹 Arrow'], ['melee', '⚔️ Melee Slash'],
+];
+function weaponOptionsHtml(selected) {
+  return WEAPON_OPTIONS.map(([v, label]) => `<option value="${v}" ${(selected || 'laser') === v ? 'selected' : ''}>${label}</option>`).join('');
+}
+
 // gated: true for Air Base/War Factory units only - adds the per-unit
 // Production time field (10-100s, play.html queues these instead of
 // spawning them instantly). Regular Combat Units stay instant-build, so
@@ -1136,6 +1150,7 @@ function makeUnitRow(list, idPrefix, counterState, data = {}, gated = false) {
       <div class="field narrow"><label>Speed</label><input type="number" class="u-speed" value="${data.speed ?? 2}" min="0" step="0.1"></div>
       <div class="field narrow"><label>Cost</label><input type="number" class="u-cost" value="${data.cost ?? 400}" min="0" step="10"></div>
       ${gated ? `<div class="field narrow"><label>Production time (s)</label><input type="number" class="u-prodtime" value="${data.prodTime ?? 30}" min="10" max="100" step="5"></div>` : ''}
+      <div class="field narrow"><label>Weapon</label><select class="u-weapon">${weaponOptionsHtml(data.weapon)}</select></div>
     </div>
   `;
   row.querySelector('.remove-unit').addEventListener('click', () => {
@@ -1195,6 +1210,7 @@ function addTurretRow(data = {}) {
       <div class="field narrow"><label>Attack</label><input type="number" class="u-attack" value="${data.attack ?? 200}" min="0"></div>
       <div class="field narrow"><label>Range</label><input type="number" class="u-range" value="${data.range ?? 500}" min="0"></div>
       <div class="field narrow"><label>Cost</label><input type="number" class="u-cost" value="${data.cost ?? 400}" min="0" step="10"></div>
+      <div class="field narrow"><label>Weapon</label><select class="u-weapon">${weaponOptionsHtml(data.weapon)}</select></div>
     </div>
   `;
   row.querySelector('.remove-unit').addEventListener('click', () => {
@@ -1368,6 +1384,7 @@ function collectUnitRows(list, uploadResults) {
       range: Number(row.querySelector('.u-range').value) || 0,
       speed: Number(row.querySelector('.u-speed').value) || 0,
       cost: Number(row.querySelector('.u-cost').value) || 0,
+      weapon: row.querySelector('.u-weapon').value || 'laser',
     };
     // Only Air Base/War Factory rows have the production-time field at
     // all (see makeUnitRow's `gated` flag) - clamp it the same way
@@ -1397,6 +1414,7 @@ function collectTurrets(uploadResults) {
       attack: Number(row.querySelector('.u-attack').value) || 0,
       range: Number(row.querySelector('.u-range').value) || 0,
       cost: Number(row.querySelector('.u-cost').value) || 0,
+      weapon: row.querySelector('.u-weapon').value || 'laser',
     };
   });
 }
