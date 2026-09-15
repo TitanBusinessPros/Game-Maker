@@ -460,7 +460,7 @@ async function main() {
     return;
   }
   statusEl.textContent = 'Loading art & sound…';
-  // Turn-Based (hot-seat): 2-5 people share this device. Only the active
+  // Turn-Based (hot-seat): 2-11 people share this device. Only the active
   // faction's units can act at all (move/attack) - everyone else is
   // frozen until their own turn comes back around. Set at map-creation
   // time (index.html's Game Style picker); Real-Time is the default and
@@ -1915,10 +1915,11 @@ async function main() {
   // Team select screen - ALWAYS shown before the match starts, for every
   // map regardless of how many computer players it has. You're always
   // Team A; each other faction gets a real team-letter picker (A through
-  // however many factions exist - up to 6), not just an A/B toggle. Two
-  // factions sharing a letter fight together; every other letter is its
-  // own independent side - so 5 factions can genuinely be Teams A-E, a
-  // real free-for-all, instead of always being forced into exactly two
+  // however many factions exist - up to 11, with 10 computer players),
+  // not just an A/B toggle. Two factions sharing a letter fight together;
+  // every other letter is its own independent side - so 10 computer
+  // players can genuinely be Teams A-J, a real free-for-all, instead of
+  // always being forced into exactly two
   // sides. The only rule enforced is that at least one other faction has
   // a different team than yours - putting literally everyone on your own
   // team leaves no opponent and the match would end the instant it began.
@@ -1971,7 +1972,7 @@ async function main() {
     // "you vs the horde" setup this mode has always defaulted to) -
     // unchanged from before per-faction teams existed. Turn-Based
     // default: every faction starts on ITS OWN letter - a free-for-all
-    // by default, since "2-5 people play the same game" reads as
+    // by default, since "several people play the same game" reads as
     // independent competitors far more often than everyone teaming up
     // against whoever's on Team A. Either way it's just a starting
     // point - any select below can be changed to any letter.

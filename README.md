@@ -40,11 +40,11 @@ appear) — a genuinely separate, self-contained game per map.
    art isn't affected by map size at all, since those always render at a
    fixed pixel size regardless of world scale.
 2. **Your faction & computer players** — you're always the human player;
-   add 1-5 computer-controlled opponents, each with its own name, color,
+   add 1-10 computer-controlled opponents, each with its own name, color,
    home base art, and **Home Base HP** (1000-5000, per faction - not one
    fixed value shared by every home base on the map).
 2a. **Game style** — ⏱️ Real-Time (default, unchanged) or 🔄 Turn-Based
-   (hot-seat: 2-5 people share this device, a timer of 10-60s per turn).
+   (hot-seat: 2-11 people share this device, a timer of 10-60s per turn).
    Turn-Based adds a **turn timer** field and, per computer player, a
    "Controlled by: 🤖 AI / 🧑 Human (hot-seat)" toggle - a human-flagged
    one takes a real turn instead of thinking on its own. Real-Time mode
@@ -152,7 +152,7 @@ entirely by one map's saved data:
   - **Real-Time** (default) - a 90-second cosmetic turn clock; a unit
     that attacks fires exactly once, then locks (can't take a new move
     or attack order) until that clock's next turn.
-  - **Turn-Based (hot-seat)** - 2-5 people share this device. Only the
+  - **Turn-Based (hot-seat)** - 2-11 people share this device. Only the
     active faction's units can act at all (move/attack/build/research
     via the panel) - everyone else, AI factions included, is completely
     frozen until their own turn comes back around. A per-faction timer
@@ -168,13 +168,14 @@ entirely by one map's saved data:
     turn comes back around.
 - **Team select** - shown before every match, for every player. You're
   always Team A; every other faction gets a real team-letter picker (one
-  letter per faction that exists, up to 6 - Team A through Team F), not
-  a fixed two-side A/B toggle. Two factions sharing a letter fight
-  together; any other letter is its own independent side - so 5
-  factions can genuinely be Teams A-E, a real free-for-all, not always
-  forced into exactly two sides (which used to mean a 5-faction
-  Turn-Based match could only ever be lopsided team-vs-team, never
-  1v1v1v1v1). Real-Time defaults everyone to Team B (the existing
+  letter per faction that exists, up to 11 with 10 computer players -
+  Team A through Team K), not a fixed two-side A/B toggle. Two factions
+  sharing a letter fight together; any other letter is its own
+  independent side - so 10 computer players can genuinely be Teams A-J,
+  a real free-for-all, not always forced into exactly two sides (which
+  used to mean a multi-faction Turn-Based match could only ever be
+  lopsided team-vs-team, never a true free-for-all). Real-Time defaults
+  everyone to Team B (the existing
   "you vs the horde" setup, unchanged); Turn-Based defaults every
   faction to its own letter (free-for-all by default, since multiple
   people sharing a device usually means independent competitors). Start

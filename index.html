@@ -313,7 +313,7 @@
         <label for="gameStyle">Game style</label>
         <select id="gameStyle">
           <option value="realtime" selected>&#9201;&#65039; Real-Time (vs computer players)</option>
-          <option value="turnbased">&#128260; Turn-Based (hot-seat, 2-5 players share this device)</option>
+          <option value="turnbased">&#128260; Turn-Based (hot-seat, 2-11 players share this device)</option>
         </select>
       </div>
       <div class="field narrow" id="turnTimerField" style="display:none;">
@@ -351,7 +351,7 @@
   <!-- 2. Factions -->
   <section class="section" id="sec-teams">
     <h2><span class="num">2</span> Your Faction &amp; Computer Players</h2>
-    <p class="hint">You're always the player faction. Add up to 5 computer-controlled factions &mdash; at play time you'll pick which ones are on your team (e.g. 5 computer players lets you do 3v3 or 2v4).</p>
+    <p class="hint">You're always the player faction. Add up to 10 computer-controlled factions &mdash; at play time you'll pick which ones are on your team (e.g. 10 computer players lets you do 5v6 or a full free-for-all).</p>
     <div class="team-block good">
       <h3>Your faction</h3>
       <div class="row">
@@ -370,7 +370,7 @@
     </div>
 
     <div id="computerPlayersList"></div>
-    <button type="button" class="btn-add" id="addComputerBtn">+ Add computer player (up to 5)</button>
+    <button type="button" class="btn-add" id="addComputerBtn">+ Add computer player (up to 10)</button>
   </section>
 
   <!-- 3. Resource & mining -->
@@ -1244,17 +1244,18 @@ function updateGoldPerRoundUI() {
 goldPerRoundEnabled.addEventListener('change', updateGoldPerRoundUI);
 
 // ---------------------------------------------------------------------
-// Computer players: 1-5 factions (AI by default; Turn-Based mode can
+// Computer players: 1-10 factions (AI by default; Turn-Based mode can
 // flag any of them "Human (hot-seat)" instead). At play time, the human
-// picks which of these join their team (e.g. 3v3 or 2v4 out of 5) - see
-// play.html's team-select screen. Reuses the same upload-slot pattern as
-// combat units above.
+// picks which of these join their team (e.g. 5v6 out of 10) - see
+// play.html's team-select screen, whose TEAM_LETTERS is generated from
+// however many factions actually exist so this never needed a matching
+// bump there. Reuses the same upload-slot pattern as combat units above.
 // ---------------------------------------------------------------------
-const MAX_COMPUTER_PLAYERS = 5;
+const MAX_COMPUTER_PLAYERS = 10;
 const computerList = document.getElementById('computerPlayersList');
 const addComputerBtn = document.getElementById('addComputerBtn');
 let computerCounter = 0;
-const COMPUTER_COLORS = ['#ff5f6d', '#ff9d4f', '#c084fc', '#60a5fa', '#f472b6'];
+const COMPUTER_COLORS = ['#ff5f6d', '#ff9d4f', '#c084fc', '#60a5fa', '#f472b6', '#facc15', '#34d399', '#38bdf8', '#fb923c', '#a3e635'];
 
 function addComputerRow(data = {}) {
   const rows = computerList.querySelectorAll('.computer-row');
