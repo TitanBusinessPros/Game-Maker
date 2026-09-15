@@ -158,10 +158,10 @@
 
   <div id="teamSelectScreen">
     <div id="teamSelectPanel">
-      <h2>Team A vs Team B</h2>
-      <p style="color:var(--dim); font-size:13px;">Every player is on a team. You're always Team A - put each computer player on A (fighting with you) or B (fighting you).</p>
+      <h2>Choose Teams</h2>
+      <p style="color:var(--dim); font-size:13px;">Every faction is on a team. You're always Team A - give each other faction any team letter: the same as yours to fight alongside you, or its own letter to fight independently (up to one team per faction, for a real free-for-all).</p>
       <div id="allyList"></div>
-      <div id="teamSelectError" style="color:var(--bad); font-size:12px; margin-top:8px; display:none;">At least one computer player has to be on Team B - otherwise there's no one to fight.</div>
+      <div id="teamSelectError" style="color:var(--bad); font-size:12px; margin-top:8px; display:none;">At least one other faction needs a different team than yours - otherwise there's no one to fight.</div>
       <button id="startMatchBtn">Start Match</button>
     </div>
   </div>
@@ -1117,16 +1117,21 @@ async function main() {
   // ---------------------------------------------------------------------
   // Team select screen - ALWAYS shown before the match starts, for every
   // map regardless of how many computer players it has. You're always
-  // Team A; each computer player gets an explicit Team A / Team B toggle
-  // (defaulting to B). The only rule enforced is that at least one has to
-  // stay on B - putting literally everyone on your own team leaves no
-  // opponent and the match would end the instant it began.
+  // Team A; each other faction gets a real team-letter picker (A through
+  // however many factions exist - up to 6), not just an A/B toggle. Two
+  // factions sharing a letter fight together; every other letter is its
+  // own independent side - so 5 factions can genuinely be Teams A-E, a
+  // real free-for-all, instead of always being forced into exactly two
+  // sides. The only rule enforced is that at least one other faction has
+  // a different team than yours - putting literally everyone on your own
+  // team leaves no opponent and the match would end the instant it began.
   // ---------------------------------------------------------------------
   const teamScreenEl = document.getElementById('teamSelectScreen');
   const allyListEl = document.getElementById('allyList');
   const startMatchBtn = document.getElementById('startMatchBtn');
   const teamErrorEl = document.getElementById('teamSelectError');
-  const pickedTeam = {}; // factionId -> 'A' | 'B', for computer players only
+  const TEAM_LETTERS = Array.from({ length: factions.length }, (_, i) => String.fromCharCode(65 + i)); // 'A', 'B', ... one per faction that exists
+  const pickedTeam = {}; // factionId -> one of TEAM_LETTERS, for computer players only
   // factionId -> 'human' | 'ai', for computer players only. Seeded from
   // whatever index.html set as a default (cfg's controlledBy per
   // faction), but this screen is the REAL, live decision - whoever's
@@ -1165,22 +1170,29 @@ async function main() {
       allyListEl.appendChild(row);
       return;
     }
-    pickedTeam[fid] = 'B';
-    row.innerHTML = `<span class="swatch" style="background:${color}"></span><span class="name">${name}</span>${controlToggle}<div class="team-toggle"><button data-fid="${fid}" data-team="A">Team A</button><button data-fid="${fid}" data-team="B" class="active-b">Team B</button></div>`;
+    // Real-Time default: everyone starts on Team B (fighting you, the
+    // "you vs the horde" setup this mode has always defaulted to) -
+    // unchanged from before per-faction teams existed. Turn-Based
+    // default: every faction starts on ITS OWN letter - a free-for-all
+    // by default, since "2-5 people play the same game" reads as
+    // independent competitors far more often than everyone teaming up
+    // against whoever's on Team A. Either way it's just a starting
+    // point - any select below can be changed to any letter.
+    pickedTeam[fid] = turnMode ? TEAM_LETTERS[fid] : 'B';
+    const teamOptions = TEAM_LETTERS.map((letter) => `<option value="${letter}" ${pickedTeam[fid] === letter ? 'selected' : ''}>Team ${letter}</option>`).join('');
+    const teamSelectStyle = 'background:var(--panel); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:6px 8px; font-size:12px; font-weight:600; cursor:pointer;';
+    row.innerHTML = `<span class="swatch" style="background:${color}"></span><span class="name">${name}</span>${controlToggle}<select class="team-select" data-fid="${fid}" style="${teamSelectStyle}">${teamOptions}</select>`;
     allyListEl.appendChild(row);
   }
   renderTeamRow(player.name, player.color, player.id, true);
   computerCfgs.forEach((c, i) => renderTeamRow(c.name, factions[i + 1].color, factions[i + 1].id, false));
 
+  allyListEl.addEventListener('change', (e) => {
+    const sel = e.target.closest('select.team-select');
+    if (!sel) return;
+    pickedTeam[Number(sel.dataset.fid)] = sel.value;
+  });
   allyListEl.addEventListener('click', (e) => {
-    const teamBtn = e.target.closest('button[data-fid]');
-    if (teamBtn) {
-      const fid = Number(teamBtn.dataset.fid);
-      pickedTeam[fid] = teamBtn.dataset.team;
-      teamBtn.parentElement.querySelectorAll('button').forEach((b) => b.classList.remove('active-a', 'active-b'));
-      teamBtn.classList.add(teamBtn.dataset.team === 'A' ? 'active-a' : 'active-b');
-      return;
-    }
     const controlBtn = e.target.closest('button[data-cfid]');
     if (controlBtn) {
       const fid = Number(controlBtn.dataset.cfid);
@@ -1192,7 +1204,12 @@ async function main() {
 
   teamScreenEl.classList.add('show');
   startMatchBtn.addEventListener('click', () => {
-    if (!Object.values(pickedTeam).includes('B')) {
+    // Generalized from "at least one has to be on B": at least one OTHER
+    // faction just needs a team different from yours - it can be its own
+    // letter (free-for-all) or grouped with other factions, doesn't
+    // matter which, as long as not literally everyone is on Team A.
+    const distinctTeams = new Set(['A', ...Object.values(pickedTeam)]);
+    if (distinctTeams.size < 2) {
       teamErrorEl.style.display = 'block';
       return;
     }

@@ -86,9 +86,19 @@ entirely by one map's saved data:
     that faction's turn (one attack per turn, not per 90s clock-turn -
     this mode has no such clock at all) and clears again the moment its
     turn comes back around.
-- **Team A / Team B** - shown before every match, for every player, with
-  up to 5 computer opponents each getting an explicit A/B toggle (you're
-  always A). At least one has to stay on B or Start Match refuses -
+- **Team select** - shown before every match, for every player. You're
+  always Team A; every other faction gets a real team-letter picker (one
+  letter per faction that exists, up to 6 - Team A through Team F), not
+  a fixed two-side A/B toggle. Two factions sharing a letter fight
+  together; any other letter is its own independent side - so 5
+  factions can genuinely be Teams A-E, a real free-for-all, not always
+  forced into exactly two sides (which used to mean a 5-faction
+  Turn-Based match could only ever be lopsided team-vs-team, never
+  1v1v1v1v1). Real-Time defaults everyone to Team B (the existing
+  "you vs the horde" setup, unchanged); Turn-Based defaults every
+  faction to its own letter (free-for-all by default, since multiple
+  people sharing a device usually means independent competitors). Start
+  Match only requires at least one other faction differ from your team -
   otherwise there's nothing to fight. In Turn-Based mode this same
   screen also has a live 🧑 Human / 🤖 AI toggle per faction - this is
   the real, final decision (seeded from, but overriding, whatever
