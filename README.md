@@ -89,8 +89,15 @@ entirely by one map's saved data:
 - **Team A / Team B** - shown before every match, for every player, with
   up to 5 computer opponents each getting an explicit A/B toggle (you're
   always A). At least one has to stay on B or Start Match refuses -
-  otherwise there's nothing to fight. In Turn-Based mode this screen
-  also shows 🧑 Human/🤖 AI next to each faction.
+  otherwise there's nothing to fight. In Turn-Based mode this same
+  screen also has a live 🧑 Human / 🤖 AI toggle per faction - this is
+  the real, final decision (seeded from, but overriding, whatever
+  index.html set as a default), made every time the map is launched.
+  Without it, a Turn-Based map could only ever have one human in it (you)
+  unless someone had gone back into the editor beforehand - there was no
+  way for a group of people to just sit down and divide up the factions
+  themselves at play time. Now anyone launching the map picks who's
+  actually playing right there.
 - **Real player control**: left-drag a box to select multiple units,
   click to move or attack. Issuing an order deselects automatically -
   a unit doesn't stay glued to your next click the way it used to. A

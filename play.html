@@ -92,6 +92,7 @@
   }
   .team-toggle button.active-a { background:var(--good); color:#06121f; border-color:var(--good); }
   .team-toggle button.active-b { background:var(--bad); color:#06121f; border-color:var(--bad); }
+  .team-toggle button.active-control { background:var(--accent); color:#06121f; border-color:var(--accent); }
   #startMatchBtn { width:100%; padding:12px; font-size:15px; font-weight:600; border:none; border-radius:8px; background:var(--accent); color:#06121f; cursor:pointer; margin-top:14px; }
   .selbox { position:absolute; border:1px solid #fff; background:rgba(255,255,255,0.1); pointer-events:none; z-index:11; }
 </style>
@@ -1126,39 +1127,67 @@ async function main() {
   const startMatchBtn = document.getElementById('startMatchBtn');
   const teamErrorEl = document.getElementById('teamSelectError');
   const pickedTeam = {}; // factionId -> 'A' | 'B', for computer players only
+  // factionId -> 'human' | 'ai', for computer players only. Seeded from
+  // whatever index.html set as a default (cfg's controlledBy per
+  // faction), but this screen is the REAL, live decision - whoever's
+  // actually sitting down to play picks it right here, every time the
+  // map is launched, regardless of what was set when the map was made.
+  // Without this being choosable here, a Turn-Based map only ever had
+  // ONE human in it (you) unless someone had gone back into the editor
+  // beforehand and flagged computer players Human - there was no way
+  // for a group of people to just sit down and divide up the factions
+  // themselves at play time.
+  const pickedControl = {};
 
-  // Turn-Based only: label each row as 🧑 Human (hot-seat) or 🤖 AI so
-  // whoever's setting up the match can see who's actually going to need
-  // to sit down and take a turn, versus who plays itself.
+  // Turn-Based only: explain the rotation, and let whoever's setting up
+  // this match choose, per faction, who's actually going to sit down and
+  // take its turn versus who plays itself.
   if (turnMode) {
     const note = document.createElement('p');
     note.style.cssText = 'color:var(--dim); font-size:12px; margin-top:-8px;';
-    note.textContent = `🔄 Turn-Based: control passes to each faction below in order, ${TURN_TIMER_SECONDS}s at a time. Pass the device when it's someone else's turn.`;
+    note.textContent = `🔄 Turn-Based: pick who controls each faction below - 🧑 Human means a real person takes that faction's turn, 🤖 AI plays it automatically. Control passes in order, ${TURN_TIMER_SECONDS}s at a time; pass the device when it's someone else's turn.`;
     document.getElementById('teamSelectPanel').insertBefore(note, allyListEl);
   }
   function renderTeamRow(name, color, fid, isPlayer) {
     const row = document.createElement('div');
     row.className = 'allyRow';
-    const controlBadge = turnMode ? `<span style="font-size:11px; color:var(--dim); margin-right:8px;">${(isPlayer || factionOf(fid).isHuman) ? '🧑 Human' : '🤖 AI'}</span>` : '';
+    let controlToggle = '';
+    if (turnMode) {
+      if (isPlayer) {
+        controlToggle = `<div class="team-toggle"><button class="active-control" disabled>🧑 Human</button></div>`;
+      } else {
+        pickedControl[fid] = factionOf(fid).isHuman ? 'human' : 'ai';
+        controlToggle = `<div class="team-toggle"><button data-cfid="${fid}" data-control="human" class="${pickedControl[fid] === 'human' ? 'active-control' : ''}">🧑 Human</button><button data-cfid="${fid}" data-control="ai" class="${pickedControl[fid] === 'ai' ? 'active-control' : ''}">🤖 AI</button></div>`;
+      }
+    }
     if (isPlayer) {
-      row.innerHTML = `<span class="swatch" style="background:${color}"></span><span class="name">${name} (you)</span>${controlBadge}<div class="team-toggle"><button class="active-a" disabled>Team A</button></div>`;
+      row.innerHTML = `<span class="swatch" style="background:${color}"></span><span class="name">${name} (you)</span>${controlToggle}<div class="team-toggle"><button class="active-a" disabled>Team A</button></div>`;
       allyListEl.appendChild(row);
       return;
     }
     pickedTeam[fid] = 'B';
-    row.innerHTML = `<span class="swatch" style="background:${color}"></span><span class="name">${name}</span>${controlBadge}<div class="team-toggle"><button data-fid="${fid}" data-team="A">Team A</button><button data-fid="${fid}" data-team="B" class="active-b">Team B</button></div>`;
+    row.innerHTML = `<span class="swatch" style="background:${color}"></span><span class="name">${name}</span>${controlToggle}<div class="team-toggle"><button data-fid="${fid}" data-team="A">Team A</button><button data-fid="${fid}" data-team="B" class="active-b">Team B</button></div>`;
     allyListEl.appendChild(row);
   }
   renderTeamRow(player.name, player.color, player.id, true);
   computerCfgs.forEach((c, i) => renderTeamRow(c.name, factions[i + 1].color, factions[i + 1].id, false));
 
   allyListEl.addEventListener('click', (e) => {
-    const btn = e.target.closest('button[data-fid]');
-    if (!btn) return;
-    const fid = Number(btn.dataset.fid);
-    pickedTeam[fid] = btn.dataset.team;
-    btn.parentElement.querySelectorAll('button').forEach((b) => b.classList.remove('active-a', 'active-b'));
-    btn.classList.add(btn.dataset.team === 'A' ? 'active-a' : 'active-b');
+    const teamBtn = e.target.closest('button[data-fid]');
+    if (teamBtn) {
+      const fid = Number(teamBtn.dataset.fid);
+      pickedTeam[fid] = teamBtn.dataset.team;
+      teamBtn.parentElement.querySelectorAll('button').forEach((b) => b.classList.remove('active-a', 'active-b'));
+      teamBtn.classList.add(teamBtn.dataset.team === 'A' ? 'active-a' : 'active-b');
+      return;
+    }
+    const controlBtn = e.target.closest('button[data-cfid]');
+    if (controlBtn) {
+      const fid = Number(controlBtn.dataset.cfid);
+      pickedControl[fid] = controlBtn.dataset.control;
+      controlBtn.parentElement.querySelectorAll('button').forEach((b) => b.classList.remove('active-control'));
+      controlBtn.classList.add('active-control');
+    }
   });
 
   teamScreenEl.classList.add('show');
@@ -1168,7 +1197,13 @@ async function main() {
       return;
     }
     player.team = 'A';
-    factions.forEach((f, i) => { if (i > 0) f.team = pickedTeam[f.id]; });
+    factions.forEach((f, i) => {
+      if (i === 0) return;
+      f.team = pickedTeam[f.id];
+      // The real, final say on human-vs-AI - overrides whatever
+      // index.html set as a default, per the note above.
+      if (turnMode) f.isHuman = pickedControl[f.id] === 'human';
+    });
     teamScreenEl.classList.remove('show');
     matchStarted = true;
   });
