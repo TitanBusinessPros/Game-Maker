@@ -835,7 +835,11 @@ function openLibraryPicker(slotKey, mediaType) {
       catItems.forEach((it) => {
         const el = document.createElement('div');
         el.className = 'library-item';
-        el.innerHTML = `<img src="${it.url}" loading="lazy" alt="${it.name}"><div class="lname">${it.name}</div>`;
+        // No visible name in the picker itself (alt text only, for
+        // screen readers - never shown on screen) - browsing the
+        // library is by thumbnail now, not by whatever the uploaded
+        // filename happened to be.
+        el.innerHTML = `<img src="${it.url}" loading="lazy" alt="${it.name}">`;
         el.addEventListener('click', () => selectLibraryAsset(it));
         libraryGrid.appendChild(el);
       });
@@ -843,10 +847,15 @@ function openLibraryPicker(slotKey, mediaType) {
       libraryGrid.hidden = true;
       libraryList.hidden = false;
       libraryList.innerHTML = '';
-      catItems.forEach((it) => {
+      // No name shown here either - just "Sound 1", "Sound 2"... within
+      // whatever category tab is open, instead of the uploaded name.
+      // Audio has no thumbnail to browse by the way images do, so a
+      // fully blank/identical row per item isn't distinguishable at all
+      // - this keeps them pickable without exposing the real name.
+      catItems.forEach((it, i) => {
         const el = document.createElement('div');
         el.className = 'library-audio-item';
-        el.innerHTML = `<span>🎵 ${it.name}</span><span class="btn-secondary" style="font-size:11px;padding:4px 8px;">Use this</span>`;
+        el.innerHTML = `<span>🎵 Sound ${i + 1}</span><span class="btn-secondary" style="font-size:11px;padding:4px 8px;">Use this</span>`;
         el.addEventListener('click', () => selectLibraryAsset(it));
         libraryList.appendChild(el);
       });
