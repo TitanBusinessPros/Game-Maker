@@ -333,7 +333,8 @@ const TECH_TREE = {
   rapid_repair: { name: 'Rapid Repair Crews', cost: 500, timeSeconds: 100, prereq: null, effect: 'regen' },
 };
 
-const HOMEWORLD_HP = 1000;
+const HOMEWORLD_HP_DEFAULT = 300; // used only as a fallback for a map saved before per-faction homeworld HP existed
+function clampHomeworldHp(v) { return Math.max(100, Math.min(500, Number(v) || HOMEWORLD_HP_DEFAULT)); }
 const TURN_SECONDS = 90;
 const MOVE_PX_PER_SPEED = 20;
 const UNIT_SIZE = 34;
@@ -438,7 +439,12 @@ async function main() {
       img: isPlayer ? playerImg : computerImgs[i - 1],
       x: worldCenter.x + Math.cos(angle) * homeRadius,
       y: worldCenter.y + Math.sin(angle) * homeRadius,
-      hp: HOMEWORLD_HP, maxHp: HOMEWORLD_HP,
+      // Per-faction, set on the map (index.html's "Homeworld HP" field,
+      // 100-500) - not a single fixed value shared by every homeworld
+      // like before. Clamped again here too, the same way index.html
+      // clamps it before saving, in case a map predates this field
+      // (undefined -> HOMEWORLD_HP_DEFAULT) or was ever hand-edited outside it.
+      hp: clampHomeworldHp(src?.hp), maxHp: clampHomeworldHp(src?.hp),
       resources: 1000, research: freshResearch(),
       team: null, // assigned on the team-select screen before the match starts
     });

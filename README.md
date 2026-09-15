@@ -32,7 +32,8 @@ appear) — a genuinely separate, self-contained game per map.
    not just a label).
 2. **Your faction & computer players** — you're always the human player;
    add 1-5 computer-controlled opponents, each with its own name, color,
-   and homeworld art.
+   homeworld art, and **homeworld HP** (100-500, per faction - not one
+   fixed value shared by every homeworld on the map).
 2a. **Game style** — ⏱️ Real-Time (default, unchanged) or 🔄 Turn-Based
    (hot-seat: 2-5 people share this device, a timer of 10-60s per turn).
    Turn-Based adds a **turn timer** field and, per computer player, a

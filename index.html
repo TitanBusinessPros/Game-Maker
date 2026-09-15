@@ -315,6 +315,7 @@
       <div class="row">
         <div class="field"><label>Faction name</label><input type="text" id="goodName" value="Allied Forces"></div>
         <div class="field narrow"><label>Color</label><input type="color" id="goodColor" value="#4fdc8f"></div>
+        <div class="field narrow"><label>Homeworld HP</label><input type="number" id="goodHp" value="300" min="100" max="500" step="10"></div>
       </div>
       <div class="field">
         <label>Homeworld art</label>
@@ -965,6 +966,7 @@ function addComputerRow(data = {}) {
     <div class="row">
       <div class="field"><label>Faction name</label><input type="text" class="c-name" value="${escapeAttr(data.name || `Hostile Forces ${idx + 1}`)}"></div>
       <div class="field narrow"><label>Color</label><input type="color" class="c-color" value="${data.color || COMPUTER_COLORS[idx % COMPUTER_COLORS.length]}"></div>
+      <div class="field narrow"><label>Homeworld HP</label><input type="number" class="c-hp" value="${data.hp || 300}" min="100" max="500" step="10"></div>
       <div class="field narrow controlled-by-field" style="display:none;">
         <label>Controlled by</label>
         <select class="c-controlledby">
@@ -1022,6 +1024,14 @@ const FIXED_UPLOAD_SLOTS = [
   'soundMusic', 'soundIntro', 'soundAttack', 'soundBuildingDestroyed', 'soundHomeUnderAttack', 'soundEndgame',
 ];
 
+// Homeworld HP is a real gameplay stat (play.html uses it as both hp and
+// maxHp for the faction), so clamp it here the same way play.html would
+// anyway - a map-maker typing 5000 or -10 shouldn't silently produce a
+// homeworld that plays differently than the 100-500 range promised by
+// the field itself.
+function clampHomeworldHp(v) {
+  return Math.max(100, Math.min(500, Number(v) || 300));
+}
 function collectComputers(uploadResults) {
   const rows = Array.from(computerList.querySelectorAll('.computer-row'));
   return rows.map((row) => {
@@ -1029,6 +1039,7 @@ function collectComputers(uploadResults) {
     return {
       name: row.querySelector('.c-name').value.trim() || 'Hostile Forces',
       color: row.querySelector('.c-color').value,
+      hp: clampHomeworldHp(row.querySelector('.c-hp').value),
       baseImage: uploadResults[id] || null,
       // Only meaningful in Turn-Based mode - see play.html's faction
       // setup. Stored regardless of current gameStyle so switching a
@@ -1072,6 +1083,7 @@ async function buildMapDoc(status) {
     player: {
       name: document.getElementById('goodName').value.trim() || 'Allied Forces',
       color: document.getElementById('goodColor').value,
+      hp: clampHomeworldHp(document.getElementById('goodHp').value),
       baseImage: uploadResults.goodBaseImage,
     },
     computers,
@@ -1221,6 +1233,7 @@ async function loadExistingMap() {
   if (m.player) {
     document.getElementById('goodName').value = m.player.name || '';
     document.getElementById('goodColor').value = m.player.color || '#4fdc8f';
+    document.getElementById('goodHp').value = m.player.hp || 300;
     if (m.player.baseImage) showExistingAsset('goodBaseImage', m.player.baseImage);
   }
   if (Array.isArray(m.computers) && m.computers.length) {
