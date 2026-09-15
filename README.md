@@ -169,7 +169,13 @@ entirely by one map's saved data:
     becomes their turn. A unit that attacks here locks for the rest of
     that faction's turn (one attack per turn, not per 90s clock-turn -
     this mode has no such clock at all) and clears again the moment its
-    turn comes back around.
+    turn comes back around - along with dropping any standing attack
+    order it still held, so it actually sits idle-and-usable rather than
+    firing again on its own the instant it unlocks (which then re-locked
+    it before anyone touched anything - reported as "the user's troops
+    are still locked" every time their turn came back around). A move
+    order is left alone across turns, since a unit can legitimately take
+    several turns to reach a far destination.
 - **Team select** - shown before every match, for every player. You're
   always Team A; every other faction gets a real team-letter picker (one
   letter per faction that exists, up to 11 with 10 computer players -

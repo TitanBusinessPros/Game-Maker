@@ -929,7 +929,26 @@ async function main() {
     const pad = 300;
     const fitZoom = Math.min(canvas.width / (center.w + pad * 2), canvas.height / (center.h + pad * 2));
     camera.zoom = Math.min(1, Math.max(ZOOM_MIN, fitZoom));
-    livingUnits(activeFaction.id).forEach((u) => { u.attackedThisTurn = false; });
+    livingUnits(activeFaction.id).forEach((u) => {
+      u.attackedThisTurn = false;
+      // A standing 'attack' order from last turn (the unit's target is
+      // still alive) would otherwise fire again the instant the lock
+      // above clears - the per-faction loop in update() calls
+      // combatTick() for any human-controlled unit whose orderType is
+      // still 'attack', with no isLocked() check of its own to stop it
+      // (combatTick() checks internally, but that's only true AFTER
+      // attackedThisTurn was just reset here). It fired and re-locked
+      // itself automatically, before the player ever gave a new order -
+      // reported as "the user's troops are still locked" every time
+      // their turn comes back around, since by the time anyone looked
+      // it had already silently used and burned its one attack. Turrets
+      // are exempt - they were never gated by attackedThisTurn at all
+      // (their own real-time cooldown), and re-acquire a target every
+      // frame regardless, so clearing theirs here would do nothing
+      // useful. Move orders are left alone - those legitimately span
+      // multiple turns for a unit still travelling toward a far target.
+      if (!u.isTurret && u.orderType === 'attack') { u.orderType = null; u.target = null; }
+    });
     renderBuildPanel();
     renderResearchPanel();
   }
