@@ -660,6 +660,30 @@ async function main() {
     units.push(u);
     return u;
   }
+  // Air Base/War Factory/Infantry Post/Helicopter Facility/Research
+  // Facility are real, attackable, destroyable entities now, not just
+  // decoration - spawned here the moment fac.built[key] is set true
+  // (both the player's Build button and aiThink), at the same
+  // offsetX/offsetY GATED_BUILDINGS already used for the old purely-
+  // decorative rendering. Zero attack/range/speed - it never fights
+  // back or moves, it just has HP that can be worn down like any other
+  // target. combatTick's own death handling (see below) is what flips
+  // fac.built[key] back to false and clears that building's production
+  // queue once this dies, so losing it actually revokes what it
+  // unlocked instead of the HP being decorative.
+  function spawnGatedBuildingEntity(fac, key) {
+    const b = GATED_BUILDINGS.find((gb) => gb.key === key);
+    const hp = Math.round(effectiveStat(fac, b.cfg.hp, 'hp'));
+    const u = {
+      id: nextUnitId++, factionId: fac.id, defIndex: -1, isMiner: false, isTurret: false,
+      isGatedBuilding: true, buildingKey: key,
+      hp, maxHp: hp, attack: 0, range: 0, speed: 0,
+      img: b.img, x: fac.x + b.offsetX, y: fac.y + b.offsetY, alive: true, selected: false,
+      orderType: null, moveTarget: null, target: null, lockedUntilTurn: 0, facingAngle: 0,
+    };
+    units.push(u);
+    return u;
+  }
   // Regular Combat Units (buildingKey === null) still spawn the instant
   // they're paid for - unchanged. An Air Base/War Factory unit instead
   // joins that building's production queue and only actually spawns
@@ -797,6 +821,22 @@ async function main() {
         t.hp = 0;
         if (t.maxHp === undefined || t.isFactionHome) playSfx(sounds.homeUnderAttack);
         if (!t.isFactionHome && t.alive !== undefined) { t.alive = false; playSfx(sounds.buildingDestroyed); }
+        // A destroyed Air Base/War Factory/Infantry Post/Helicopter
+        // Facility/Research Facility actually revokes what it unlocked -
+        // "once that building is gone no troops can be built from that
+        // specific building" - not just decorative HP. Also cancels
+        // whatever was mid-production in its queue (the factory itself
+        // is gone, there's nothing left to finish building it in) and,
+        // if the loss belongs to whoever's turn it currently is,
+        // refreshes the build/research panels immediately instead of
+        // leaving them showing the pre-destruction state (same staleness
+        // bug fixed for the "just built it" direction earlier).
+        if (t.isGatedBuilding) {
+          const owner = factionOf(t.factionId);
+          owner.built[t.buildingKey] = false;
+          owner.buildQueue[t.buildingKey] = [];
+          if (owner === activeFaction) { renderBuildPanel(); renderResearchPanel(); }
+        }
       }
     }
   }
@@ -911,6 +951,7 @@ async function main() {
       spawnMiner(fac.id, fac.x - 40, fac.y); fac.resources -= 80;
     } else if (neededBuilding && Math.random() < 0.5) {
       fac.resources -= neededBuilding.cfg.cost; fac.built[neededBuilding.key] = true;
+      spawnGatedBuildingEntity(fac, neededBuilding.key);
     } else if (unitDefs.length) {
       const affordable = unitDefs.map((d, i) => ({ d, i })).filter((x) => fac.resources >= x.d.cost && (!x.d.buildingKey || fac.built[x.d.buildingKey]));
       if (affordable.length) {
@@ -1007,6 +1048,7 @@ async function main() {
 
     for (const u of units) {
       if (!u.alive) continue;
+      if (u.isGatedBuilding) continue; // pure HP - never moves, never fights back, just a real target (see spawnGatedBuildingEntity)
       const fac = factionOf(u.factionId);
       if (u.isTurret) {
         // Checked BEFORE the Turn-Based freeze below, deliberately - a
@@ -1154,11 +1196,13 @@ async function main() {
   function drawUnit(u) {
     const p = toScreen(u.x, u.y);
     if (p.x < -60 || p.x > canvas.width + 60 || p.y < -60 || p.y > canvas.height + 60) return;
-    const size = UNIT_SIZE * camera.zoom;
+    const size = (u.isGatedBuilding ? GATED_BUILDING_SIZE : UNIT_SIZE) * camera.zoom;
     if (u.selected) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p.x, p.y, size / 2 + 5, 0, 7); ctx.stroke(); }
     // Only the sprite itself rotates to face where the unit is headed
     // (same as After Earth's own Unit.draw()) - the HP bar/lock icon below
-    // stay screen-aligned, same as the real game keeps them too.
+    // stay screen-aligned, same as the real game keeps them too. A
+    // building's facingAngle never changes from 0 (it never moves), so
+    // this rotate is a harmless no-op for those.
     if (u.img) {
       const fit = fittedSize(u.img, size);
       ctx.save();
@@ -1166,6 +1210,16 @@ async function main() {
       ctx.rotate(u.facingAngle || 0);
       ctx.drawImage(u.img, -fit.w / 2, -fit.h / 2, fit.w, fit.h);
       ctx.restore();
+    } else if (u.isGatedBuilding) {
+      // Same fallback as before this became a real unit - a colored
+      // circle with the building's own emoji icon, not a plain circle
+      // like every other unitless fallback, so it stays recognizable as
+      // "which building is this" even with no art uploaded.
+      const b = GATED_BUILDINGS.find((gb) => gb.key === u.buildingKey);
+      ctx.fillStyle = factionOf(u.factionId).color; ctx.beginPath(); ctx.arc(p.x, p.y, size / 2, 0, 7); ctx.fill();
+      ctx.font = `${Math.round(size * 0.55)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(b.icon, p.x, p.y);
+      ctx.textBaseline = 'alphabetic';
     } else { ctx.fillStyle = factionOf(u.factionId).color; ctx.beginPath(); ctx.arc(p.x, p.y, size / 2, 0, 7); ctx.fill(); }
     const pct = Math.max(0, u.hp / u.maxHp);
     ctx.fillStyle = '#2a3550'; ctx.fillRect(p.x - size / 2, p.y - size / 2 - 7, size, 3);
@@ -1208,32 +1262,13 @@ async function main() {
       ctx.drawImage(resourceImg, p.x - fit.w / 2, p.y - fit.h / 2, fit.w, fit.h);
     } else { ctx.fillStyle = '#e8b93a'; ctx.beginPath(); ctx.arc(p.x, p.y, size / 2, 0, 7); ctx.fill(); }
   }
-  // Air Base / War Factory: drawn near their faction's homeworld once
-  // that faction has actually built it (fac.built[key]) - purely
-  // decorative/informational, same as the resource deposit above (not a
-  // combat target: nothing in nearestEnemy/handleClick's target search
-  // looks at these, only at factions and units).
-  function drawGatedBuilding(f, b) {
-    if (!f.built[b.key]) return;
-    const p = toScreen(f.x + b.offsetX, f.y + b.offsetY);
-    const size = GATED_BUILDING_SIZE * camera.zoom;
-    if (b.img) {
-      const fit = fittedSize(b.img, size);
-      ctx.drawImage(b.img, p.x - fit.w / 2, p.y - fit.h / 2, fit.w, fit.h);
-    } else {
-      // No art uploaded for this building (or it failed to load) used
-      // to mean nothing was drawn at all - a built Infantry Post/etc
-      // with no custom art was completely invisible in-game, reported
-      // as "has no icon to represent it." Every other entity in the
-      // game (homeworld, units, the deposit) already falls back to a
-      // colored shape when its own image is missing - this matches
-      // that same pattern instead of being a silent gap.
-      ctx.fillStyle = f.color; ctx.beginPath(); ctx.arc(p.x, p.y, size / 2, 0, 7); ctx.fill();
-      ctx.font = `${Math.round(size * 0.55)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(b.icon, p.x, p.y);
-      ctx.textBaseline = 'alphabetic';
-    }
-  }
+  // Air Base/War Factory/etc used to be drawn here as a purely
+  // decorative marker near the homeworld, not a real unit - replaced by
+  // spawnGatedBuildingEntity() pushing a real entity into `units`, drawn
+  // by the normal drawUnit() loop instead (see its isGatedBuilding
+  // branch for the same fallback icon this used to have), so it can
+  // actually be attacked. See combatTick's death handling for what
+  // happens when one is destroyed.
   // The valid turret-placement zone (TURRET_MIN_RANGE-TURRET_MAX_RANGE
   // around activeFaction's own Home Base) as two dashed circles, only
   // while placement mode is actually active.
@@ -1277,7 +1312,7 @@ async function main() {
     }
 
     for (const d of deposits) drawDeposit(d);
-    for (const f of factions) if (f.hp > 0) { drawFactionHome(f); GATED_BUILDINGS.forEach((b) => drawGatedBuilding(f, b)); }
+    for (const f of factions) if (f.hp > 0) drawFactionHome(f);
     for (const u of units) if (u.alive) drawUnit(u);
     drawBeams();
     drawTurretRangeRing();
@@ -1441,7 +1476,7 @@ async function main() {
     const r = canvas.getBoundingClientRect();
     const p = toWorld(evt.clientX - r.left, evt.clientY - r.top);
     if (placingTurret) { tryPlaceTurret(p); return; }
-    const own = livingUnits(activeFaction.id).find((u) => !u.isMiner && Math.hypot(u.x - p.x, u.y - p.y) < UNIT_SIZE / 2 + 8);
+    const own = livingUnits(activeFaction.id).find((u) => !u.isMiner && Math.hypot(u.x - p.x, u.y - p.y) < (u.isGatedBuilding ? GATED_BUILDING_SIZE : UNIT_SIZE) / 2 + 8);
     if (own) {
       livingUnits(activeFaction.id).forEach((u) => u.selected = false);
       own.selected = true;
@@ -1462,7 +1497,7 @@ async function main() {
       // excluded them) - a player just had no way to actually click one
       // to order an attack. Reported as "we need to allow the mining
       // ships to be attacked."
-      target = units.find((u) => u.alive && !isAlly(activeFaction.id, u.factionId) && Math.hypot(u.x - p.x, u.y - p.y) < UNIT_SIZE / 2 + 8);
+      target = units.find((u) => u.alive && !isAlly(activeFaction.id, u.factionId) && Math.hypot(u.x - p.x, u.y - p.y) < (u.isGatedBuilding ? GATED_BUILDING_SIZE : UNIT_SIZE) / 2 + 8);
     }
     sel.forEach((u) => {
       if (isLocked(u)) return; // attacked this turn - can't take a new order yet
@@ -1486,9 +1521,12 @@ async function main() {
       if (count) textEl.innerHTML = `<strong>${count} units selected</strong>`;
       return;
     }
-    const def = u.isMiner ? { name: cfg.miningUnit?.name || 'Mining Ship' } : u.isTurret ? turretDefs[u.defIndex] : unitDefs[u.defIndex];
+    const def = u.isMiner ? { name: cfg.miningUnit?.name || 'Mining Ship' }
+      : u.isTurret ? turretDefs[u.defIndex]
+      : u.isGatedBuilding ? buildingCfgByKey[u.buildingKey]
+      : unitDefs[u.defIndex];
     box.style.display = 'block';
-    const statsLine = u.isMiner ? '' : u.isTurret ? ` · ATK ${u.attack} · RNG ${u.range} · stationary` : ` · ATK ${u.attack} · RNG ${u.range} · SPD ${u.speed.toFixed(1)}`;
+    const statsLine = u.isMiner ? '' : u.isTurret ? ` · ATK ${u.attack} · RNG ${u.range} · stationary` : u.isGatedBuilding ? '' : ` · ATK ${u.attack} · RNG ${u.range} · SPD ${u.speed.toFixed(1)}`;
     textEl.innerHTML = `<strong>${def.name}</strong><br>HP ${Math.round(u.hp)}/${u.maxHp}${statsLine}${isLocked(u) ? '<br><span style="color:var(--warn)">🔒 locked until next turn</span>' : ''}`;
   }
   function hideUnitInfo() { document.getElementById('unitInfoBox').style.display = 'none'; }
@@ -1602,7 +1640,12 @@ async function main() {
       // until something else happened to refresh it - reported as
       // "mining is still locked on the research page" even though the
       // gate itself (fac.built.researchFacility) was already lifted.
-      btn.onclick = () => { activeFaction.resources -= b.cfg.cost; activeFaction.built[b.key] = true; renderBuildPanel(); renderResearchPanel(); };
+      btn.onclick = () => {
+        activeFaction.resources -= b.cfg.cost;
+        activeFaction.built[b.key] = true;
+        spawnGatedBuildingEntity(activeFaction, b.key);
+        renderBuildPanel(); renderResearchPanel();
+      };
       row.appendChild(btn);
       el.appendChild(row);
     });
@@ -1755,7 +1798,7 @@ async function main() {
     return {
       cfg, turnNumber, turnTimer, activeIdx, hotseatTimer, moveNumber,
       factions: factions.map((f) => ({ id: f.id, resources: f.resources, hp: f.hp, team: f.team, built: f.built, buildQueue: f.buildQueue, researched: [...f.research.researched], active: f.research.active })),
-      units: units.filter((u) => u.alive).map((u) => ({ factionId: u.factionId, defIndex: u.defIndex, isMiner: !!u.isMiner, isTurret: !!u.isTurret, x: u.x, y: u.y, hp: u.hp, maxHp: u.maxHp })),
+      units: units.filter((u) => u.alive).map((u) => ({ factionId: u.factionId, defIndex: u.defIndex, isMiner: !!u.isMiner, isTurret: !!u.isTurret, isGatedBuilding: !!u.isGatedBuilding, buildingKey: u.buildingKey, x: u.x, y: u.y, hp: u.hp, maxHp: u.maxHp })),
     };
   }
   document.getElementById('saveBtn').addEventListener('click', () => {
@@ -1778,7 +1821,10 @@ async function main() {
     });
     units.length = 0;
     data.units.forEach((u) => {
-      const spawned = u.isMiner ? spawnMiner(u.factionId, u.x, u.y) : u.isTurret ? spawnTurret(u.factionId, u.defIndex, u.x, u.y) : spawnUnit(u.factionId, u.defIndex, u.x, u.y);
+      const spawned = u.isMiner ? spawnMiner(u.factionId, u.x, u.y)
+        : u.isTurret ? spawnTurret(u.factionId, u.defIndex, u.x, u.y)
+        : u.isGatedBuilding ? spawnGatedBuildingEntity(factionOf(u.factionId), u.buildingKey)
+        : spawnUnit(u.factionId, u.defIndex, u.x, u.y);
       spawned.hp = u.hp; spawned.maxHp = u.maxHp;
     });
     if (turnMode && typeof data.activeIdx === 'number') {

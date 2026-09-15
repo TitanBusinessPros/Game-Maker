@@ -235,27 +235,37 @@ entirely by one map's saved data:
   - and like research/mining income, queues keep progressing regardless
   of whose turn it is in Turn-Based mode. A map with no units defined
   under a given building never shows any of it at all for that
-  building. Once built, the building's own art is drawn near its
-  faction's homeworld (a fixed offset per building so none of them ever
-  overlap each other or the resource deposit) - purely a visual marker,
-  not a combat target (nothing in the game's targeting looks at these,
-  same as the resource deposit). If no art was uploaded for that
-  building, it falls back to a faction-colored circle with the
-  building's own emoji icon on it instead of drawing nothing at all,
-  same as every other entity in the game already does when its image is
+  building. Once built, the building spawns as a **real, attackable
+  entity** at a fixed offset near its faction's homeworld (each building
+  its own offset, so none of them ever overlap each other or the
+  resource deposit) - not decoration, an actual target with the HP set
+  on the map (same 1000-5000 field/range as Home Base's), a visible HP
+  bar, targetable by `nearestEnemy()` (AI) and by a player's own click
+  to attack, same as any unit. Destroying one actually revokes what it
+  unlocked: `fac.built[key]` flips back to false, its production queue
+  is cleared (whatever was mid-build there is gone with it), and no
+  more of its units can be built - or, for Research Facility, no more
+  research - until it's built again from scratch. It never fights back
+  or moves on its own (0 attack/range/speed - it's a pure HP target,
+  not a defender; that's what Gun Turrets are for). If no art was
+  uploaded for it, it falls back to a faction-colored circle with the
+  building's own emoji icon instead of drawing nothing at all, same as
+  every other entity in the game already does when its image is
   missing. The production countdown shown in the
   build panel updates live every frame (it used to only update when
   something else happened to redraw the panel, so it looked frozen -
   reported as "no timer for troop production" even though production
   itself was always progressing correctly in the background).
 - **Research Facility** (mandatory, set on the map): same one-time-
-  purchase build-panel row as the buildings above, but it gates the
-  Research tab itself rather than a unit list - `startResearch()`
-  refuses outright (and every row in the Research tab shows 🔒 Locked,
-  with a banner explaining why) until that faction has actually built
-  it. No unit list, so it always shows in the Build panel regardless -
-  there's nothing that would make it optional the way an empty unit
-  list does for the other buildings.
+  purchase build-panel row, same real attackable/destroyable entity, as
+  the buildings above, but it gates the Research tab itself rather than
+  a unit list - `startResearch()` refuses outright (and every row in the
+  Research tab shows 🔒 Locked, with a banner explaining why) until that
+  faction has actually built it, and destroying one re-locks research
+  the same way destroying a War Factory re-locks its units. No unit
+  list, so it always shows in the Build panel regardless - there's
+  nothing that would make it optional the way an empty unit list does
+  for the other buildings.
 - **Gun Turrets** (optional, set on the map): stationary defenses,
   structured differently from the buildings above entirely - no gating
   building, no production queue, no Speed stat. Clicking "Place" in the
