@@ -68,6 +68,17 @@
     flex: none;
   }
   .section .hint { color: var(--text-dim); font-size: 12px; margin: 0 0 14px; }
+  .info-link {
+    position: relative; display: inline-block; color: var(--accent); font-weight: 400;
+    font-size: 11px; cursor: help; margin-left: 4px; border-bottom: 1px dotted var(--accent);
+  }
+  .info-link .info-tooltip {
+    display: none; position: absolute; left: 0; top: 100%; margin-top: 6px; width: 260px;
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 12px; font-size: 11px; line-height: 1.5; color: var(--text-dim);
+    font-weight: 400; z-index: 20; white-space: normal;
+  }
+  .info-link:hover .info-tooltip, .info-link:focus .info-tooltip { display: block; }
   .section .subhead { font-size: 13px; font-weight: 600; color: var(--text-dim); margin: 18px 0 8px; padding-top: 10px; border-top: 1px solid var(--border); }
   .section .subhead:first-of-type { margin-top: 0; padding-top: 0; border-top: none; }
 
@@ -288,7 +299,7 @@
         <input type="text" id="baseLabel" placeholder="Home Base / Planet / Island" value="Home Base">
       </div>
       <div class="field narrow">
-        <label for="mapSize">Map size</label>
+        <label for="mapSize">Map size <span class="info-link" tabindex="0">ⓘ recommended sizes<span class="info-tooltip">Background art is compressed to 768px max no matter what you upload, then stretched to cover the whole map - so it looks sharpest on Tiny (~2&times; stretch) and softer as the map grows: Small ~4&times;, Medium ~8&times;, Large ~14&times;. Pick simpler, lower-detail background art for bigger maps. Character/unit/building art isn't affected - those always render at a fixed size.</span></span></label>
         <select id="mapSize">
           <option value="tiny">Tiny</option>
           <option value="small">Small (3&times; Tiny)</option>
