@@ -430,8 +430,25 @@ entirely by one map's saved data:
   else. AI factions place them too, picking a random valid spot in the
   same ring instead of needing a click.
 - **⬇ Download as index.html** - packages the map's data inline into a
-  fully standalone copy of this page. Verified: opens and runs from
-  `file://` with zero network calls.
+  fully standalone copy of this page. This used to only bundle the map's
+  *data* (unit stats, names, etc.) while every image/sound field stayed a
+  live Firebase Storage URL - the downloaded file still needed internet
+  to actually render or play anything, which the claim here used to get
+  wrong. Now the button itself fetches every art/sound URL the map
+  actually uses (`inlineUrlsAsDataUris()` - recurses through the whole
+  config generically rather than a hand-written list of fields, so a
+  future field never needs adding here separately) and inlines each as a
+  base64 `data:` URI before packaging, so it's genuinely a zero-network-call
+  file once downloaded. The same URL reused across several units/turrets
+  (a shared library asset) is only ever fetched once. The button shows
+  "⬇ Preparing… N/M" while this runs (can take a few seconds for a map
+  with a lot of art) and disables itself meanwhile. This does depend on
+  the Storage bucket allowing cross-origin reads (CORS) from wherever
+  `index.html`/`play.html` are hosted - without that, the fetch for a
+  given asset fails and that one asset is quietly left as a live URL
+  instead (logged to the console) rather than breaking the whole
+  download, so a CORS gap degrades gracefully instead of blocking
+  Download entirely.
 - **Titan Business Pros logo + hidden page** - a small clickable logo in
   the top-left corner of the topbar, present in every game this maker
   produces (it lives directly in `play.html`'s own markup, which is
