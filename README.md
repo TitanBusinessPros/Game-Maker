@@ -568,7 +568,17 @@ Project: `game-maker-ed014`.
   owning `uid` (maps) or the admin email (library) via rules.
 - **Storage** — `maps/{uid}/{mapId}/...` for map-specific uploads,
   `library/{category}/...` for the shared library. Same read-public/
-  write-locked pattern.
+  write-locked pattern. Its bucket also has a **CORS policy**
+  (`cors.json` in this repo, applied via `gcloud storage buckets update
+  gs://game-maker-ed014.firebasestorage.app --cors-file=cors.json` -
+  Storage rules/`firebase deploy` don't cover this, it's a bucket-level
+  GCS setting) allowing GET + `Content-Type` from
+  `https://titanbusinesspros.github.io` - added so `play.html`'s
+  "⬇ Download as index.html" button can actually `fetch()` art/sound
+  bytes cross-origin to inline them as base64 (see that bullet above);
+  without it every image/sound in Storage was already publicly
+  viewable via `<img>`/`<audio>` (those don't need CORS), just not
+  readable by JavaScript, which is what fetching-to-inline needs.
 
 The web config (`apiKey` etc.) is a public client identifier, not a
 secret. `firestore.rules`/`storage.rules` in this repo are deployed via
