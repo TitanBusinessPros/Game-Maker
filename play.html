@@ -591,6 +591,16 @@ async function main() {
   let activeFaction = player;
   let hotseatTimer = TURN_TIMER_SECONDS;
   let moveNumber = 1; // counts every individual turn taken by anyone, starting at the first player's first turn
+  let lastGoldRound = 0; // see applyGoldPerRound() - which round it was last paid out for, so it fires exactly once per round
+  // Optional (index.html's "Give everyone free gold each round"
+  // checkbox) - a flat handout to every living faction, on top of
+  // normal mining income. Called once per Real-Time "turn" (the
+  // 90s cosmetic clock - there's no separate concept of a "round" in
+  // this mode) or once per Turn-Based round (see advanceTurn below).
+  function applyGoldPerRound() {
+    if (!cfg.goldPerRound) return;
+    factions.forEach((f) => { if (f.hp > 0) f.resources += cfg.goldPerRound; });
+  }
 
   const worldMinX = Math.min(...factions.map((f) => f.x)) - 400;
   const worldMaxX = Math.max(...factions.map((f) => f.x)) + 400;
@@ -835,6 +845,11 @@ async function main() {
     activeFaction = factions[activeIdx];
     hotseatTimer = TURN_TIMER_SECONDS;
     moveNumber++;
+    // Same "Round N" the top-bar label already computes from
+    // moveNumber - fires applyGoldPerRound() exactly once each time
+    // that number goes up, not once per individual move.
+    const round = Math.ceil(moveNumber / factions.length);
+    if (round > lastGoldRound) { lastGoldRound = round; applyGoldPerRound(); }
     const center = factionViewCenter(activeFaction);
     camera.x = center.x; camera.y = center.y;
     // Zoom OUT (never in past the normal default) just enough that the
@@ -929,7 +944,7 @@ async function main() {
       if (hotseatTimer <= 0) advanceTurn();
     } else {
       turnTimer -= dt;
-      if (turnTimer <= 0) { turnTimer = TURN_SECONDS; turnNumber++; }
+      if (turnTimer <= 0) { turnTimer = TURN_SECONDS; turnNumber++; applyGoldPerRound(); }
     }
 
     for (const f of factions) {

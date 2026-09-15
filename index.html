@@ -268,6 +268,7 @@
 <header>
   <h1>Game Maker</h1>
   <p>Build one map's worth of art, sound, and units. Nothing here changes the combat math &mdash; it just tells the engine what to call things and what to draw.</p>
+  <p style="color:var(--text-dim); font-size:12px; margin-top:-8px;">💡 Tip: character/unit images look best with a <strong>transparent background</strong> (PNG) - anything with a solid background will show up as a visible box around the sprite in-game.</p>
   <div id="userBar" style="display:none; font-size:12px; color:var(--text-dim); margin-top:8px;"></div>
 </header>
 
@@ -311,6 +312,20 @@
     </div>
     <p class="hint" id="gameStyleHint" style="display:none;">
       Turn-Based: only one faction can act at a time - everyone else is frozen until their turn comes back around. Control passes automatically when the timer runs out. Mark any computer player below as "Human (hot-seat)" to let a real person take its turn instead of AI; resource income and research keep running for everyone regardless of whose turn it is.
+    </p>
+    <div class="row">
+      <div class="field narrow" style="display:flex; align-items:flex-end; padding-bottom:9px;">
+        <label style="display:flex; align-items:center; gap:6px; font-weight:normal; margin:0;">
+          <input type="checkbox" id="goldPerRoundEnabled" style="width:auto;"> Give everyone free gold each round
+        </label>
+      </div>
+      <div class="field narrow" id="goldPerRoundField" style="display:none;">
+        <label for="goldPerRoundAmount">Gold per round</label>
+        <input type="number" id="goldPerRoundAmount" value="100" min="1" step="10">
+      </div>
+    </div>
+    <p class="hint" id="goldPerRoundHint" style="display:none;">
+      Every player (you and every computer player) automatically receives this much gold at the start of each round, on top of normal mining income - optional, off by default.
     </p>
     <div class="field">
       <label>Map background art (optional)</label>
@@ -1100,7 +1115,7 @@ function makeUnitRow(list, idPrefix, counterState, data = {}, gated = false) {
     </div>
     <div class="upload-slot" data-slot="${id}">
       <div class="thumb">none</div>
-      <div class="meta"><div class="name">No file chosen</div><div class="status">unit sprite</div></div>
+      <div class="meta"><div class="name">No file chosen</div><div class="status">unit sprite - transparent PNG works best</div></div>
       <input type="file" accept="image/*" style="width:auto">
     </div>
     <div class="row" style="margin-top:10px;">
@@ -1161,7 +1176,7 @@ function addTurretRow(data = {}) {
     </div>
     <div class="upload-slot" data-slot="${id}">
       <div class="thumb">none</div>
-      <div class="meta"><div class="name">No file chosen</div><div class="status">turret sprite</div></div>
+      <div class="meta"><div class="name">No file chosen</div><div class="status">turret sprite - transparent PNG works best</div></div>
       <input type="file" accept="image/*" style="width:auto">
     </div>
     <div class="row" style="margin-top:10px;">
@@ -1199,6 +1214,23 @@ function updateGameStyleUI() {
   document.querySelectorAll('.controlled-by-field').forEach((el) => { el.style.display = turnBased ? 'block' : 'none'; });
 }
 gameStyleSelect.addEventListener('change', updateGameStyleUI);
+
+// ---------------------------------------------------------------------
+// Optional "gold per round" - a flat amount every faction gets handed
+// automatically at the start of each round, on top of normal mining
+// income. Off by default (the checkbox, not just a 0 amount, so it's a
+// real opt-in rather than something a map-maker could leave on by
+// accident with a stray number in an empty-looking field).
+// ---------------------------------------------------------------------
+const goldPerRoundEnabled = document.getElementById('goldPerRoundEnabled');
+const goldPerRoundField = document.getElementById('goldPerRoundField');
+const goldPerRoundHint = document.getElementById('goldPerRoundHint');
+function updateGoldPerRoundUI() {
+  const on = goldPerRoundEnabled.checked;
+  goldPerRoundField.style.display = on ? 'block' : 'none';
+  goldPerRoundHint.style.display = on ? 'block' : 'none';
+}
+goldPerRoundEnabled.addEventListener('change', updateGoldPerRoundUI);
 
 // ---------------------------------------------------------------------
 // Computer players: 1-5 factions (AI by default; Turn-Based mode can
@@ -1381,6 +1413,10 @@ async function buildMapDoc(status) {
     mapSize: document.getElementById('mapSize').value || 'medium',
     gameStyle: document.getElementById('gameStyle').value || 'realtime',
     turnTimerSeconds: Math.max(10, Math.min(60, Number(document.getElementById('turnTimerSeconds').value) || 30)),
+    // 0 whenever the checkbox is off, regardless of whatever's typed in
+    // the amount field - play.html only needs to check "> 0", no
+    // separate enabled flag to keep in sync with it.
+    goldPerRound: goldPerRoundEnabled.checked ? Math.max(1, Number(document.getElementById('goldPerRoundAmount').value) || 100) : 0,
     backgroundImage: uploadResults.backgroundImage,
     player: {
       name: document.getElementById('goodName').value.trim() || 'Allied Forces',
@@ -1607,6 +1643,9 @@ async function loadExistingMap() {
   document.getElementById('mapSize').value = m.mapSize || 'medium';
   document.getElementById('gameStyle').value = m.gameStyle || 'realtime';
   document.getElementById('turnTimerSeconds').value = m.turnTimerSeconds || 30;
+  goldPerRoundEnabled.checked = !!m.goldPerRound;
+  document.getElementById('goldPerRoundAmount').value = m.goldPerRound || 100;
+  updateGoldPerRoundUI();
   if (m.backgroundImage) showExistingAsset('backgroundImage', m.backgroundImage);
 
   if (m.player) {

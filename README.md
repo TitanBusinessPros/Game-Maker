@@ -40,6 +40,15 @@ appear) — a genuinely separate, self-contained game per map.
    "Controlled by: 🤖 AI / 🧑 Human (hot-seat)" toggle - a human-flagged
    one takes a real turn instead of thinking on its own. Real-Time mode
    never shows either control; every computer player there is always AI.
+2b. **Gold per round** (optional, off by default) — a checkbox ("Give
+   everyone free gold each round") plus an amount. When on, every
+   faction (you and every computer player, alive ones only) gets handed
+   that much gold automatically at the start of each round - on top of
+   normal mining income, not instead of it. "Round" means the same
+   thing the top bar's "Round N" already means in Turn-Based mode
+   (once every faction has taken a turn); in Real-Time mode, which has
+   no separate round concept, it fires on the existing 90s cosmetic
+   turn-clock instead.
 3. **Resource & mining** — the deposit every home base gets nearby (name,
    size, art - a real "mine" image, separate from the vessel that works
    it) and the mining unit that drains it (name, income/hour, art).
@@ -173,7 +182,15 @@ entirely by one map's saved data:
   shows its own live income right above it on the map itself, not just
   in the top HUD ("⛏ +900/hr" / "⛏ en route…" on a solid chip so it
   reads clearly over any background), same idea as the source game's
-  own display.
+  own display. No cap on how many you can build any more (the Build
+  panel row shows a running count instead of ever disabling to
+  "Already built") - each one parked in range adds its own full income
+  share, so more miners genuinely means more income, not wasted gold.
+  A faction's AI always gets its first miner as soon as it can, then
+  only occasionally builds more (10%/tick, capped at 3) so it doesn't
+  neglect its army. And an enemy's miner is a real click-to-attack
+  target now too - it always had real HP and could always be killed by
+  an AI, a player just had no way to actually order an attack on one.
 - Laser beams on every attack, colored per unit type from an 8-color
   palette (colors repeat past 8 types).
 - Units rotate to face their actual direction of travel.
