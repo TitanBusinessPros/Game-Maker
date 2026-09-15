@@ -138,7 +138,9 @@ entirely by one map's saved data:
     frozen until their own turn comes back around. A per-faction timer
     (10-60s, set on the map) counts down and then passes control to the
     next faction automatically - "no continued [global] timer," just
-    each faction's own window. The top bar shows whose turn it is and
+    each faction's own window - or a **⏭ Skip Turn** button next to the
+    timer ends it early on purpose, same effect as the timer running out
+    on its own. The top bar shows whose turn it is and
     the seconds left; the camera snaps to their home base when it
     becomes their turn. A unit that attacks here locks for the rest of
     that faction's turn (one attack per turn, not per 90s clock-turn -

@@ -240,6 +240,7 @@
     <div id="topbarCenter">
       <div id="hudRow"></div>
       <span id="turnLabel"></span>
+      <button id="skipTurnBtn" style="display:none; align-self:flex-start;">⏭ Skip Turn</button>
     </div>
     <div id="topbarActions">
       <button id="pauseBtn">⏸️ Pause</button>
@@ -1968,6 +1969,17 @@ async function main() {
     const help = document.getElementById('turnModeHelp');
     help.style.display = 'block';
     help.innerHTML = `🔄 <strong>Turn-Based mode:</strong> only the faction named at the top can act right now - everyone else is frozen. You get ${TURN_TIMER_SECONDS}s, then control passes to the next faction automatically. Resource income and research keep running in the background for everyone, turn or no turn.`;
+    // Voluntarily end the active faction's turn early instead of
+    // waiting out the full timer - same effect as hotseatTimer running
+    // out (advanceTurn() doesn't care why it's being called), just
+    // player-triggered. Only shown/wired at all in Turn-Based mode -
+    // Real-Time has no per-player turn to skip.
+    const skipBtn = document.getElementById('skipTurnBtn');
+    skipBtn.style.display = 'inline-block';
+    skipBtn.addEventListener('click', () => {
+      if (gameOver || paused || !matchStarted) return;
+      advanceTurn();
+    });
   }
   statusEl.style.display = 'none';
   appEl.classList.add('ready');
