@@ -872,7 +872,19 @@ async function main() {
       });
       if (options.length) startResearch(fac, options.includes('mining_ops') && !fac.research.researched.has('mining_ops') ? 'mining_ops' : options[Math.floor(Math.random() * options.length)]);
     }
-    const hasMiner = units.some((u) => u.alive && u.factionId === fac.id && u.isMiner);
+    // Unlimited Mining Ships are allowed now (no more one-miner cap -
+    // see renderBuildPanel), but an AI can't just use "build one if it
+    // has none" for that any more, or it would spam nothing but miners
+    // forever once mining_ops is researched (it's checked first, ahead
+    // of buildings/units, so it would starve out everything else). The
+    // first miner is still guaranteed as soon as it's affordable - an
+    // AI's economy has to actually start - but beyond that, more
+    // miners are just an occasional low-probability option alongside
+    // its other spending, capped at 3 so it doesn't over-invest there
+    // instead of fielding an army.
+    const minerCount = units.filter((u) => u.alive && u.factionId === fac.id && u.isMiner).length;
+    const wantsFirstMiner = minerCount === 0 && fac.research.researched.has('mining_ops') && fac.resources >= 80;
+    const wantsAnotherMiner = minerCount > 0 && minerCount < 3 && fac.research.researched.has('mining_ops') && fac.resources >= 80 && Math.random() < 0.1;
     // Half the time it can afford one, an AI prioritizes an unbuilt
     // gated building it actually needs (unitCfgs.length) or that's
     // always relevant regardless of units (alwaysShow - Research
@@ -880,7 +892,7 @@ async function main() {
     // to roll it could go the whole match without ever unlocking that
     // building's units, or never researching anything at all.
     const neededBuilding = GATED_BUILDINGS.find((b) => (b.unitCfgs.length || b.alwaysShow) && !fac.built[b.key] && fac.resources >= b.cfg.cost);
-    if (!hasMiner && fac.research.researched.has('mining_ops') && fac.resources >= 80) {
+    if (wantsFirstMiner || wantsAnotherMiner) {
       spawnMiner(fac.id, fac.x - 40, fac.y); fac.resources -= 80;
     } else if (neededBuilding && Math.random() < 0.5) {
       fac.resources -= neededBuilding.cfg.cost; fac.built[neededBuilding.key] = true;
@@ -941,20 +953,30 @@ async function main() {
           if (f === activeFaction) renderBuildPanel();
         }
       }
-      // Income only flows while the miner is actually parked within range
+      // Income only flows while a miner is actually parked within range
       // of its faction's own deposit - matching "a Mining Ship parked
       // within range of a deposit drains it," not "having built one ever
-      // is enough regardless of where it is."
-      const miner = units.find((u) => u.alive && u.factionId === f.id && u.isMiner);
+      // is enough regardless of where it is." Unlimited Mining Ships can
+      // be built now (see renderBuildPanel/aiThink - no more one-miner
+      // cap), so this sums every one of the faction's own miners
+      // currently in range instead of just checking a single ship -
+      // each additional miner parked at the deposit adds its own full
+      // share of income, same as adding more workers to it should.
       const deposit = deposits.find((d) => d.factionId === f.id);
-      const mining = miner && deposit && Math.hypot(miner.x - deposit.x, miner.y - deposit.y) < MINING_RANGE;
-      // NOT named "mining" - nearestEnemy() below has a stray `e.mining`
-      // check of its own (leftover, never actually true before this) that
-      // would start silently exempting an active miner from being
-      // attacked at all if this used that same name. Resource ships are
-      // meant to stay a real, killable target the whole time.
-      if (miner) miner.activelyMining = !!mining; // read by drawUnit for the live income label
-      if (mining) f.resources += (miningRate(f) / 3600) * dt;
+      let minersInRange = 0;
+      units.forEach((u) => {
+        if (!u.alive || u.factionId !== f.id || !u.isMiner) return;
+        // NOT named "mining" - nearestEnemy() below has a stray
+        // `e.mining` check of its own (leftover, never actually true
+        // before this) that would start silently exempting an active
+        // miner from being attacked at all if this used that same name.
+        // Resource ships are meant to stay a real, killable target the
+        // whole time.
+        const inRange = !!deposit && Math.hypot(u.x - deposit.x, u.y - deposit.y) < MINING_RANGE;
+        u.activelyMining = inRange; // read by drawUnit for the live income label
+        if (inRange) minersInRange++;
+      });
+      if (minersInRange > 0) f.resources += (miningRate(f) / 3600) * dt * minersInRange;
       // AI factions only get to act (build/research decisions) during
       // their own turn in Turn-Based mode - frozen the rest of the time,
       // same as a human faction would be. In Real-Time mode this is
@@ -1419,7 +1441,13 @@ async function main() {
       if (Math.hypot(f.x - p.x, f.y - p.y) < HOMEWORLD_SIZE / 2) { target = f; break; }
     }
     if (!target) {
-      target = units.find((u) => u.alive && !u.isMiner && !isAlly(activeFaction.id, u.factionId) && Math.hypot(u.x - p.x, u.y - p.y) < UNIT_SIZE / 2 + 8);
+      // An enemy Mining Ship used to be un-targetable here specifically
+      // (the !u.isMiner exclusion) even though it was always a real,
+      // killable unit everywhere else (AI's own nearestEnemy() never
+      // excluded them) - a player just had no way to actually click one
+      // to order an attack. Reported as "we need to allow the mining
+      // ships to be attacked."
+      target = units.find((u) => u.alive && !isAlly(activeFaction.id, u.factionId) && Math.hypot(u.x - p.x, u.y - p.y) < UNIT_SIZE / 2 + 8);
     }
     sel.forEach((u) => {
       if (isLocked(u)) return; // attacked this turn - can't take a new order yet
@@ -1518,12 +1546,16 @@ async function main() {
     updateHomeHpBar();
     const minerRow = document.createElement('div');
     minerRow.className = 'buildRow';
-    const hasMiner = units.some((u) => u.alive && u.factionId === activeFaction.id && u.isMiner);
+    // No cap - unlimited Mining Ships can be built now, each one adding
+    // its own full income share once parked at the deposit (see the
+    // per-faction income loop in update()). Shows a running count
+    // instead of ever disabling to "Already built".
+    const minerCount = units.filter((u) => u.alive && u.factionId === activeFaction.id && u.isMiner).length;
     const minerUnlocked = activeFaction.research.researched.has('mining_ops');
-    minerRow.innerHTML = `<div class="name">${cfg.miningUnit?.name || 'Mining Ship'}</div><div class="stats">HP ${cfg.miningUnit?.hp || 40} · Cost 80 · ${minerUnlocked ? 'earns resources parked on your deposit' : 'requires Mining Operations research'}</div>`;
+    minerRow.innerHTML = `<div class="name">${cfg.miningUnit?.name || 'Mining Ship'}${minerCount ? ` (${minerCount} built)` : ''}</div><div class="stats">HP ${cfg.miningUnit?.hp || 40} · Cost 80 · ${minerUnlocked ? 'earns resources parked on your deposit - build as many as you want' : 'requires Mining Operations research'}</div>`;
     const minerBtn = document.createElement('button');
-    minerBtn.textContent = hasMiner ? 'Already built' : (minerUnlocked ? 'Build' : 'Locked');
-    minerBtn.disabled = hasMiner || !minerUnlocked || !canAfford(activeFaction, 80);
+    minerBtn.textContent = minerUnlocked ? 'Build' : 'Locked';
+    minerBtn.disabled = !minerUnlocked || !canAfford(activeFaction, 80);
     minerBtn.onclick = () => { activeFaction.resources -= 80; spawnMiner(activeFaction.id, activeFaction.x + 40, activeFaction.y); renderBuildPanel(); };
     minerRow.appendChild(minerBtn);
     el.appendChild(minerRow);
