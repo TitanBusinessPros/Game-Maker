@@ -52,31 +52,27 @@ appear) — a genuinely separate, self-contained game per map.
 3. **Resource & mining** — the deposit every home base gets nearby (name,
    size, art - a real "mine" image, separate from the vessel that works
    it) and the mining unit that drains it (name, income/hour, art).
-   Below that, two more subsections:
-   - **Additional resources** (optional) — a **+ Add resource** button
-     adds another named resource beyond Gold (e.g. Oil, Wood - just a
-     name, no deposit/mining unit of its own). Every unit/turret added
-     below (see item 4) gets a checkbox per resource that currently
-     exists here, with an amount for each one checked - a Tank could
-     read "50 Gold, 100 Oil" if both boxes are checked with those
-     amounts. Adding, removing, or renaming a resource here live-updates
-     every already-added unit/turret's checkboxes (existing checked
-     amounts are preserved; the new/renamed resource just shows up as
-     another row). A resource's id is assigned once when it's added and
-     never reused or derived from its name, same reasoning as
-     `admin.html`'s category ids - a unit's saved cost is keyed by that
-     id, so renaming the resource later must not orphan it.
-   - **Free resources each round** (optional, off by default for every
-     resource) — moved down from this section's old, singular "Gold per
-     round" spot at the top of the checklist and generalized: one
-     checkbox + amount row per resource that currently exists (Gold
-     included). Checking one hands every faction (you and every alive
-     computer player) that much of that resource automatically at the
-     start of each round, on top of Gold's normal mining income (not
-     instead of it). "Round" means the same thing the top bar's
-     "Round N" already means in Turn-Based mode (once every faction has
-     taken a turn); in Real-Time mode, which has no separate round
-     concept, it fires on the existing 90s cosmetic turn-clock instead.
+   Below that, **Additional resources** (optional) — a **+ Add resource**
+   button adds another named resource beyond Gold (e.g. Oil, Wood), each
+   with its own **income per hour** and its own **deposit art** (shown
+   near every home base in `play.html` - see the "Multiple resources"
+   bullet further down). Unlike Gold, an extra resource's income is
+   passive - it's earned automatically every hour, no mining unit or
+   deposit range to manage; the art is just a visual marker for where it
+   "comes from." Every unit/turret added below (see item 4) gets a
+   checkbox per resource that currently exists here, with an amount for
+   each one checked - a Tank could read "50 Gold, 100 Oil" if both boxes
+   are checked with those amounts. Adding, removing, or renaming a
+   resource here live-updates every already-added unit/turret's
+   checkboxes (existing checked amounts are preserved; the new/renamed
+   resource just shows up as another row) - though adding/removing a
+   resource row itself never touches any OTHER resource's own row (each
+   one is its own DOM subtree with a real file upload slot), so a
+   not-yet-saved file picked for one resource survives editing another.
+   A resource's id is assigned once when it's added and never reused or
+   derived from its name, same reasoning as `admin.html`'s category ids -
+   a unit's saved cost is keyed by that id, so renaming the resource
+   later must not orphan it.
 4. **Air Base** (optional) — a building for planes/jets/spaceships/etc.
    Give it a name (defaults to "Air Base"), its own **art**, **HP**
    (1000-5000, same range/field as Home Base's), and a build cost, then
@@ -148,6 +144,19 @@ appear) — a genuinely separate, self-contained game per map.
    click.
 5. **Sounds** — background music, intro music, attack/building-destroyed/
    home-base-under-attack/game-over sfx. All optional, all `.mp3`.
+5a. **Free Resources Each Round** (optional) — its own section now (moved
+   down from a single "Gold per round" checkbox that used to sit at the
+   top of the checklist, under item 2), sitting right before My Maps.
+   One checkbox + amount row per resource that currently exists (Gold
+   plus anything added under item 3's Additional Resources). Checking
+   one hands every faction (you and every alive computer player) that
+   much of that resource automatically at the start of each round, on
+   top of Gold's normal mining income and any extra resource's own
+   passive income (not instead of either). "Round" means the same thing
+   the top bar's "Round N" already means in Turn-Based mode (once every
+   faction has taken a turn); in Real-Time mode, which has no separate
+   round concept, it fires on the existing 90s cosmetic turn-clock
+   instead.
 6. **My Maps** — every map saved under your signed-in account, draft or
    finished, with Edit/▶ Play/Delete.
 
@@ -181,12 +190,19 @@ entirely by one map's saved data:
   combat units and Gun Turrets use this multi-resource system - Gated
   buildings' own one-time unlock cost, the Mining Ship's flat cost, and
   research costs are all still plain Gold, unchanged. Gold is the only
-  resource mining ever produces; every other resource only ever grows
-  through the "Free resources each round" grant (see item 3's `index.html`
-  bullet above) - there's no deposit/mining-unit mechanic for anything
-  but Gold. A map saved before multiple resources existed still loads
-  and plays identically (its one flat `cost` number is read as a Gold
-  cost, and its old single `goldPerRound` value becomes a Gold grant).
+  resource an actual mining unit ever drains from a deposit (parked
+  within range, same as always); every other resource earns its
+  own income/hour automatically and continuously instead - no unit or
+  range to manage - plus whatever "Free resources each round" (item 5a)
+  adds on top. Each extra resource also gets its own deposit marker
+  drawn near every home base (`index.html`'s per-resource art upload) -
+  purely a visual "this is where it comes from," not an interactive
+  object; a resource added with no art falls back to a plain circle + 💎,
+  same graceful-fallback treatment every other optional image gets
+  elsewhere in this file. A map saved before multiple resources existed
+  still loads and plays identically (its one flat `cost` number is read
+  as a Gold cost, and its old single `goldPerRound` value becomes a
+  Gold grant).
 - **Two game styles**, picked at map-creation time:
   - **Real-Time** (default) - a 90-second cosmetic turn clock; a unit
     that attacks fires exactly once, then locks (can't take a new move

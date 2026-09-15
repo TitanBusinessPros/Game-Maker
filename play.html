@@ -525,14 +525,18 @@ async function main() {
   const turretImages = await Promise.all(turretDefs.map((t) => loadImage(t.imageUrl)));
 
   // Multiple named resources (index.html's "+ Add resource" under
-  // Resource & Mining) - Gold always exists (it's what mining produces,
-  // and every pre-existing map already assumes it), cfg.resources adds
-  // any others a map-maker defined (e.g. Oil). Extra resources have no
-  // deposit/mining unit of their own - the only way to earn them is the
-  // per-resource "free each round" grant below (cfg.resourceGrants),
-  // same as Gold Per Round always worked, just generalized to N
-  // resources instead of exactly one.
+  // Resource & Mining) - Gold always exists (it's what the Mining Ship
+  // produces, and every pre-existing map already assumes it), cfg.resources
+  // adds any others a map-maker defined (e.g. Oil), each with its own
+  // income/hour and deposit art. Unlike Gold, an extra resource's income
+  // is passive - no Mining Ship or deposit range to manage, it just
+  // accrues every tick (see the income loop in update()); its deposit
+  // image is purely a visual marker near each faction's home (see
+  // extraDeposits below), not an interactive/mineable object. On top of
+  // that, any resource (Gold included) can also hand out a flat "free
+  // each round" grant (cfg.resourceGrants) - see applyResourceGrants().
   const EXTRA_RESOURCES = cfg.resources || [];
+  const EXTRA_RESOURCE_IMAGES = await Promise.all(EXTRA_RESOURCES.map((r) => loadImage(r.image)));
   const ALL_RESOURCE_IDS = ['gold', ...EXTRA_RESOURCES.map((r) => r.id)];
   const RESOURCE_NAMES = Object.fromEntries([['gold', 'Gold'], ...EXTRA_RESOURCES.map((r) => [r.id, r.name || 'Resource'])]);
   function freshWallet() {
@@ -654,6 +658,16 @@ async function main() {
   const worldW = worldMaxX - worldMinX, worldH = worldMaxY - worldMinY;
 
   const deposits = factions.map((f) => ({ factionId: f.id, x: f.x, y: f.y - 100, size: cfg.resource?.size || 5000 }));
+  // One deposit marker per extra resource per faction - purely a visual
+  // "this is where it comes from" (no range/mining-unit interaction, see
+  // the passive income loop in update()), laid out in a row below home
+  // base so they don't overlap Gold's own deposit (above home, y-100) or
+  // any of the GATED_BUILDINGS (which sit at |offset| <= 140).
+  const extraDeposits = factions.flatMap((f) => EXTRA_RESOURCES.map((r, i) => ({
+    factionId: f.id, resourceId: r.id,
+    x: f.x + (i - (EXTRA_RESOURCES.length - 1) / 2) * 90, y: f.y + 200,
+    img: EXTRA_RESOURCE_IMAGES[i],
+  })));
 
   const units = [];
   let nextUnitId = 1;
@@ -1192,6 +1206,11 @@ async function main() {
         if (inRange) minersInRange++;
       });
       if (minersInRange > 0) f.resources.gold += (miningRate(f) / 3600) * dt * minersInRange;
+      // Extra resources are passive (see EXTRA_RESOURCES' own comment
+      // above) - no deposit range or unit to manage, every faction just
+      // earns its stated income/hour continuously, same conditions as
+      // Gold's own income line right above.
+      EXTRA_RESOURCES.forEach((r) => { f.resources[r.id] = (f.resources[r.id] || 0) + ((Number(r.incomePerHour) || 0) / 3600) * dt; });
       // AI factions only get to act (build/research decisions) during
       // their own turn in Turn-Based mode - frozen the rest of the time,
       // same as a human faction would be. In Real-Time mode this is
@@ -1443,6 +1462,23 @@ async function main() {
       ctx.drawImage(resourceImg, p.x - fit.w / 2, p.y - fit.h / 2, fit.w, fit.h);
     } else { ctx.fillStyle = '#e8b93a'; ctx.beginPath(); ctx.arc(p.x, p.y, size / 2, 0, 7); ctx.fill(); }
   }
+  // Same idea as drawDeposit() above, just per-item image (d.img) instead
+  // of the one global resourceImg, since there can be several of these
+  // now - falls back to a plain circle + 💎 the same way a missing image
+  // falls back everywhere else in this file (gated buildings, turrets).
+  function drawExtraDeposit(d) {
+    const p = toScreen(d.x, d.y);
+    const size = DEPOSIT_SIZE * camera.zoom;
+    if (d.img) {
+      const fit = fittedSize(d.img, size);
+      ctx.drawImage(d.img, p.x - fit.w / 2, p.y - fit.h / 2, fit.w, fit.h);
+    } else {
+      ctx.fillStyle = '#8a94ad';
+      ctx.beginPath(); ctx.arc(p.x, p.y, size / 2, 0, 7); ctx.fill();
+      ctx.font = `${Math.round(size * 0.5)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('💎', p.x, p.y);
+    }
+  }
   // Air Base/War Factory/etc used to be drawn here as a purely
   // decorative marker near the homeworld, not a real unit - replaced by
   // spawnGatedBuildingEntity() pushing a real entity into `units`, drawn
@@ -1647,6 +1683,7 @@ async function main() {
     }
 
     for (const d of deposits) drawDeposit(d);
+    for (const d of extraDeposits) drawExtraDeposit(d);
     for (const f of factions) if (f.hp > 0) drawFactionHome(f);
     for (const u of units) if (u.alive) drawUnit(u);
     drawEffects();

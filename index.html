@@ -408,12 +408,7 @@
       <div id="extraResourcesList"></div>
       <button type="button" class="btn-add" id="addResourceBtn">+ Add resource</button>
     </div>
-    <p class="hint">Gold is always available - it's what the mining unit above produces, and every unit/turret can already cost it. Add more named resources (Oil, Wood, whatever fits your theme) if you want some units to also require them: each unit/turret below gets a checkbox per resource here, with how much of it that one costs.</p>
-    <div class="field" style="margin-top:18px; padding-top:14px; border-top:1px solid var(--border);">
-      <label>Free resources each round (optional)</label>
-      <div id="resourceGrantsList"></div>
-    </div>
-    <p class="hint">Check any resource above to have every player (you and every computer player) automatically receive that much of it at the start of each round, on top of normal Gold mining income - off by default for every resource.</p>
+    <p class="hint">Gold is always available - it's what the mining unit above produces, and every unit/turret can already cost it. Add more named resources (Oil, Wood, whatever fits your theme) if you want some units to also require them: each one gets its own income per hour (earned automatically, no mining unit needed) and its own deposit art shown near every home base. Every unit/turret below then gets a checkbox per resource here, with how much of it that one costs.</p>
   </section>
 
   <!-- Combat Units: replaced by Air Base / War Factory below as the way
@@ -578,6 +573,13 @@
         <div class="upload-slot" data-slot="soundEndgame"><div class="thumb">none</div><div class="meta"><div class="name">No file chosen</div><div class="status">win/loss</div></div><input type="file" accept="audio/*" style="width:auto"></div>
       </div>
     </div>
+  </section>
+
+  <!-- 5a. Free resources each round -->
+  <section class="section" id="sec-resource-grants">
+    <h2><span class="num">5a</span> Free Resources Each Round (optional)</h2>
+    <p class="hint">Check any resource below to have every player (you and every computer player) automatically receive that much of it at the start of each round, on top of normal Gold mining income - off by default for every resource. This list always includes Gold plus anything added under Resource &amp; Mining above.</p>
+    <div id="resourceGrantsList"></div>
   </section>
 
   <!-- 6. My maps -->
@@ -1265,37 +1267,71 @@ gameStyleSelect.addEventListener('change', updateGameStyleUI);
 // reasoning as admin.html's category ids - a saved unit's costs are
 // keyed by id, so renaming a resource later must not orphan them.
 // ---------------------------------------------------------------------
-let extraResources = []; // [{id, name}]
+let extraResources = []; // [{id, name}] - just enough to drive allResources()/checkbox labels; income/image live in the DOM, read at save time (see collectExtraResources)
 let resourceCounter = 0;
 function allResources() { return [{ id: 'gold', name: 'Gold', builtin: true }, ...extraResources]; }
 
-function renderExtraResourcesList() {
-  const el = document.getElementById('extraResourcesList');
-  el.innerHTML = extraResources.map((r, i) => `
-    <div class="row" style="align-items:center; gap:8px; margin-bottom:6px;">
-      <div class="field"><input type="text" class="resource-name" value="${escapeAttr(r.name)}" placeholder="e.g. Oil" data-idx="${i}"></div>
-      <button type="button" class="remove-unit resource-remove" data-idx="${i}" title="Remove resource">&times;</button>
+// One row per resource, added/removed individually rather than the whole
+// list being wiped and rebuilt on every change - a resource row now
+// carries a real file upload slot (deposit art), and a full rebuild
+// would blow away any file a user had just picked (but not yet
+// uploaded) in every OTHER resource's row, since a <input type=file>'s
+// chosen file lives only in that DOM node, nowhere else. Same reasoning
+// as why unit rows are never wiped and rebuilt as a group either.
+function addExtraResourceRow(r) {
+  const row = document.createElement('div');
+  row.className = 'resource-row';
+  row.dataset.resourceId = r.id;
+  row.style.marginBottom = '14px';
+  row.innerHTML = `
+    <div class="row" style="align-items:flex-end;">
+      <div class="field"><label>Resource name</label><input type="text" class="resource-name" value="${escapeAttr(r.name || '')}" placeholder="e.g. Oil"></div>
+      <div class="field narrow"><label>Income per hour</label><input type="number" class="resource-rate" value="${r.incomePerHour ?? 300}" min="1" step="10"></div>
+      <button type="button" class="remove-unit resource-remove" title="Remove resource">&times;</button>
     </div>
-  `).join('');
-  el.querySelectorAll('.resource-name').forEach((input) => {
-    input.addEventListener('input', () => {
-      extraResources[Number(input.dataset.idx)].name = input.value;
-      refreshAllCostUI(); // every unit/turret checkbox label + the grants section show this resource's name live
-    });
+    <div class="upload-slot" data-slot="${r.id}">
+      <div class="thumb">none</div>
+      <div class="meta"><div class="name">No file chosen</div><div class="status">deposit art shown near each home base (optional)</div></div>
+      <input type="file" accept="image/*" style="width:auto">
+    </div>
+  `;
+  row.querySelector('.resource-name').addEventListener('input', () => {
+    r.name = row.querySelector('.resource-name').value;
+    refreshAllCostUI(); // every unit/turret checkbox label + the grants section show this resource's name live
   });
-  el.querySelectorAll('.resource-remove').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      extraResources.splice(Number(btn.dataset.idx), 1);
-      renderExtraResourcesList();
-      refreshAllCostUI();
-    });
+  row.querySelector('.remove-unit').addEventListener('click', () => {
+    delete existingAssetUrls[r.id];
+    extraResources = extraResources.filter((x) => x.id !== r.id);
+    row.remove();
+    refreshAllCostUI();
   });
+  wireUploadSlot(row.querySelector('.upload-slot'));
+  document.getElementById('extraResourcesList').appendChild(row);
+  if (r.image) showExistingAsset(r.id, r.image);
+  return row;
 }
 document.getElementById('addResourceBtn').addEventListener('click', () => {
-  extraResources.push({ id: 'resource_' + (resourceCounter++), name: '' });
-  renderExtraResourcesList();
+  const r = { id: 'resource_' + (resourceCounter++), name: '' };
+  extraResources.push(r);
+  addExtraResourceRow(r);
   refreshAllCostUI();
 });
+// Read directly from the DOM at save time (name/income/uploaded image),
+// same pattern as collectUnitRows/collectTurrets/collectComputers below -
+// more robust than trusting extraResources' own `.name` mirror (kept in
+// sync only for the live checkbox-label updates above) to also be
+// correct for everything else.
+function collectExtraResources(uploadResults) {
+  return Array.from(document.querySelectorAll('#extraResourcesList .resource-row')).map((row) => {
+    const id = row.dataset.resourceId;
+    return {
+      id,
+      name: row.querySelector('.resource-name').value.trim() || 'Resource',
+      incomePerHour: Number(row.querySelector('.resource-rate').value) || 300,
+      image: uploadResults[id] || null,
+    };
+  });
+}
 
 // Free resources each round - one checkbox+amount row per resource that
 // currently exists (Gold included), replacing the old single "gold per
@@ -1533,7 +1569,8 @@ async function buildMapDoc(status) {
   const heliUnitSlots = Array.from(heliUnitList.querySelectorAll('.unit-row')).map((row) => row.dataset.unitId);
   const turretSlots = Array.from(turretList.querySelectorAll('.unit-row')).map((row) => row.dataset.unitId);
   const computerSlots = Array.from(computerList.querySelectorAll('.computer-row')).map((row) => row.dataset.computerId);
-  const uploadResults = await uploadSlotsWithLimit([...FIXED_UPLOAD_SLOTS, ...unitSlots, ...airUnitSlots, ...warUnitSlots, ...infantryUnitSlots, ...heliUnitSlots, ...turretSlots, ...computerSlots]);
+  const resourceSlots = Array.from(document.querySelectorAll('#extraResourcesList .resource-row')).map((row) => row.dataset.resourceId);
+  const uploadResults = await uploadSlotsWithLimit([...FIXED_UPLOAD_SLOTS, ...unitSlots, ...airUnitSlots, ...warUnitSlots, ...infantryUnitSlots, ...heliUnitSlots, ...turretSlots, ...computerSlots, ...resourceSlots]);
   const units = collectUnits(uploadResults);
   const airUnits = collectAirUnits(uploadResults);
   const warUnits = collectWarUnits(uploadResults);
@@ -1549,14 +1586,15 @@ async function buildMapDoc(status) {
     mapSize: document.getElementById('mapSize').value || 'medium',
     gameStyle: document.getElementById('gameStyle').value || 'realtime',
     turnTimerSeconds: Math.max(10, Math.min(60, Number(document.getElementById('turnTimerSeconds').value) || 30)),
-    // Extra named resources beyond Gold (id/name only - see
-    // allResources()), and which ones (Gold included) hand out a free
-    // amount each round - only resources actually checked appear here,
-    // so play.html just needs Object.entries(...), no separate enabled
-    // flag to keep in sync with it. Replaces the old single goldPerRound
-    // number (still read as a fallback by play.html for a map saved
-    // before this was generalized).
-    resources: extraResources.map((r) => ({ id: r.id, name: r.name.trim() || 'Resource' })),
+    // Extra named resources beyond Gold - each with its own passive
+    // income/hour and deposit art (see collectExtraResources) - and
+    // which ones (Gold included) hand out a free amount each round -
+    // only resources actually checked appear here, so play.html just
+    // needs Object.entries(...), no separate enabled flag to keep in
+    // sync with it. Replaces the old single goldPerRound number (still
+    // read as a fallback by play.html for a map saved before this was
+    // generalized).
+    resources: collectExtraResources(uploadResults),
     resourceGrants: currentGrantsFromDOM(),
     backgroundImage: uploadResults.backgroundImage,
     player: {
@@ -1797,7 +1835,8 @@ async function loadExistingMap() {
     const match = /^resource_(\d+)$/.exec(r.id);
     return match ? Math.max(max, Number(match[1]) + 1) : max;
   }, 0);
-  renderExtraResourcesList();
+  document.getElementById('extraResourcesList').innerHTML = '';
+  if (Array.isArray(m.resources)) m.resources.forEach((r) => addExtraResourceRow(r));
   // m.resourceGrants is the current shape; m.goldPerRound is a fallback
   // for a map saved before this was generalized to multiple resources
   // (it only ever meant a flat Gold amount).
