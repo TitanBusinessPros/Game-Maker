@@ -212,16 +212,34 @@ compresses them the same way `index.html` does, and writes to Firestore
 by the rules below (checked directly: an unauthorized session's write is
 actually rejected, not just hidden in the UI), not just a client check.
 
-Categories are hierarchical: **Maps**, **Characters** (with a sub-picker
-for **Space Ships**, **Navy Ships**, **Jets**, **Army Men** - stored as
-`characters/<type>`), **Worlds**, **Bases**, **Sounds**. The "Current
-library" list renders these as real nested sections (a Characters heading
-with its four sub-headings under it), and anything uploaded under an
-older flat category before this structure existed still shows up under
+Categories are hierarchical: **Maps**, **Characters** (sub-picker:
+**Space Ships**, **Navy Ships**, **Planes and Jets**, **Helicopters**,
+**Army Men**, **Infantry**, **Artillery** - stored as `characters/<type>`),
+**Worlds**, **Bases**, **Resources** (flat, no sub-picker), **Structures**
+(sub-picker: **War Factory**, **Airport**, **Infantry Post**, **Research
+Facility** - `structures/<type>`), **Sounds** (sub-picker: **Background
+Music**, **Intro Music**, **Attack**, **Building Destroyed**, **Home Base
+Under Attack**, **Game Over** - `sounds/<type>`). Any top-level category
+with `children` in `CATEGORY_TREE` gets this same sub-picker UI - it used
+to be hardcoded to just Characters, generalized once Structures and
+Sounds needed one too, so adding another sub-picker later only means
+editing `CATEGORY_TREE`, not the picker UI itself. Sub-category **ids**
+are never renamed once items can exist under them, even when a label
+changes (Jets' id is still `characters/jets` even though its label is now
+"Planes and Jets") - otherwise already-uploaded art under the old id
+would silently fall into "Other" instead of staying findable. The
+"Current library" list renders these as real nested sections, and
+anything uploaded under an older/removed category still shows up under
 an "Other" section instead of disappearing. `index.html`'s library picker
-groups by whatever category string it finds, so it reflects this
-hierarchy automatically - it also has a label map so tabs read
-"Space Ships" instead of the raw `characters/space_ships` id.
+groups by whatever category string it finds (same picker for every
+upload slot, not filtered per-slot - all image categories show as tabs
+for any image slot, all sound sub-categories for any sound slot), so it
+reflects this hierarchy automatically - it also has a matching label map
+so tabs read "Space Ships" instead of the raw `characters/space_ships`
+id. `index.html`'s own Sounds section (map-basics checklist item 5, not
+the library) also got subsection headings (Music / Combat SFX / Event &
+Warning SFX) grouping its 6 upload slots, separate from - but named to
+match - the library's own sound sub-categories.
 
 `window.__ADMIN_DEBUG` (CATEGORY_TREE / renderLibraryInto / currentCategory,
 read-only) is left in for the same reason as `play.html`'s `__GM_DEBUG` -

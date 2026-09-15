@@ -68,6 +68,8 @@
     flex: none;
   }
   .section .hint { color: var(--text-dim); font-size: 12px; margin: 0 0 14px; }
+  .section .subhead { font-size: 13px; font-weight: 600; color: var(--text-dim); margin: 18px 0 8px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .section .subhead:first-of-type { margin-top: 0; padding-top: 0; border-top: none; }
 
   .row { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
   .field { flex: 1 1 220px; min-width: 0; }
@@ -431,6 +433,8 @@
   <section class="section" id="sec-audio">
     <h2><span class="num">5</span> Sounds</h2>
     <p class="hint">All optional, all .mp3. Skip any you don't have &mdash; the engine just won't play that cue.</p>
+
+    <h3 class="subhead">🎵 Music</h3>
     <div class="row">
       <div class="field">
         <label>Background music</label>
@@ -441,6 +445,8 @@
         <div class="upload-slot" data-slot="soundIntro"><div class="thumb">none</div><div class="meta"><div class="name">No file chosen</div><div class="status">plays once at start</div></div><input type="file" accept="audio/*" style="width:auto"></div>
       </div>
     </div>
+
+    <h3 class="subhead">💥 Combat SFX</h3>
     <div class="row">
       <div class="field">
         <label>Attack / weapon fire sfx</label>
@@ -451,6 +457,8 @@
         <div class="upload-slot" data-slot="soundBuildingDestroyed"><div class="thumb">none</div><div class="meta"><div class="name">No file chosen</div><div class="status">per building lost</div></div><input type="file" accept="audio/*" style="width:auto"></div>
       </div>
     </div>
+
+    <h3 class="subhead">📢 Event / Warning SFX</h3>
     <div class="row">
       <div class="field">
         <label>Home Base under attack sfx</label>
@@ -680,13 +688,33 @@ const CATEGORY_LABELS = {
   maps: 'Maps',
   'characters/space_ships': 'Space Ships',
   'characters/navy_ships': 'Navy Ships',
-  'characters/jets': 'Jets',
+  'characters/jets': 'Planes and Jets',
+  'characters/helicopters': 'Helicopters',
   'characters/army_men': 'Army Men',
+  'characters/infantry': 'Infantry',
+  'characters/artillery': 'Artillery',
   worlds: 'Worlds',
   bases: 'Bases',
+  resources: 'Resources',
+  'structures/war_factory': 'War Factory',
+  'structures/airport': 'Airport',
+  'structures/infantry_post': 'Infantry Post',
+  'structures/research_facility': 'Research Facility',
+  'sounds/music': 'Background Music',
+  'sounds/intro': 'Intro Music',
+  'sounds/attack': 'Attack',
+  'sounds/building_destroyed': 'Building Destroyed',
+  'sounds/home_under_attack': 'Home Base Under Attack',
+  'sounds/endgame': 'Game Over',
   sounds: 'Sounds',
 };
-const CATEGORY_ORDER = ['maps', 'characters/space_ships', 'characters/navy_ships', 'characters/jets', 'characters/army_men', 'worlds', 'bases', 'sounds'];
+const CATEGORY_ORDER = [
+  'maps',
+  'characters/space_ships', 'characters/navy_ships', 'characters/jets', 'characters/helicopters', 'characters/army_men', 'characters/infantry', 'characters/artillery',
+  'worlds', 'bases', 'resources',
+  'structures/war_factory', 'structures/airport', 'structures/infantry_post', 'structures/research_facility',
+  'sounds/music', 'sounds/intro', 'sounds/attack', 'sounds/building_destroyed', 'sounds/home_under_attack', 'sounds/endgame', 'sounds',
+];
 
 let libraryManifest = [];
 async function loadLibraryManifest() {

@@ -88,17 +88,14 @@
             <option value="characters">Characters</option>
             <option value="worlds">Worlds</option>
             <option value="bases">Bases</option>
+            <option value="resources">Resources</option>
+            <option value="structures">Structures</option>
             <option value="sounds">Sounds (mp3)</option>
           </select>
         </div>
         <div class="field" id="subCategoryField">
-          <label for="subCategorySelect">Character type</label>
-          <select id="subCategorySelect">
-            <option value="characters/space_ships">Space Ships</option>
-            <option value="characters/navy_ships">Navy Ships</option>
-            <option value="characters/jets">Jets</option>
-            <option value="characters/army_men">Army Men</option>
-          </select>
+          <label for="subCategorySelect" id="subCategoryLabel">Sub-category</label>
+          <select id="subCategorySelect"></select>
         </div>
       </div>
       <div class="field" style="margin-bottom:14px;">
@@ -211,41 +208,77 @@ onAuthStateChanged(auth, (user) => {
 });
 
 // ---------------------------------------------------------------------
-// Category select: Maps / Characters (with a Space Ships / Navy Ships /
-// Jets / Army Men sub-picker) / Worlds / Bases / Sounds. Character items
-// are stored under a "characters/<type>" category id so the map
-// creator's library picker (which just groups by whatever category
-// string it sees) naturally shows them as their own sub-groups too.
+// Category tree + display labels, shared by the "Current library"
+// grouping below so headings read as "Characters > Space Ships" instead
+// of the raw "characters/space_ships" id, and legacy items from before
+// any of this restructuring (old flat categories like "ships" or
+// "planets") still show up under "Other" instead of silently vanishing.
+// Sub-category ids are deliberately never renamed once items exist under
+// them (only labels change) - Jets kept its id below even though its
+// label changed, so previously-uploaded jet art doesn't get silently
+// orphaned into "Other".
 // ---------------------------------------------------------------------
-const topCategorySelect = document.getElementById('topCategorySelect');
-const subCategoryField = document.getElementById('subCategoryField');
-const subCategorySelect = document.getElementById('subCategorySelect');
-topCategorySelect.addEventListener('change', () => {
-  subCategoryField.style.display = topCategorySelect.value === 'characters' ? 'block' : 'none';
-});
-subCategoryField.style.display = topCategorySelect.value === 'characters' ? 'block' : 'none';
-
-function currentCategory() {
-  return topCategorySelect.value === 'characters' ? subCategorySelect.value : topCategorySelect.value;
-}
-
-// Category tree + display labels, shared by the "Current library" grouping
-// below so headings read as "Characters > Space Ships" instead of the raw
-// "characters/space_ships" id, and legacy items from before this
-// restructuring (old flat categories like "ships" or "planets") still show
-// up under "Other" instead of silently vanishing.
 const CATEGORY_TREE = [
   { id: 'maps', label: 'Maps' },
   { id: 'characters', label: 'Characters', children: [
     { id: 'characters/space_ships', label: 'Space Ships' },
     { id: 'characters/navy_ships', label: 'Navy Ships' },
-    { id: 'characters/jets', label: 'Jets' },
+    { id: 'characters/jets', label: 'Planes and Jets' },
+    { id: 'characters/helicopters', label: 'Helicopters' },
     { id: 'characters/army_men', label: 'Army Men' },
+    { id: 'characters/infantry', label: 'Infantry' },
+    { id: 'characters/artillery', label: 'Artillery' },
   ] },
   { id: 'worlds', label: 'Worlds' },
   { id: 'bases', label: 'Bases' },
-  { id: 'sounds', label: 'Sounds' },
+  { id: 'resources', label: 'Resources' },
+  { id: 'structures', label: 'Structures', children: [
+    { id: 'structures/war_factory', label: 'War Factory' },
+    { id: 'structures/airport', label: 'Airport' },
+    { id: 'structures/infantry_post', label: 'Infantry Post' },
+    { id: 'structures/research_facility', label: 'Research Facility' },
+  ] },
+  { id: 'sounds', label: 'Sounds', children: [
+    { id: 'sounds/music', label: 'Background Music' },
+    { id: 'sounds/intro', label: 'Intro Music' },
+    { id: 'sounds/attack', label: 'Attack' },
+    { id: 'sounds/building_destroyed', label: 'Building Destroyed' },
+    { id: 'sounds/home_under_attack', label: 'Home Base Under Attack' },
+    { id: 'sounds/endgame', label: 'Game Over' },
+  ] },
 ];
+
+// ---------------------------------------------------------------------
+// Category select: any top-level entry in CATEGORY_TREE that has
+// `children` gets a sub-picker (Characters, Structures, and Sounds all
+// do now - originally this was hardcoded to just Characters). The
+// sub-select's own options are generated from that entry's children
+// instead of being separately hand-written in the HTML, so adding a new
+// sub-category only ever means editing CATEGORY_TREE in one place.
+// ---------------------------------------------------------------------
+const topCategorySelect = document.getElementById('topCategorySelect');
+const subCategoryField = document.getElementById('subCategoryField');
+const subCategorySelect = document.getElementById('subCategorySelect');
+const subCategoryLabel = document.getElementById('subCategoryLabel');
+
+function updateSubCategoryUI() {
+  const top = CATEGORY_TREE.find((t) => t.id === topCategorySelect.value);
+  const children = top?.children || [];
+  if (!children.length) {
+    subCategoryField.style.display = 'none';
+    return;
+  }
+  subCategoryField.style.display = 'block';
+  subCategoryLabel.textContent = `${top.label} type`;
+  subCategorySelect.innerHTML = children.map((c) => `<option value="${c.id}">${c.label}</option>`).join('');
+}
+topCategorySelect.addEventListener('change', updateSubCategoryUI);
+updateSubCategoryUI();
+
+function currentCategory() {
+  const top = CATEGORY_TREE.find((t) => t.id === topCategorySelect.value);
+  return top?.children?.length ? subCategorySelect.value : topCategorySelect.value;
+}
 
 // ---------------------------------------------------------------------
 // Upload: same 5-at-a-time pattern proven in the main map creator, plus a
