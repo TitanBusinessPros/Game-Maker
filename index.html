@@ -1119,6 +1119,10 @@ const turretCounterState = { n: 0 };
 const WEAPON_OPTIONS = [
   ['laser', '⚡ Laser'], ['bullet', '🔫 Bullet'], ['explosion', '💥 Explosion'],
   ['missile', '🚀 Missile'], ['arrow', '🏹 Arrow'], ['melee', '⚔️ Melee Slash'],
+  ['flamethrower', '🔥 Flamethrower'], ['lightning', '🌩️ Lightning Bolt'],
+  ['poison', '🧪 Poison Spray'], ['ice', '❄️ Ice Shard'], ['railgun', '📡 Railgun'],
+  ['grenade', '💣 Grenade Toss'], ['shockwave', '🔊 Shockwave'], ['cannonball', '🎱 Cannonball'],
+  ['javelin', '🔱 Javelin'], ['whip', '🪢 Whip'],
 ];
 function weaponOptionsHtml(selected) {
   return WEAPON_OPTIONS.map(([v, label]) => `<option value="${v}" ${(selected || 'laser') === v ? 'selected' : ''}>${label}</option>`).join('');

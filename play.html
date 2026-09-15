@@ -761,6 +761,25 @@ async function main() {
   // `kind` on each pushed effect is what drawEffects() actually
   // switches on, so an explosion/missile pair (missile leaves a trail
   // AND bursts on impact) is just two effects pushed from one shot.
+  // World-space jagged path between two points, used by the Lightning
+  // weapon effect - `segments` intermediate points each nudged sideways
+  // by a random amount so the bolt reads as a crooked arc instead of a
+  // straight line, computed once per shot (not per frame - see the
+  // 'lightning' case above).
+  function jaggedPoints(x1, y1, x2, y2, segments) {
+    const pts = [{ x: x1, y: y1 }];
+    const dx = x2 - x1, dy = y2 - y1;
+    const len = Math.hypot(dx, dy) || 1;
+    const nx = -dy / len, ny = dx / len; // unit vector perpendicular to the line
+    for (let i = 1; i < segments; i++) {
+      const t = i / segments;
+      const jitter = (Math.random() - 0.5) * len * 0.15;
+      pts.push({ x: x1 + dx * t + nx * jitter, y: y1 + dy * t + ny * jitter });
+    }
+    pts.push({ x: x2, y: y2 });
+    return pts;
+  }
+
   const effects = [];
   function fireWeaponEffect(u, t) {
     const color = EFFECT_COLORS[Math.max(0, u.defIndex) % EFFECT_COLORS.length];
@@ -781,6 +800,40 @@ async function main() {
         break;
       case 'melee':
         effects.push({ kind: 'melee', x: x2, y: y2, color, ttl: 0.2, life: 0.2 });
+        break;
+      case 'flamethrower':
+        effects.push({ kind: 'flamethrower', x1, y1, x2, y2, color, ttl: 0.2, life: 0.2 });
+        break;
+      case 'lightning':
+        // Jagged points computed once here (world space, since the
+        // target barely moves in this effect's ~0.15s life) rather than
+        // re-randomized every drawEffects() frame - a bolt that
+        // reshapes itself each frame reads as noise, not a jagged arc.
+        effects.push({ kind: 'lightning', pts: jaggedPoints(x1, y1, x2, y2, 5), color, ttl: 0.15, life: 0.15 });
+        break;
+      case 'poison':
+        effects.push({ kind: 'poison', x: x2, y: y2, color, ttl: 0.3, life: 0.3 });
+        break;
+      case 'ice':
+        effects.push({ kind: 'ice', x1, y1, x2, y2, color, ttl: 0.22, life: 0.22 });
+        break;
+      case 'railgun':
+        effects.push({ kind: 'railgun', x1, y1, x2, y2, color, ttl: 0.14, life: 0.14 });
+        break;
+      case 'grenade':
+        effects.push({ kind: 'grenade', x1, y1, x2, y2, color, ttl: 0.3, life: 0.3 });
+        break;
+      case 'shockwave':
+        effects.push({ kind: 'shockwave', x: x2, y: y2, color, ttl: 0.3, life: 0.3 });
+        break;
+      case 'cannonball':
+        effects.push({ kind: 'cannonball', x1, y1, x2, y2, color, ttl: 0.22, life: 0.22 });
+        break;
+      case 'javelin':
+        effects.push({ kind: 'javelin', x1, y1, x2, y2, color, ttl: 0.22, life: 0.22 });
+        break;
+      case 'whip':
+        effects.push({ kind: 'whip', x1, y1, x2, y2, color, ttl: 0.14, life: 0.14 });
         break;
       default: // 'laser', or anything unrecognized
         effects.push({ kind: 'laser', x1, y1, x2, y2, color, ttl: 0.18, life: 0.18 });
@@ -1421,6 +1474,110 @@ async function main() {
           ctx.lineTo(p.x + Math.cos(ang) * radius, p.y + Math.sin(ang) * radius);
           ctx.stroke();
         }
+      } else if (e.kind === 'flamethrower') {
+        // A handful of jittered dots along the path, widening toward the
+        // target (a cone), re-randomized every frame on purpose - a
+        // flame spray is supposed to flicker, unlike a stable bolt.
+        const p1 = toScreen(e.x1, e.y1), p2 = toScreen(e.x2, e.y2);
+        for (let i = 0; i < 7; i++) {
+          const t = 0.1 + (i / 7) * 0.8;
+          const spread = t * 10 * camera.zoom;
+          const bx = p1.x + (p2.x - p1.x) * t + (Math.random() - 0.5) * spread;
+          const by = p1.y + (p2.y - p1.y) * t + (Math.random() - 0.5) * spread;
+          ctx.beginPath(); ctx.arc(bx, by, (2 + Math.random() * 2.5) * camera.zoom, 0, 7); ctx.fill();
+        }
+      } else if (e.kind === 'lightning') {
+        // e.pts is precomputed world-space (see jaggedPoints()) - just
+        // project each point through the current camera and stroke
+        // through them, so panning/zooming mid-flash still looks right.
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        e.pts.forEach((pt, i) => {
+          const p = toScreen(pt.x, pt.y);
+          if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+        });
+        ctx.stroke();
+      } else if (e.kind === 'poison') {
+        const p = toScreen(e.x, e.y);
+        const r = 9 * camera.zoom;
+        ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, 7); ctx.fill();
+        for (let i = 0; i < 4; i++) {
+          const ang = (i / 4) * Math.PI * 2 + Math.random() * 0.5;
+          const dist = r * (1 + Math.random());
+          ctx.beginPath(); ctx.arc(p.x + Math.cos(ang) * dist, p.y + Math.sin(ang) * dist, 2.5 * camera.zoom, 0, 7); ctx.fill();
+        }
+      } else if (e.kind === 'ice') {
+        const p1 = toScreen(e.x1, e.y1), p2 = toScreen(e.x2, e.y2);
+        ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+        for (let i = 0; i < 5; i++) {
+          const ang = (i / 5) * Math.PI * 2;
+          ctx.beginPath();
+          ctx.moveTo(p2.x, p2.y);
+          ctx.lineTo(p2.x + Math.cos(ang) * 9 * camera.zoom, p2.y + Math.sin(ang) * 9 * camera.zoom);
+          ctx.stroke();
+        }
+      } else if (e.kind === 'railgun') {
+        const p1 = toScreen(e.x1, e.y1), p2 = toScreen(e.x2, e.y2);
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+        ctx.beginPath(); ctx.arc(p1.x, p1.y, 4 * camera.zoom, 0, 7); ctx.fill();
+        ctx.beginPath(); ctx.arc(p2.x, p2.y, 4 * camera.zoom, 0, 7); ctx.fill();
+      } else if (e.kind === 'grenade') {
+        const p1 = toScreen(e.x1, e.y1), p2 = toScreen(e.x2, e.y2);
+        // Quadratic curve bowed upward (a lofted arc) instead of the
+        // straight lines every other travel effect uses, so it reads as
+        // "thrown" rather than "shot."
+        const midX = (p1.x + p2.x) / 2, midY = (p1.y + p2.y) / 2 - 30 * camera.zoom;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.quadraticCurveTo(midX, midY, p2.x, p2.y); ctx.stroke();
+        ctx.setLineDash([]);
+        const gProgress = 1 - e.ttl / e.life;
+        const gRadius = (4 + gProgress * 16) * camera.zoom;
+        ctx.beginPath(); ctx.arc(p2.x, p2.y, gRadius, 0, 7); ctx.stroke();
+      } else if (e.kind === 'shockwave') {
+        const p = toScreen(e.x, e.y);
+        const sProgress = 1 - e.ttl / e.life;
+        ctx.lineWidth = 2;
+        [0, 0.3].forEach((delay) => {
+          const rp = Math.max(0, sProgress - delay);
+          if (rp <= 0) return;
+          ctx.beginPath(); ctx.arc(p.x, p.y, rp * 26 * camera.zoom, 0, 7); ctx.stroke();
+        });
+      } else if (e.kind === 'cannonball') {
+        const p1 = toScreen(e.x1, e.y1), p2 = toScreen(e.x2, e.y2);
+        const cProgress = Math.min(1, (1 - e.ttl / e.life) * 1.4);
+        const bx = p1.x + (p2.x - p1.x) * cProgress, by = p1.y + (p2.y - p1.y) * cProgress;
+        ctx.beginPath(); ctx.arc(bx, by, 5 * camera.zoom, 0, 7); ctx.fill();
+        if (cProgress >= 1) {
+          for (let i = 0; i < 4; i++) {
+            const ang = (i / 4) * Math.PI * 2;
+            ctx.beginPath();
+            ctx.arc(p2.x + Math.cos(ang) * 6 * camera.zoom, p2.y + Math.sin(ang) * 6 * camera.zoom, 2 * camera.zoom, 0, 7);
+            ctx.fill();
+          }
+        }
+      } else if (e.kind === 'javelin') {
+        const p1 = toScreen(e.x1, e.y1), p2 = toScreen(e.x2, e.y2);
+        const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+        // Longer shaft than Arrow's (0.35 vs 0.55) - a heavier thrown
+        // weapon reads as spanning more of the distance, not a short dart.
+        const shaftStart = { x: p1.x + (p2.x - p1.x) * 0.35, y: p1.y + (p2.y - p1.y) * 0.35 };
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(shaftStart.x, shaftStart.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+        ctx.save();
+        ctx.translate(p2.x, p2.y); ctx.rotate(angle);
+        ctx.beginPath(); ctx.moveTo(8, 0); ctx.lineTo(0, 3); ctx.lineTo(-6, 0); ctx.lineTo(0, -3); ctx.closePath(); ctx.fill();
+        ctx.restore();
+      } else if (e.kind === 'whip') {
+        const p1 = toScreen(e.x1, e.y1), p2 = toScreen(e.x2, e.y2);
+        const dx = p2.x - p1.x, dy = p2.y - p1.y;
+        // Control point bowed perpendicular to the line (a "lash" curve),
+        // not lofted upward like Grenade's - a whip snaps sideways, not up.
+        const midX = (p1.x + p2.x) / 2 - dy * 0.25, midY = (p1.y + p2.y) / 2 + dx * 0.25;
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.quadraticCurveTo(midX, midY, p2.x, p2.y); ctx.stroke();
       }
       ctx.globalAlpha = 1;
     }

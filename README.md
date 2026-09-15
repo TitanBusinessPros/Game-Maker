@@ -225,22 +225,38 @@ entirely by one map's saved data:
   target now too - it always had real HP and could always be killed by
   an AI, a player just had no way to actually order an attack on one.
 - Every attack draws a **weapon effect** picked per unit (a **Weapon**
-  dropdown on each unit/turret row in `index.html`: Laser, Bullet,
-  Explosion, Missile, Arrow, or Melee Slash - defaults to Laser, so any
-  map saved before this field existed keeps its original beam with no
-  change). Purely cosmetic - it only changes what gets drawn, never
-  damage, range, or attack timing, which all still happen the instant
-  the target's in range same as before. Laser is the original full beam;
-  Bullet is a short tracer near the target only; Explosion is a burst
-  drawn at the impact point with no travel line at all; Missile draws a
-  thicker trail plus an Explosion burst on arrival; Arrow draws a small
-  triangle "arrowhead" angled toward its direction of travel; Melee
-  Slash draws a short arc at the target instead of anything traveling.
-  All six are drawn entirely with canvas shapes (`drawEffects()` in
-  `play.html`) - none of them need or use an uploaded image, same as the
-  original laser never did; only the unit's own sprite is art you
-  provide. Every type still uses the same per-unit-type color as before
-  (an 8-color palette, repeating past 8 unit types).
+  dropdown on each unit/turret row in `index.html`, 16 options - defaults
+  to Laser, so any map saved before this field existed keeps its
+  original beam with no change). Purely cosmetic - it only changes what
+  gets drawn, never damage, range, or attack timing, which all still
+  happen the instant the target's in range same as before. All 16 are
+  drawn entirely with canvas shapes (`drawEffects()` in `play.html`) -
+  none of them need or use an uploaded image, same as the original laser
+  never did; only the unit's own sprite is art you provide. Every type
+  still uses the same per-unit-type color as before (an 8-color palette,
+  repeating past 8 unit types) - none of these hardcode their own color
+  (no "orange" flamethrower, no "green" poison) so that stays true.
+  The original six: Laser (the original full beam), Bullet (a short
+  tracer near the target only), Explosion (a burst at the impact point,
+  no travel line), Missile (a thicker trail plus an Explosion burst on
+  arrival), Arrow (a small triangle arrowhead angled toward its
+  direction of travel), Melee Slash (a short arc at the target, nothing
+  traveling). Ten more: Flamethrower (a flickering, re-randomized-every-
+  frame spray of dots widening toward the target - the one effect that's
+  deliberately noisy instead of stable), Lightning Bolt (a jagged path,
+  computed once per shot - see `jaggedPoints()` - not per frame, so the
+  bolt doesn't visibly reshape itself while it's on screen), Poison
+  Spray (a splash blob with a few drip particles at the impact point),
+  Ice Shard (a thin travel line plus a 5-point crystal-spike burst on
+  arrival), Railgun (an ultra-thin line with a bright flash circle at
+  both the origin and the impact point), Grenade Toss (a dashed
+  quadratic-curve arc bowed upward - "thrown," not "shot" - plus a burst
+  on landing), Shockwave (two concentric rings expanding from the
+  impact point on a staggered delay, no travel line), Cannonball (a
+  single heavy dot that travels then bursts into a small dust-puff ring
+  on arrival), Javelin (like Arrow but a longer shaft and a diamond
+  head, reading as a heavier thrown weapon), Whip (a quadratic curve
+  bowed sideways rather than upward - a lash, not a lob).
 - Units rotate to face their actual direction of travel. A faction's
   home base art itself slowly spins in place, but only when the map's
   `baseLabel` field (checklist item 1's "Home Base is called a...")
