@@ -165,10 +165,15 @@ entirely by one map's saved data:
 - **Mining ships auto-travel**: built next to your own deposit, a miner
   immediately gets a move order there on its own - no manual command
   needed - and income only flows while it's actually parked within range
-  of the deposit, not just for existing somewhere on the map. It's a
-  real, killable unit (40 HP) the whole time, and now shows its own live
-  income right above it ("⛏ +900/hr" / "⛏ en route…"), same idea as the
-  source game's own display.
+  of the deposit, not just for existing somewhere on the map. Its HP is
+  a real per-map setting now (index.html's "Mining unit HP" field,
+  defaults to 40, gets the same HP-research bonus every other unit
+  does) shown right in the Build panel row, not a number only baked
+  into the engine - it's a real, killable unit the whole time. It also
+  shows its own live income right above it on the map itself, not just
+  in the top HUD ("⛏ +900/hr" / "⛏ en route…" on a solid chip so it
+  reads clearly over any background), same idea as the source game's
+  own display.
 - Laser beams on every attack, colored per unit type from an 8-color
   palette (colors repeat past 8 types).
 - Units rotate to face their actual direction of travel.

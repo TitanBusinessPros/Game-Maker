@@ -674,9 +674,15 @@ async function main() {
     // in the whole update loop moved a miner at all, regardless of any
     // order it held).
     const deposit = deposits.find((d) => d.factionId === factionId);
+    const fac = factionOf(factionId);
+    // HP is a real per-map setting now (index.html's "Mining unit HP"
+    // field), same effectiveStat() HP-research bonus every other unit
+    // gets - not a fixed 40 baked into the engine. Falls back to 40 for
+    // a map saved before this field existed.
+    const hp = Math.round(effectiveStat(fac, cfg.miningUnit?.hp || 40, 'hp'));
     const u = {
       id: nextUnitId++, factionId, defIndex: -1, isMiner: true,
-      hp: 40, maxHp: 40, attack: 0, range: 0, speed: 1.6,
+      hp, maxHp: hp, attack: 0, range: 0, speed: 1.6,
       img: miningImg, x, y, alive: true, selected: false,
       orderType: deposit ? 'move' : null, moveTarget: deposit ? { x: deposit.x, y: deposit.y } : null,
       target: null, lockedUntilTurn: 0, facingAngle: 0,
@@ -1100,8 +1106,24 @@ async function main() {
     // shown for enemies - seeing an opponent's live income would be more
     // intel than this game gives you anywhere else.
     if (u.isMiner && isAlly(activeFaction.id, u.factionId)) {
-      ctx.fillStyle = '#ffd24a'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center';
-      ctx.fillText(u.activelyMining ? `⛏ +${miningRate(factionOf(u.factionId))}/hr` : '⛏ en route…', p.x, p.y - size / 2 - 12);
+      // A solid dark chip behind the text, not just bare fillText on
+      // whatever the background happens to be - easy to lose against a
+      // busy map background or a bright unit sprite otherwise. Bigger
+      // and bolder than a normal label on purpose, so it reads as its
+      // own thing at a glance instead of blending in with HP bars/lock
+      // icons. save/restore so textBaseline (needed to center the chip
+      // vertically on the text) doesn't leak into any other text drawn
+      // later this frame.
+      ctx.save();
+      const label = u.activelyMining ? `⛏ +${miningRate(factionOf(u.factionId))}/hr` : '⛏ en route…';
+      const labelY = p.y - size / 2 - 16;
+      ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      const w = ctx.measureText(label).width;
+      ctx.fillStyle = 'rgba(6,18,31,0.85)';
+      ctx.fillRect(p.x - w / 2 - 6, labelY - 10, w + 12, 20);
+      ctx.fillStyle = '#ffd24a';
+      ctx.fillText(label, p.x, labelY);
+      ctx.restore();
     }
   }
   function drawDeposit(d) {
@@ -1447,7 +1469,7 @@ async function main() {
     minerRow.className = 'buildRow';
     const hasMiner = units.some((u) => u.alive && u.factionId === activeFaction.id && u.isMiner);
     const minerUnlocked = activeFaction.research.researched.has('mining_ops');
-    minerRow.innerHTML = `<div class="name">${cfg.miningUnit?.name || 'Mining Ship'}</div><div class="stats">Cost 80 · ${minerUnlocked ? 'earns resources parked on your deposit' : 'requires Mining Operations research'}</div>`;
+    minerRow.innerHTML = `<div class="name">${cfg.miningUnit?.name || 'Mining Ship'}</div><div class="stats">HP ${cfg.miningUnit?.hp || 40} · Cost 80 · ${minerUnlocked ? 'earns resources parked on your deposit' : 'requires Mining Operations research'}</div>`;
     const minerBtn = document.createElement('button');
     minerBtn.textContent = hasMiner ? 'Already built' : (minerUnlocked ? 'Build' : 'Locked');
     minerBtn.disabled = hasMiner || !minerUnlocked || !canAfford(activeFaction, 80);

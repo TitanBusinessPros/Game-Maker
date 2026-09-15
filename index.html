@@ -365,6 +365,10 @@
         <label>Income per hour</label>
         <input type="number" id="miningRate" value="600" min="1" step="10">
       </div>
+      <div class="field narrow">
+        <label>Mining unit HP</label>
+        <input type="number" id="miningUnitHp" value="40" min="1">
+      </div>
     </div>
     <div class="field">
       <label>Mining unit art</label>
@@ -1378,6 +1382,7 @@ async function buildMapDoc(status) {
     miningUnit: {
       name: document.getElementById('miningUnitName').value.trim() || 'Mining Ship',
       ratePerHour: Number(document.getElementById('miningRate').value) || 600,
+      hp: Math.max(1, Number(document.getElementById('miningUnitHp').value) || 40),
       image: uploadResults.miningUnitImage,
     },
     units,
@@ -1610,6 +1615,7 @@ async function loadExistingMap() {
   if (m.miningUnit) {
     document.getElementById('miningUnitName').value = m.miningUnit.name || 'Mining Ship';
     document.getElementById('miningRate').value = m.miningUnit.ratePerHour || 600;
+    document.getElementById('miningUnitHp').value = m.miningUnit.hp || 40;
     if (m.miningUnit.image) showExistingAsset('miningUnitImage', m.miningUnit.image);
   }
 
