@@ -757,10 +757,21 @@ async function main() {
     if (turnMode) u.attackedThisTurn = true;
     else u.lockedUntilTurn = turnNumber + 1;
   }
+  // Turrets use their own short real-time cooldown instead of
+  // isLocked/lockUnit - those enforce "one attack per turn," a
+  // player-balance rule for units you actively command, and a turret
+  // firing autonomously at anything in range for as long as it's within
+  // range isn't that. In Turn-Based mode especially, gating it the same
+  // way would mean u.attackedThisTurn only clears when the turret's own
+  // owner becomes active again, so it would fire once and then go
+  // silent until its owner's turn came back around - exactly the
+  // opposite of "auto shoot at anything in range."
+  const TURRET_ATTACK_COOLDOWN = 1.2;
   function combatTick(u, dt) {
     const t = u.target;
     if (!t || t.hp <= 0 || t.alive === false) { u.target = null; return; }
-    if (isLocked(u)) return;
+    if (u.isTurret) { if (elapsed < (u.turretCooldownUntil || 0)) return; }
+    else if (isLocked(u)) return;
     const dist = Math.hypot(t.x - u.x, t.y - u.y);
     u.facingAngle = facingToward(u, t.x, t.y);
     if (dist > u.range) {
@@ -770,7 +781,8 @@ async function main() {
       t.hp -= u.attack;
       fireBeam(u, t);
       playSfx(sounds.attack);
-      lockUnit(u);
+      if (u.isTurret) u.turretCooldownUntil = elapsed + TURRET_ATTACK_COOLDOWN;
+      else lockUnit(u);
       if (t.hp <= 0) {
         t.hp = 0;
         if (t.maxHp === undefined || t.isFactionHome) playSfx(sounds.homeUnderAttack);
@@ -783,6 +795,7 @@ async function main() {
   factions.forEach((f) => { f.isFactionHome = true; });
 
   let turnTimer = TURN_SECONDS, turnNumber = 1, aiTimer = AI_TICK_SECONDS, fogOn = false;
+  let elapsed = 0; // real seconds since the match started - drives turret attack cooldowns only (see combatTick)
 
   // Centers on the middle of a faction's homeworld AND all its own living
   // units, not just the homeworld - advanceTurn() used to snap straight
@@ -896,6 +909,7 @@ async function main() {
 
   function update(dt) {
     if (paused || gameOver || !matchStarted) return;
+    elapsed += dt;
     if (turnMode) {
       // No continued/global clock in this mode - just each faction's own
       // hot-seat window, counting down in real time.
@@ -957,23 +971,32 @@ async function main() {
     for (const u of units) {
       if (!u.alive) continue;
       const fac = factionOf(u.factionId);
+      if (u.isTurret) {
+        // Checked BEFORE the Turn-Based freeze below, deliberately - a
+        // defensive turret is supposed to protect its owner
+        // autonomously at all times, not just during its owner's own
+        // turn. Freezing it the same as every other unit would mean an
+        // enemy could walk straight through/into its range during any
+        // OTHER faction's turn and it would just sit there doing
+        // nothing until its owner's turn came back around - reported as
+        // "cannons don't auto shoot on all players" (only whichever
+        // faction happened to be active could ever fire theirs). Never
+        // moves (its speed is 0, so combatTick's own out-of-range chase
+        // math always computes zero displacement - it never chases, it
+        // just can't fire until something comes within range on its
+        // own), and always auto-acquires a target instead of waiting on
+        // a human player's click the way a normal owned unit would.
+        if (!u.target || u.target.hp <= 0 || u.target.alive === false) u.target = nearestEnemy(u);
+        if (u.target) combatTick(u, dt);
+        continue;
+      }
       // Turn-Based mode: a faction that isn't the active one is fully
       // frozen - none of its units move, chase, or attack at all,
       // regardless of what orders they're holding. They pick back up
       // exactly where they left off once their turn comes back around.
       // Real-Time mode: always true, so this never changes anything there.
+      // (Turrets are exempt - see above.)
       if (turnMode && fac.id !== activeIdx) continue;
-      if (u.isTurret) {
-        // Fire-and-forget, regardless of who owns it - never moves (its
-        // speed is 0, so combatTick's own out-of-range chase math always
-        // computes zero displacement - it never chases, it just can't
-        // fire until something comes within range on its own), and
-        // always auto-acquires a target instead of waiting on a human
-        // player's click the way a normal owned unit would.
-        if (!u.target || u.target.hp <= 0 || u.target.alive === false) u.target = nearestEnemy(u);
-        if (u.target) combatTick(u, dt);
-        continue;
-      }
       if (u.isMiner) {
         // Nothing moved a miner at all before this - it had orderType/
         // moveTarget fields but this loop only ever branched on
