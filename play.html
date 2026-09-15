@@ -14,14 +14,22 @@
   #topbar {
     position:absolute; top:0; left:0; right:0; z-index:20;
     background:rgba(11,14,20,0.9); border-bottom:1px solid var(--border);
-    display:flex; align-items:center; gap:8px; padding:8px 12px; flex-wrap:wrap; font-size:12px;
+    display:flex; align-items:flex-start; gap:12px; padding:8px 12px; flex-wrap:wrap; font-size:12px;
   }
-  #topbar .spacer { flex:1; }
   #topbar button, #topbar a {
     background:var(--panel2); color:var(--text); border:1px solid var(--border); border-radius:6px;
     padding:6px 9px; font-size:11px; cursor:pointer; text-decoration:none; white-space:nowrap;
   }
+  /* Left = map title, fixed. Middle = HUD + turn status, grows/wraps to
+     fill whatever's left. Right = every action button (Pause through the
+     panel toggle) as one cluster, pinned to the right edge via
+     margin-left:auto and wrapping as its own group on narrow screens
+     instead of interleaving with the middle section. */
+  #topbarLeft { flex:none; display:flex; align-items:center; padding-top:6px; }
+  #topbarCenter { flex:1 1 240px; min-width:0; display:flex; flex-direction:column; gap:4px; padding-top:4px; }
+  #topbarActions { flex:none; display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end; margin-left:auto; }
   #hudRow { display:flex; gap:8px; flex-wrap:wrap; font-size:11px; }
+  #turnLabel { font-size:11px; color:var(--dim); }
   canvas { display:block; background:#06121f; }
   #sidePanel {
     position:absolute; top:0; right:0; bottom:0; width:320px; max-width:88vw;
@@ -103,20 +111,22 @@
 
 <div id="app">
   <div id="topbar">
-    <strong id="mapTitleLabel">Map</strong>
-    <span class="spacer"></span>
-    <div id="hudRow"></div>
-    <span class="spacer"></span>
-    <span id="turnLabel"></span>
-    <button id="pauseBtn">⏸️ Pause</button>
-    <button id="soundBtn">🔈 Sound</button>
-    <button id="fogBtn">🌫️ Fog: Off</button>
-    <button id="saveBtn">💾 Save</button>
-    <label style="background:var(--panel2); border:1px solid var(--border); border-radius:6px; padding:6px 9px; font-size:11px; cursor:pointer;">
-      📂 Load<input id="loadInput" type="file" accept=".json" style="display:none;">
-    </label>
-    <button id="downloadBtn">⬇ index.html</button>
-    <button id="panelToggleBtn">☰</button>
+    <div id="topbarLeft"><strong id="mapTitleLabel">Map</strong></div>
+    <div id="topbarCenter">
+      <div id="hudRow"></div>
+      <span id="turnLabel"></span>
+    </div>
+    <div id="topbarActions">
+      <button id="pauseBtn">⏸️ Pause</button>
+      <button id="soundBtn">🔈 Sound</button>
+      <button id="fogBtn">🌫️ Fog: Off</button>
+      <button id="saveBtn">💾 Save</button>
+      <label style="background:var(--panel2); border:1px solid var(--border); border-radius:6px; padding:6px 9px; font-size:11px; cursor:pointer;">
+        📂 Load<input id="loadInput" type="file" accept=".json" style="display:none;">
+      </label>
+      <button id="downloadBtn">⬇ index.html</button>
+      <button id="panelToggleBtn">☰</button>
+    </div>
   </div>
 
   <canvas id="canvas"></canvas>
@@ -338,6 +348,7 @@ async function main() {
   let activeIdx = 0;
   let activeFaction = player;
   let hotseatTimer = TURN_TIMER_SECONDS;
+  let moveNumber = 1; // counts every individual turn taken by anyone, starting at the first player's first turn
 
   const worldMinX = Math.min(...factions.map((f) => f.x)) - 400;
   const worldMaxX = Math.max(...factions.map((f) => f.x)) + 400;
@@ -484,6 +495,25 @@ async function main() {
 
   let turnTimer = TURN_SECONDS, turnNumber = 1, aiTimer = AI_TICK_SECONDS, fogOn = false;
 
+  // Centers on the middle of a faction's homeworld AND all its own living
+  // units, not just the homeworld - advanceTurn() used to snap straight
+  // to f.x/f.y every turn, which meant any troops that had advanced away
+  // from home landed off-screen (and un-selectable, box-select included)
+  // the instant control came back to that faction. They weren't actually
+  // stuck - they just couldn't be seen or clicked - which is exactly
+  // "troops locked up and wouldn't move on multiple turns even though
+  // the same player had other troops that WERE allowed to move" (the
+  // ones still near home, still in view, kept getting new orders fine).
+  function factionViewCenter(f) {
+    const own = livingUnits(f.id);
+    if (!own.length) return { x: f.x, y: f.y, w: 0, h: 0 };
+    const xs = [f.x, ...own.map((u) => u.x)], ys = [f.y, ...own.map((u) => u.y)];
+    return {
+      x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2,
+      w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys),
+    };
+  }
+
   // Turn-Based mode only: rotate control to the next living faction,
   // wrapping around, and reset everything that's specific to "whose turn
   // is it" - the hot-seat timer, the camera (so whoever's picking up the
@@ -502,7 +532,16 @@ async function main() {
     } while (factions[activeIdx].hp <= 0);
     activeFaction = factions[activeIdx];
     hotseatTimer = TURN_TIMER_SECONDS;
-    camera.x = activeFaction.x; camera.y = activeFaction.y;
+    moveNumber++;
+    const center = factionViewCenter(activeFaction);
+    camera.x = center.x; camera.y = center.y;
+    // Zoom OUT (never in past the normal default) just enough that the
+    // whole spread - homeworld plus every unit, however far they've
+    // advanced - actually fits on screen with some breathing room, so
+    // nothing is left off-screen and unselectable this turn either.
+    const pad = 300;
+    const fitZoom = Math.min(canvas.width / (center.w + pad * 2), canvas.height / (center.h + pad * 2));
+    camera.zoom = Math.min(1, Math.max(ZOOM_MIN, fitZoom));
     livingUnits(activeFaction.id).forEach((u) => { u.attackedThisTurn = false; });
     renderBuildPanel();
     renderResearchPanel();
@@ -785,7 +824,8 @@ async function main() {
     row.innerHTML = factions.map((f) => `<span style="color:${f.color}">${turnMode && f.id === activeIdx ? '👉 ' : ''}${f.name}: ${Math.round(f.hp)} HP · 🪙 ${Math.round(f.resources)} Gold${turnMode ? ` [Team ${f.team}]` : (f.team === player.team ? ' 🤝' : '')}</span>`).join(' ');
     if (turnMode) {
       const secs = Math.max(0, Math.ceil(hotseatTimer));
-      document.getElementById('turnLabel').textContent = `🔄 ${activeFaction.name}'s turn · ${secs}s left`;
+      const round = Math.ceil(moveNumber / factions.length);
+      document.getElementById('turnLabel').textContent = `🔄 Round ${round} · Move ${moveNumber} · ${activeFaction.name}'s turn · ${secs}s left`;
     } else {
       const mins = Math.floor(Math.max(0, turnTimer) / 60), secs = Math.floor(Math.max(0, turnTimer) % 60);
       document.getElementById('turnLabel').textContent = `Turn ${turnNumber} · next in ${mins}:${String(secs).padStart(2, '0')}`;
@@ -1068,7 +1108,7 @@ async function main() {
 
   function serializeState() {
     return {
-      cfg, turnNumber, turnTimer, activeIdx, hotseatTimer,
+      cfg, turnNumber, turnTimer, activeIdx, hotseatTimer, moveNumber,
       factions: factions.map((f) => ({ id: f.id, resources: f.resources, hp: f.hp, team: f.team, researched: [...f.research.researched], active: f.research.active })),
       units: units.filter((u) => u.alive).map((u) => ({ factionId: u.factionId, defIndex: u.defIndex, isMiner: !!u.isMiner, x: u.x, y: u.y, hp: u.hp, maxHp: u.maxHp })),
     };
@@ -1098,6 +1138,7 @@ async function main() {
       activeIdx = data.activeIdx;
       activeFaction = factions[activeIdx];
       hotseatTimer = typeof data.hotseatTimer === 'number' ? data.hotseatTimer : TURN_TIMER_SECONDS;
+      moveNumber = typeof data.moveNumber === 'number' ? data.moveNumber : moveNumber;
     }
     matchStarted = true;
     document.getElementById('teamSelectScreen').classList.remove('show');
@@ -1244,6 +1285,7 @@ async function main() {
   window.__GM_DEBUG = {
     factions, units, deposits, camera, get turnNumber() { return turnNumber; }, toScreen, beams,
     turnMode, get activeFaction() { return activeFaction; }, get hotseatTimer() { return hotseatTimer; },
+    get moveNumber() { return moveNumber; },
   };
 
   const topbarEl = document.getElementById('topbar');
