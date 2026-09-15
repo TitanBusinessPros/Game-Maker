@@ -260,15 +260,15 @@
   <!-- 1. Map basics -->
   <section class="section" id="sec-basics">
     <h2><span class="num">1</span> Map Basics</h2>
-    <p class="hint">The name of this map and what to call a "homeworld" here &mdash; Planet, Island, Base, whatever fits your theme.</p>
+    <p class="hint">The name of this map and what to call a "home base" here &mdash; Home Base, Planet, Island, whatever fits your theme.</p>
     <div class="row">
       <div class="field">
         <label for="mapName">Map name</label>
         <input type="text" id="mapName" placeholder="e.g. Pacific Theater">
       </div>
       <div class="field narrow">
-        <label for="baseLabel">Homeworld is called a&hellip;</label>
-        <input type="text" id="baseLabel" placeholder="Planet / Island / Base" value="Planet">
+        <label for="baseLabel">Home Base is called a&hellip;</label>
+        <input type="text" id="baseLabel" placeholder="Home Base / Planet / Island" value="Home Base">
       </div>
       <div class="field narrow">
         <label for="mapSize">Map size</label>
@@ -315,10 +315,10 @@
       <div class="row">
         <div class="field"><label>Faction name</label><input type="text" id="goodName" value="Allied Forces"></div>
         <div class="field narrow"><label>Color</label><input type="color" id="goodColor" value="#4fdc8f"></div>
-        <div class="field narrow"><label>Homeworld HP</label><input type="number" id="goodHp" value="300" min="100" max="500" step="10"></div>
+        <div class="field narrow"><label>Home Base HP</label><input type="number" id="goodHp" value="2000" min="1000" max="5000" step="100"></div>
       </div>
       <div class="field">
-        <label>Homeworld art</label>
+        <label>Home Base art</label>
         <div class="upload-slot" data-slot="goodBaseImage">
           <div class="thumb">none</div>
           <div class="meta"><div class="name">No file chosen</div><div class="status">required to finish</div></div>
@@ -334,7 +334,7 @@
   <!-- 3. Resource & mining -->
   <section class="section" id="sec-resource">
     <h2><span class="num">3</span> Resource &amp; Mining</h2>
-    <p class="hint">Every homeworld gets one of these nearby. Name it whatever fits &mdash; Gold Mine, Fishing Ground, Oil Rig &mdash; and give it an income rate.</p>
+    <p class="hint">Every home base gets one of these nearby. Name it whatever fits &mdash; Gold Mine, Fishing Ground, Oil Rig &mdash; and give it an income rate.</p>
     <div class="row">
       <div class="field">
         <label>Resource deposit name</label>
@@ -381,6 +381,18 @@
     <button type="button" class="btn-add" id="addUnitBtn">+ Add another unit</button>
   </section>
 
+  <!-- 4a. Air Base -->
+  <section class="section" id="sec-airbase">
+    <h2><span class="num">4a</span> Air Base (optional)</h2>
+    <p class="hint">A second building, separate from the Combat Units above. Name it whatever fits (Air Base, Hangar, Spaceport&hellip;) and give it a build cost. The units you add below it - planes, jets, spaceships, whatever - can't be built until a player actually builds this first. Leave the unit list empty and this whole feature just doesn't show up in-game.</p>
+    <div class="row">
+      <div class="field"><label>Building name</label><input type="text" id="airBaseName" value="Air Base"></div>
+      <div class="field narrow"><label>Build cost</label><input type="number" id="airBaseCost" value="150" min="0" step="10"></div>
+    </div>
+    <div id="airUnitList"></div>
+    <button type="button" class="btn-add" id="addAirUnitBtn">+ Add an air unit</button>
+  </section>
+
   <!-- 5. Audio -->
   <section class="section" id="sec-audio">
     <h2><span class="num">5</span> Sounds</h2>
@@ -407,7 +419,7 @@
     </div>
     <div class="row">
       <div class="field">
-        <label>Homeworld under attack sfx</label>
+        <label>Home Base under attack sfx</label>
         <div class="upload-slot" data-slot="soundHomeUnderAttack"><div class="thumb">none</div><div class="meta"><div class="name">No file chosen</div><div class="status">warning cue</div></div><input type="file" accept="audio/*" style="width:auto"></div>
       </div>
       <div class="field">
@@ -880,13 +892,19 @@ async function uploadSlotsWithLimit(slotKeys) {
 // ---------------------------------------------------------------------
 // Combat units: a repeatable checklist row. Same stat fields the engine
 // itself uses (hp / attack / range / speed / cost) so a saved map can
-// later be dropped straight into the combat resolver unchanged.
+// later be dropped straight into the combat resolver unchanged. Shared
+// by both the regular Combat Units list and the Air Base's own unit
+// list below (makeUnitRow takes which list/id-prefix/counter to use, so
+// this one row-builder serves both instead of two near-duplicate
+// copies).
 // ---------------------------------------------------------------------
 const unitList = document.getElementById('unitList');
-let unitCounter = 0;
+const airUnitList = document.getElementById('airUnitList');
+const unitCounterState = { n: 0 };
+const airUnitCounterState = { n: 0 };
 
-function addUnitRow(data = {}) {
-  const id = 'unit_' + (unitCounter++);
+function makeUnitRow(list, idPrefix, counterState, data = {}) {
+  const id = idPrefix + '_' + (counterState.n++);
   const row = document.createElement('div');
   row.className = 'unit-row';
   row.dataset.unitId = id;
@@ -913,13 +931,19 @@ function addUnitRow(data = {}) {
     row.remove();
   });
   wireUploadSlot(row.querySelector('.upload-slot'));
-  unitList.appendChild(row);
+  list.appendChild(row);
   if (data.imageUrl) showExistingAsset(id, data.imageUrl);
   return row;
 }
+function addUnitRow(data = {}) { return makeUnitRow(unitList, 'unit', unitCounterState, data); }
+function addAirUnitRow(data = {}) { return makeUnitRow(airUnitList, 'airunit', airUnitCounterState, data); }
 
 document.getElementById('addUnitBtn').addEventListener('click', () => addUnitRow());
 addUnitRow({ name: 'Cruiser', hp: 300, attack: 200, range: 500, speed: 2, cost: 400 });
+
+document.getElementById('addAirUnitBtn').addEventListener('click', () => addAirUnitRow());
+// Starts empty on purpose - unlike Combat Units, Air Base is opt-in
+// (see checklistGaps: it's never required to Finish & Save).
 
 // ---------------------------------------------------------------------
 // Game style: Real-Time (default, unchanged) vs Turn-Based hot-seat.
@@ -966,7 +990,7 @@ function addComputerRow(data = {}) {
     <div class="row">
       <div class="field"><label>Faction name</label><input type="text" class="c-name" value="${escapeAttr(data.name || `Hostile Forces ${idx + 1}`)}"></div>
       <div class="field narrow"><label>Color</label><input type="color" class="c-color" value="${data.color || COMPUTER_COLORS[idx % COMPUTER_COLORS.length]}"></div>
-      <div class="field narrow"><label>Homeworld HP</label><input type="number" class="c-hp" value="${data.hp || 300}" min="100" max="500" step="10"></div>
+      <div class="field narrow"><label>Home Base HP</label><input type="number" class="c-hp" value="${data.hp || 2000}" min="1000" max="5000" step="100"></div>
       <div class="field narrow controlled-by-field" style="display:none;">
         <label>Controlled by</label>
         <select class="c-controlledby">
@@ -976,7 +1000,7 @@ function addComputerRow(data = {}) {
       </div>
     </div>
     <div class="field">
-      <label>Homeworld art</label>
+      <label>Home Base art</label>
       <div class="upload-slot" data-slot="${id}">
         <div class="thumb">none</div>
         <div class="meta"><div class="name">No file chosen</div><div class="status">required to finish</div></div>
@@ -1024,13 +1048,13 @@ const FIXED_UPLOAD_SLOTS = [
   'soundMusic', 'soundIntro', 'soundAttack', 'soundBuildingDestroyed', 'soundHomeUnderAttack', 'soundEndgame',
 ];
 
-// Homeworld HP is a real gameplay stat (play.html uses it as both hp and
+// Home Base HP is a real gameplay stat (play.html uses it as both hp and
 // maxHp for the faction), so clamp it here the same way play.html would
-// anyway - a map-maker typing 5000 or -10 shouldn't silently produce a
-// homeworld that plays differently than the 100-500 range promised by
+// anyway - a map-maker typing 50000 or -10 shouldn't silently produce a
+// home base that plays differently than the 1000-5000 range promised by
 // the field itself.
 function clampHomeworldHp(v) {
-  return Math.max(100, Math.min(500, Number(v) || 300));
+  return Math.max(1000, Math.min(5000, Number(v) || 2000));
 }
 function collectComputers(uploadResults) {
   const rows = Array.from(computerList.querySelectorAll('.computer-row'));
@@ -1049,8 +1073,8 @@ function collectComputers(uploadResults) {
   });
 }
 
-function collectUnits(uploadResults) {
-  const rows = Array.from(unitList.querySelectorAll('.unit-row'));
+function collectUnitRows(list, uploadResults) {
+  const rows = Array.from(list.querySelectorAll('.unit-row'));
   return rows.map((row) => {
     const id = row.dataset.unitId;
     return {
@@ -1064,18 +1088,22 @@ function collectUnits(uploadResults) {
     };
   });
 }
+function collectUnits(uploadResults) { return collectUnitRows(unitList, uploadResults); }
+function collectAirUnits(uploadResults) { return collectUnitRows(airUnitList, uploadResults); }
 
 async function buildMapDoc(status) {
   const unitSlots = Array.from(unitList.querySelectorAll('.unit-row')).map((row) => row.dataset.unitId);
+  const airUnitSlots = Array.from(airUnitList.querySelectorAll('.unit-row')).map((row) => row.dataset.unitId);
   const computerSlots = Array.from(computerList.querySelectorAll('.computer-row')).map((row) => row.dataset.computerId);
-  const uploadResults = await uploadSlotsWithLimit([...FIXED_UPLOAD_SLOTS, ...unitSlots, ...computerSlots]);
+  const uploadResults = await uploadSlotsWithLimit([...FIXED_UPLOAD_SLOTS, ...unitSlots, ...airUnitSlots, ...computerSlots]);
   const units = collectUnits(uploadResults);
+  const airUnits = collectAirUnits(uploadResults);
   const computers = collectComputers(uploadResults);
   return {
     ownerId: currentUser.uid,
     status, // 'draft' | 'complete'
     name: document.getElementById('mapName').value.trim() || 'Untitled Map',
-    baseLabel: document.getElementById('baseLabel').value.trim() || 'Planet',
+    baseLabel: document.getElementById('baseLabel').value.trim() || 'Home Base',
     mapSize: document.getElementById('mapSize').value || 'medium',
     gameStyle: document.getElementById('gameStyle').value || 'realtime',
     turnTimerSeconds: Math.max(10, Math.min(60, Number(document.getElementById('turnTimerSeconds').value) || 30)),
@@ -1098,6 +1126,15 @@ async function buildMapDoc(status) {
       image: uploadResults.miningUnitImage,
     },
     units,
+    // Optional - see index.html's Air Base section hint. play.html only
+    // shows the "build the Air Base" gate at all when airUnits actually
+    // has entries; an empty list here means the feature is simply
+    // absent from this map, same as never having added it.
+    airBase: {
+      name: document.getElementById('airBaseName').value.trim() || 'Air Base',
+      cost: Number(document.getElementById('airBaseCost').value) || 150,
+    },
+    airUnits,
     sounds: {
       music: uploadResults.soundMusic,
       intro: uploadResults.soundIntro,
@@ -1113,9 +1150,9 @@ async function buildMapDoc(status) {
 function checklistGaps(mapDoc) {
   const gaps = [];
   if (!mapDoc.name || mapDoc.name === 'Untitled Map') gaps.push('map name');
-  if (!mapDoc.player.baseImage) gaps.push('your faction’s homeworld art');
+  if (!mapDoc.player.baseImage) gaps.push('your faction’s home base art');
   if (mapDoc.computers.length === 0) gaps.push('at least one computer player');
-  mapDoc.computers.forEach((c, i) => { if (!c.baseImage) gaps.push(`computer player #${i + 1} (${c.name}) homeworld art`); });
+  mapDoc.computers.forEach((c, i) => { if (!c.baseImage) gaps.push(`computer player #${i + 1} (${c.name}) home base art`); });
   if (!mapDoc.resource.image) gaps.push('resource deposit art');
   if (!mapDoc.miningUnit.image) gaps.push('mining unit art');
   if (mapDoc.units.length === 0) gaps.push('at least one combat unit');
@@ -1224,7 +1261,7 @@ async function loadExistingMap() {
   if (!snap.exists()) return;
   const m = snap.data();
   document.getElementById('mapName').value = m.name || '';
-  document.getElementById('baseLabel').value = m.baseLabel || 'Planet';
+  document.getElementById('baseLabel').value = m.baseLabel || 'Home Base';
   document.getElementById('mapSize').value = m.mapSize || 'medium';
   document.getElementById('gameStyle').value = m.gameStyle || 'realtime';
   document.getElementById('turnTimerSeconds').value = m.turnTimerSeconds || 30;
@@ -1233,7 +1270,7 @@ async function loadExistingMap() {
   if (m.player) {
     document.getElementById('goodName').value = m.player.name || '';
     document.getElementById('goodColor').value = m.player.color || '#4fdc8f';
-    document.getElementById('goodHp').value = m.player.hp || 300;
+    document.getElementById('goodHp').value = m.player.hp || 2000;
     if (m.player.baseImage) showExistingAsset('goodBaseImage', m.player.baseImage);
   }
   if (Array.isArray(m.computers) && m.computers.length) {
@@ -1257,6 +1294,15 @@ async function loadExistingMap() {
   if (Array.isArray(m.units) && m.units.length) {
     unitList.innerHTML = '';
     m.units.forEach((u) => addUnitRow(u));
+  }
+
+  if (m.airBase) {
+    document.getElementById('airBaseName').value = m.airBase.name || 'Air Base';
+    document.getElementById('airBaseCost').value = m.airBase.cost || 150;
+  }
+  if (Array.isArray(m.airUnits) && m.airUnits.length) {
+    airUnitList.innerHTML = '';
+    m.airUnits.forEach((u) => addAirUnitRow(u));
   }
 
   if (m.sounds) {

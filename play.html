@@ -280,7 +280,7 @@
         <strong>Click the minimap</strong> to jump the camera there - with units selected, it also sends them there.<br>
         A unit that attacks locks in place (can't take a new move order, still keeps firing) until the next turn.<br>
         A <strong>Mining Ship</strong> parked on your deposit earns resources automatically.<br>
-        The match ends when a homeworld's HP reaches 0 - your whole team wins together.
+        The match ends when a home base's HP reaches 0 - your whole team wins together.
       </p>
       <p id="turnModeHelp" style="display:none; font-size:12px; color:var(--dim); line-height:1.6; border-top:1px solid var(--border); padding-top:8px; margin-top:8px;"></p>
     </div>
@@ -414,8 +414,8 @@ const TECH_TREE = {
   rapid_repair: { name: 'Rapid Repair Crews', cost: 500, timeSeconds: 100, prereq: null, effect: 'regen' },
 };
 
-const HOMEWORLD_HP_DEFAULT = 300; // used only as a fallback for a map saved before per-faction homeworld HP existed
-function clampHomeworldHp(v) { return Math.max(100, Math.min(500, Number(v) || HOMEWORLD_HP_DEFAULT)); }
+const HOMEWORLD_HP_DEFAULT = 2000; // used only as a fallback for a map saved before per-faction home base HP existed
+function clampHomeworldHp(v) { return Math.max(1000, Math.min(5000, Number(v) || HOMEWORLD_HP_DEFAULT)); }
 const TURN_SECONDS = 90;
 const MOVE_PX_PER_SPEED = 20;
 const UNIT_SIZE = 34;
@@ -476,7 +476,17 @@ async function main() {
   const playerImg = await loadImage(cfg.player?.baseImage);
   const computerCfgs = cfg.computers || [];
   const computerImgs = await Promise.all(computerCfgs.map((c) => loadImage(c.baseImage)));
-  const unitDefs = cfg.units || [];
+  // Air Base units (index.html's optional 4a section) are merged into
+  // the same unitDefs/unitImages arrays as regular Combat Units - same
+  // defIndex space, so spawnUnit/combatTick/drawUnit/etc. all handle
+  // them with zero extra code. Only isAir distinguishes them, read by
+  // the build panel below to gate them behind hasAirBase.
+  const airBaseCfg = cfg.airBase || { name: 'Air Base', cost: 150 };
+  const airUnitDefs = cfg.airUnits || [];
+  const unitDefs = [
+    ...(cfg.units || []).map((u) => ({ ...u, isAir: false })),
+    ...airUnitDefs.map((u) => ({ ...u, isAir: true })),
+  ];
   const unitImages = await Promise.all(unitDefs.map((u) => loadImage(u.imageUrl)));
 
   const sounds = {
@@ -520,13 +530,14 @@ async function main() {
       img: isPlayer ? playerImg : computerImgs[i - 1],
       x: worldCenter.x + Math.cos(angle) * homeRadius,
       y: worldCenter.y + Math.sin(angle) * homeRadius,
-      // Per-faction, set on the map (index.html's "Homeworld HP" field,
-      // 100-500) - not a single fixed value shared by every homeworld
+      // Per-faction, set on the map (index.html's "Home Base HP" field,
+      // 1000-5000) - not a single fixed value shared by every home base
       // like before. Clamped again here too, the same way index.html
       // clamps it before saving, in case a map predates this field
       // (undefined -> HOMEWORLD_HP_DEFAULT) or was ever hand-edited outside it.
       hp: clampHomeworldHp(src?.hp), maxHp: clampHomeworldHp(src?.hp),
       resources: 1000, research: freshResearch(),
+      hasAirBase: false, // see the Air Base build-panel row / aiThink below
       team: null, // assigned on the team-select screen before the match starts
     });
   }
@@ -759,8 +770,13 @@ async function main() {
     const hasMiner = units.some((u) => u.alive && u.factionId === fac.id && u.isMiner);
     if (!hasMiner && fac.research.researched.has('mining_ops') && fac.resources >= 80) {
       spawnMiner(fac.id, fac.x - 40, fac.y); fac.resources -= 80;
+    } else if (airUnitDefs.length && !fac.hasAirBase && fac.resources >= airBaseCfg.cost && Math.random() < 0.5) {
+      // Half the time it can afford one, prioritize the Air Base over a
+      // random unit - otherwise an AI that never happens to roll it
+      // could go the whole match without ever unlocking its air units.
+      fac.resources -= airBaseCfg.cost; fac.hasAirBase = true;
     } else if (unitDefs.length) {
-      const affordable = unitDefs.map((d, i) => ({ d, i })).filter((x) => fac.resources >= x.d.cost);
+      const affordable = unitDefs.map((d, i) => ({ d, i })).filter((x) => fac.resources >= x.d.cost && (!x.d.isAir || fac.hasAirBase));
       if (affordable.length) {
         const pick = affordable[Math.floor(Math.random() * affordable.length)];
         fac.resources -= pick.d.cost;
@@ -1237,13 +1253,31 @@ async function main() {
     minerBtn.onclick = () => { activeFaction.resources -= 80; spawnMiner(activeFaction.id, activeFaction.x + 40, activeFaction.y); renderBuildPanel(); };
     minerRow.appendChild(minerBtn);
     el.appendChild(minerRow);
+    // Air Base row - only shown at all if the map actually defines air
+    // units (index.html's optional 4a section left empty means this
+    // whole feature is absent, same as before it existed). A one-time
+    // building purchase, same "Build once, then Already built" pattern
+    // as the Mining Ship above - not a placed/attackable world object,
+    // just a per-faction unlock flag (hasAirBase) gating the units below.
+    if (airUnitDefs.length) {
+      const airBaseRow = document.createElement('div');
+      airBaseRow.className = 'buildRow';
+      airBaseRow.innerHTML = `<div class="name">${airBaseCfg.name}</div><div class="stats">Cost ${airBaseCfg.cost} · required before any of its units below can be built</div>`;
+      const airBaseBtn = document.createElement('button');
+      airBaseBtn.textContent = activeFaction.hasAirBase ? 'Already built' : 'Build';
+      airBaseBtn.disabled = activeFaction.hasAirBase || !canAfford(activeFaction, airBaseCfg.cost);
+      airBaseBtn.onclick = () => { activeFaction.resources -= airBaseCfg.cost; activeFaction.hasAirBase = true; renderBuildPanel(); };
+      airBaseRow.appendChild(airBaseBtn);
+      el.appendChild(airBaseRow);
+    }
     unitDefs.forEach((def, i) => {
       const row = document.createElement('div');
       row.className = 'buildRow';
-      row.innerHTML = `<div class="name">${def.name}</div><div class="stats">HP ${def.hp} · ATK ${def.attack} · RNG ${def.range} · SPD ${def.speed} · Cost ${def.cost}</div>`;
+      const locked = def.isAir && !activeFaction.hasAirBase;
+      row.innerHTML = `<div class="name">${def.name}${def.isAir ? ' ✈️' : ''}</div><div class="stats">HP ${def.hp} · ATK ${def.attack} · RNG ${def.range} · SPD ${def.speed} · Cost ${def.cost}${locked ? ` · requires ${airBaseCfg.name}` : ''}</div>`;
       const btn = document.createElement('button');
-      btn.textContent = 'Build';
-      btn.disabled = !canAfford(activeFaction, def.cost);
+      btn.textContent = locked ? 'Locked' : 'Build';
+      btn.disabled = locked || !canAfford(activeFaction, def.cost);
       btn.onclick = () => { activeFaction.resources -= def.cost; spawnUnit(activeFaction.id, i, activeFaction.x + 40 + (Math.random() - 0.5) * 60, activeFaction.y + (Math.random() - 0.5) * 60); renderBuildPanel(); };
       row.appendChild(btn);
       el.appendChild(row);
@@ -1357,7 +1391,7 @@ async function main() {
   function serializeState() {
     return {
       cfg, turnNumber, turnTimer, activeIdx, hotseatTimer, moveNumber,
-      factions: factions.map((f) => ({ id: f.id, resources: f.resources, hp: f.hp, team: f.team, researched: [...f.research.researched], active: f.research.active })),
+      factions: factions.map((f) => ({ id: f.id, resources: f.resources, hp: f.hp, team: f.team, hasAirBase: f.hasAirBase, researched: [...f.research.researched], active: f.research.active })),
       units: units.filter((u) => u.alive).map((u) => ({ factionId: u.factionId, defIndex: u.defIndex, isMiner: !!u.isMiner, x: u.x, y: u.y, hp: u.hp, maxHp: u.maxHp })),
     };
   }
@@ -1375,6 +1409,7 @@ async function main() {
     data.factions.forEach((fd) => {
       const f = factions[fd.id];
       f.resources = fd.resources; f.hp = fd.hp; f.team = fd.team;
+      f.hasAirBase = !!fd.hasAirBase;
       f.research.researched = new Set(fd.researched); f.research.active = fd.active;
     });
     units.length = 0;

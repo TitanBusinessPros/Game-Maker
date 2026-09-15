@@ -26,27 +26,34 @@ appear) — a genuinely separate, self-contained game per map.
 
 ## `index.html` — the checklist
 
-1. **Map basics** — name, what to call a homeworld (Planet/Island/Base/etc),
-   and a **map size** (Tiny / Small = 3× Tiny / Medium = 2× Small /
-   Large = 2× Medium — actually scales homeworld spacing in `play.html`,
-   not just a label).
+1. **Map basics** — name, what to call a home base (Home Base/Planet/
+   Island/etc, defaults to "Home Base"), and a **map size** (Tiny /
+   Small = 3× Tiny / Medium = 2× Small / Large = 2× Medium — actually
+   scales home base spacing in `play.html`, not just a label).
 2. **Your faction & computer players** — you're always the human player;
    add 1-5 computer-controlled opponents, each with its own name, color,
-   homeworld art, and **homeworld HP** (100-500, per faction - not one
-   fixed value shared by every homeworld on the map).
+   home base art, and **Home Base HP** (1000-5000, per faction - not one
+   fixed value shared by every home base on the map).
 2a. **Game style** — ⏱️ Real-Time (default, unchanged) or 🔄 Turn-Based
    (hot-seat: 2-5 people share this device, a timer of 10-60s per turn).
    Turn-Based adds a **turn timer** field and, per computer player, a
    "Controlled by: 🤖 AI / 🧑 Human (hot-seat)" toggle - a human-flagged
    one takes a real turn instead of thinking on its own. Real-Time mode
    never shows either control; every computer player there is always AI.
-3. **Resource & mining** — the deposit every homeworld gets nearby (name,
+3. **Resource & mining** — the deposit every home base gets nearby (name,
    size, art - a real "mine" image, separate from the vessel that works
    it) and the mining unit that drains it (name, income/hour, art).
 4. **Combat units** — add as many as you want, each with hp/attack/range/
    speed/cost - the exact fields `play.html`'s engine reads.
+4a. **Air Base** (optional) — a second building, separate from Combat
+   Units. Give it a name (defaults to "Air Base") and a build cost, then
+   add units under it the same way as Combat Units (planes, jets,
+   spaceships, whatever fits) - `play.html` won't let anyone build those
+   specific units until they've actually built this first. Leave its
+   unit list empty and the whole feature is simply absent from the map,
+   same as never adding it.
 5. **Sounds** — background music, intro music, attack/building-destroyed/
-   homeworld-under-attack/game-over sfx. All optional, all `.mp3`.
+   home-base-under-attack/game-over sfx. All optional, all `.mp3`.
 6. **My Maps** — every map saved under your signed-in account, draft or
    finished, with Edit/▶ Play/Delete.
 
@@ -82,7 +89,7 @@ entirely by one map's saved data:
     (10-60s, set on the map) counts down and then passes control to the
     next faction automatically - "no continued [global] timer," just
     each faction's own window. The top bar shows whose turn it is and
-    the seconds left; the camera snaps to their homeworld when it
+    the seconds left; the camera snaps to their home base when it
     becomes their turn. A unit that attacks here locks for the rest of
     that faction's turn (one attack per turn, not per 90s clock-turn -
     this mode has no such clock at all) and clears again the moment its
@@ -137,10 +144,19 @@ entirely by one map's saved data:
   identical squares rather than one map; a cover-fit single image trades
   some softness on a big map for actually looking like one accurate
   picture.
-- The homeworld's HP is also a real bar at the top of the Build panel
+- The home base's HP is also a real bar at the top of the Build panel
   (updated live every frame), not just the small one floating over its
   canvas sprite - and the resource counter up top is explicitly labeled
   "🪙 ... Gold" instead of a bare, unlabeled number.
+- **Air Base** (optional, set on the map): a second buildable structure,
+  separate from the regular unit list, that has to be built before any
+  of its own units can be. In the Build panel it shows as a one-time
+  purchase ("Build" → "Already built", same pattern as the Mining Ship);
+  its units show as 🔒 Locked with a "requires <Air Base name>" note
+  until that faction actually builds it - even for AI factions, who
+  prioritize building it about half the time they can afford it rather
+  than picking a random unit. A map with no air units defined never
+  shows any of this at all.
 - **⬇ Download as index.html** - packages the map's data inline into a
   fully standalone copy of this page. Verified: opens and runs from
   `file://` with zero network calls.
