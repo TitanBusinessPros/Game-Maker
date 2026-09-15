@@ -1087,12 +1087,26 @@ async function main() {
     return ar >= 1 ? { w: maxSize, h: maxSize / ar } : { w: maxSize * ar, h: maxSize };
   }
 
+  // Only when the map-maker actually called their home base a "Planet"
+  // (index.html's baseLabel field, e.g. "Home Base is called a...") -
+  // not for "Island"/"Base"/whatever else someone typed there. Matches
+  // the source game's own planets slowly spinning in place.
+  const HOME_IS_PLANET = (cfg.baseLabel || '').toLowerCase().includes('planet');
+  const HOME_SPIN_RADIANS_PER_SEC = 0.15; // a full rotation roughly every 42s - slow, planet-like, not a spinning coin
   function drawFactionHome(f) {
     const p = toScreen(f.x, f.y);
     const size = HOMEWORLD_SIZE * camera.zoom;
     if (f.img) {
       const fit = fittedSize(f.img, size);
-      ctx.drawImage(f.img, p.x - fit.w / 2, p.y - fit.h / 2, fit.w, fit.h);
+      if (HOME_IS_PLANET) {
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(elapsed * HOME_SPIN_RADIANS_PER_SEC);
+        ctx.drawImage(f.img, -fit.w / 2, -fit.h / 2, fit.w, fit.h);
+        ctx.restore();
+      } else {
+        ctx.drawImage(f.img, p.x - fit.w / 2, p.y - fit.h / 2, fit.w, fit.h);
+      }
     } else { ctx.fillStyle = f.color; ctx.beginPath(); ctx.arc(p.x, p.y, size / 2, 0, 7); ctx.fill(); }
     const pct = Math.max(0, f.hp / f.maxHp);
     ctx.fillStyle = '#2a3550'; ctx.fillRect(p.x - size / 2, p.y - size / 2 - 10, size, 5);
@@ -1163,11 +1177,25 @@ async function main() {
   // combat target: nothing in nearestEnemy/handleClick's target search
   // looks at these, only at factions and units).
   function drawGatedBuilding(f, b) {
-    if (!f.built[b.key] || !b.img) return;
+    if (!f.built[b.key]) return;
     const p = toScreen(f.x + b.offsetX, f.y + b.offsetY);
     const size = GATED_BUILDING_SIZE * camera.zoom;
-    const fit = fittedSize(b.img, size);
-    ctx.drawImage(b.img, p.x - fit.w / 2, p.y - fit.h / 2, fit.w, fit.h);
+    if (b.img) {
+      const fit = fittedSize(b.img, size);
+      ctx.drawImage(b.img, p.x - fit.w / 2, p.y - fit.h / 2, fit.w, fit.h);
+    } else {
+      // No art uploaded for this building (or it failed to load) used
+      // to mean nothing was drawn at all - a built Infantry Post/etc
+      // with no custom art was completely invisible in-game, reported
+      // as "has no icon to represent it." Every other entity in the
+      // game (homeworld, units, the deposit) already falls back to a
+      // colored shape when its own image is missing - this matches
+      // that same pattern instead of being a silent gap.
+      ctx.fillStyle = f.color; ctx.beginPath(); ctx.arc(p.x, p.y, size / 2, 0, 7); ctx.fill();
+      ctx.font = `${Math.round(size * 0.55)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(b.icon, p.x, p.y);
+      ctx.textBaseline = 'alphabetic';
+    }
   }
   // The valid turret-placement zone (TURRET_MIN_RANGE-TURRET_MAX_RANGE
   // around activeFaction's own Home Base) as two dashed circles, only
