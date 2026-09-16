@@ -363,7 +363,15 @@ async function uploadOneFile(file, category) {
   const path = `library/${category}/${Date.now()}_${file.name}`;
   const ref = storageRef(storage, path);
   const url = await Promise.race([
-    (async () => { await uploadBytes(ref, file); return getDownloadURL(ref); })(),
+    // Date.now() in the path means nothing ever gets overwritten at the
+    // same URL, so a year-long "never revalidate" cache is safe here too
+    // - see the matching comment in index.html's uploadOneFile. Without
+    // this, Storage's own default (private, max-age=0) meant every map
+    // that picks a library asset re-downloads it fresh, from every
+    // visitor, on every single play/edit session, forever - the whole
+    // point of a shared library (reuse) got none of the bandwidth
+    // benefit that should come with it.
+    (async () => { await uploadBytes(ref, file, { cacheControl: 'public, max-age=31536000, immutable' }); return getDownloadURL(ref); })(),
     new Promise((_, reject) => setTimeout(
       () => reject(new Error(`"${file.name}" timed out after ${UPLOAD_TIMEOUT_MS / 1000}s`)),
       UPLOAD_TIMEOUT_MS
