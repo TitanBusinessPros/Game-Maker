@@ -26,10 +26,24 @@
      margin-left:auto and wrapping as its own group on narrow screens
      instead of interleaving with the middle section. */
   #topbarLeft { flex:none; display:flex; align-items:center; gap:8px; padding-top:6px; }
-  #topbarCenter { flex:1 1 240px; min-width:0; display:flex; flex-direction:column; gap:4px; padding-top:4px; }
+  /* Allied-forces HUD + round/turn status, centered in whatever middle
+     space is left between the map title (left) and the action buttons
+     (right) - align-items:center on a column flex container centers
+     each child's own width, not just the container itself. */
+  #topbarCenter { flex:1 1 240px; min-width:0; display:flex; flex-direction:column; align-items:center; gap:4px; padding-top:4px; }
   #topbarActions { flex:none; display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end; margin-left:auto; }
-  #hudRow { display:flex; gap:8px; flex-wrap:wrap; font-size:11px; }
+  #hudRow { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; font-size:11px; }
   #turnLabel { font-size:11px; color:var(--dim); }
+  /* The map's own name, dressed up as a small plaque/badge instead of
+     plain bold text, so it actually reads as "the name of this game"
+     rather than blending into the rest of the topbar. */
+  #mapTitleLabel {
+    display:inline-block; padding:6px 16px;
+    background:linear-gradient(135deg, var(--accent), #2a5db0);
+    color:#06121f; border:1px solid rgba(255,255,255,0.25); border-radius:8px;
+    font-size:14px; font-weight:800; letter-spacing:0.02em;
+    box-shadow:0 2px 6px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.3);
+  }
   canvas { display:block; background:#06121f; }
   #sidePanel {
     position:absolute; top:0; right:0; bottom:0; width:320px; max-width:88vw;
