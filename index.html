@@ -1249,7 +1249,12 @@ const WEAPON_OPTIONS = [
   ['flamethrower', '🔥 Flamethrower'], ['lightning', '🌩️ Lightning Bolt'],
   ['poison', '🧪 Poison Spray'], ['ice', '❄️ Ice Shard'], ['railgun', '📡 Railgun'],
   ['grenade', '💣 Grenade Toss'], ['shockwave', '🔊 Shockwave'], ['cannonball', '🎱 Cannonball'],
-  ['javelin', '🔱 Javelin'], ['whip', '🪢 Whip'],
+  // 🪢 (knot) used to be here for Whip - it's a 2020-era emoji many
+  // fonts (Windows especially) still have no glyph for, so it rendered
+  // as a blank box in the dropdown. 〰️ (wavy dash) is one of the
+  // oldest, most universally-supported emoji there is and reads fine as
+  // a whip crack/lash line.
+  ['javelin', '🔱 Javelin'], ['whip', '〰️ Whip'],
 ];
 function weaponOptionsHtml(selected) {
   return WEAPON_OPTIONS.map(([v, label]) => `<option value="${v}" ${(selected || 'laser') === v ? 'selected' : ''}>${label}</option>`).join('');
