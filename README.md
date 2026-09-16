@@ -161,7 +161,23 @@ appear) — a genuinely separate, self-contained game per map.
    round concept, it fires on the existing 90s cosmetic turn-clock
    instead.
 6. **My Maps** — every map saved under your signed-in account, draft or
-   finished, with Edit/▶ Play/Delete.
+   finished, with Edit/Delete plus, for a finished map, two ways to
+   actually play it: **⬇ Download My Game** (primary) and a smaller
+   secondary **🔗 Live link**. Download produces the exact same
+   standalone, fully-offline HTML file `play.html`'s own download button
+   does (`inlineUrlsAsDataUris()`, reimplemented here so it runs straight
+   from the map list - fetch the map's saved data, base64-inline every
+   art/sound URL it references, fetch `play.html`'s own source, inject
+   the result via `window.GM_INLINE_CONFIG`), without ever having to
+   open the live play page first. The Live link still opens
+   `play.html?map=<id>` same as before - kept reachable but no longer
+   the primary action, since a download is a frozen snapshot (won't
+   reflect a later edit to the map) while the live link always shows the
+   current saved version and costs real Storage egress on every visit
+   (see the Firebase project section below for what that means at
+   scale). Removing the emphasis on the live link doesn't remove the
+   *page* itself - `play.html?map=<id>` keeps working for anyone who
+   has that URL, whether or not the Download button exists.
 
 Every upload slot has a **📚 Library** button next to it, pulling from
 whatever the admin has added via `admin.html` (Firestore `libraryItems`
@@ -488,7 +504,19 @@ entirely by one map's saved data:
   given asset fails and that one asset is quietly left as a live URL
   instead (logged to the console) rather than breaking the whole
   download, so a CORS gap degrades gracefully instead of blocking
-  Download entirely.
+  Download entirely. One real gap this doesn't close: `play.html`'s own
+  `<script type="module">` still has static top-level `import`s of the
+  Firebase SDK itself from `gstatic.com` (`firebase-app.js`,
+  `firebase-firestore.js`) - those run unconditionally the instant the
+  module loads, before `loadConfig()` ever gets to check
+  `window.GM_INLINE_CONFIG`, so the downloaded file still needs *some*
+  connectivity to reach `gstatic.com` even though it never touches this
+  project's own Firebase project once open. That's a free, unrelated
+  Google CDN (not billed to this project, so it doesn't affect the cost
+  picture at all), but it does mean "zero network calls, period" isn't
+  literally true yet for someone with no internet access at all - closing
+  that gap would mean bundling the Firebase SDK itself into the
+  downloaded file too, not just the map's own art/sound.
 - **Titan Business Pros logo + hidden page** - a small clickable logo in
   the top-left corner of the topbar, present in every game this maker
   produces (it lives directly in `play.html`'s own markup, which is

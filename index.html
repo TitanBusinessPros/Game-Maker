@@ -1794,13 +1794,24 @@ async function refreshMyMaps() {
     const m = d.data();
     const li = document.createElement('li');
     const tagClass = m.status === 'complete' ? 'complete' : 'draft';
-    const playBtn = m.status === 'complete'
-      ? `<a class="btn-primary" style="text-decoration:none; padding:8px 14px; font-size:13px; border-radius:6px; display:inline-block;" href="play.html?map=${d.id}">▶ Play</a>`
+    // "⬇ Download My Game" is the primary action for a finished map now -
+    // produces the same standalone, fully offline HTML file play.html's
+    // own download button does, straight from here, no detour through
+    // the live Firebase-backed play page needed at all (see
+    // downloadStandaloneGame below). The live link still exists - it's
+    // not possible to actually remove play.html?map=... itself, since
+    // that's the page, not a button - so it stays reachable as a small
+    // secondary "🔗 Live link" next to it, for anyone who specifically
+    // wants a shareable link instead of a file (it auto-updates if the
+    // map is edited later; a downloaded file is a frozen snapshot).
+    const actions = m.status === 'complete'
+      ? `<button type="button" class="btn-primary download-game" data-id="${d.id}">⬇ Download My Game</button>
+         <a class="btn-secondary" style="text-decoration:none; padding:8px 14px; font-size:13px; border-radius:6px; display:inline-block;" href="play.html?map=${d.id}" target="_blank" rel="noopener">🔗 Live link</a>`
       : '';
     li.innerHTML = `
       <span>${escapeAttr(m.name || 'Untitled Map')} <span class="tag ${tagClass}">${m.status}</span></span>
       <span>
-        ${playBtn}
+        ${actions}
         <button type="button" class="btn-secondary open-map" data-id="${d.id}">Edit</button>
         <button type="button" class="btn-danger delete-map" data-id="${d.id}">Delete</button>
       </span>
@@ -1821,6 +1832,80 @@ async function refreshMyMaps() {
       refreshMyMaps();
     });
   });
+  listEl.querySelectorAll('.download-game').forEach((btn) => {
+    btn.addEventListener('click', () => downloadStandaloneGame(btn.dataset.id, btn));
+  });
+}
+
+// ---------------------------------------------------------------------
+// "⬇ Download My Game" - same idea as play.html's own "⬇ index.html"
+// button (inlineUrlsAsDataUris there), reimplemented here so it can run
+// straight from the map list: fetch that map's saved data, base64-inline
+// every art/sound URL it references, fetch play.html's own source, and
+// inject the result the same way play.html's download button does
+// (window.GM_INLINE_CONFIG - loadConfig() there checks for this BEFORE
+// ever trying to fetch anything from Firestore, so the file this
+// produces never touches this project's Firebase at all once opened).
+// ---------------------------------------------------------------------
+async function inlineUrlsAsDataUris(value, onProgress) {
+  const cache = new Map();
+  function collectUrls(v) {
+    if (typeof v === 'string' && /^https?:\/\//.test(v)) { if (!cache.has(v)) cache.set(v, null); }
+    else if (Array.isArray(v)) v.forEach(collectUrls);
+    else if (v && typeof v === 'object') Object.values(v).forEach(collectUrls);
+  }
+  collectUrls(value);
+  const urls = [...cache.keys()];
+  let done = 0;
+  await Promise.all(urls.map(async (url) => {
+    try {
+      const blob = await fetch(url).then((r) => r.blob());
+      const dataUri = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+      cache.set(url, dataUri);
+    } catch (err) {
+      console.error('Could not inline for offline play (kept as a live URL, so it still needs internet to load):', url, err);
+      cache.set(url, url);
+    }
+    done++;
+    if (onProgress) onProgress(done, urls.length);
+  }));
+  function replace(v) {
+    if (typeof v === 'string') return cache.has(v) ? cache.get(v) : v;
+    if (Array.isArray(v)) return v.map(replace);
+    if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, vv]) => [k, replace(vv)]));
+    return v;
+  }
+  return replace(value);
+}
+async function downloadStandaloneGame(mapId, btn) {
+  const originalLabel = btn.textContent;
+  btn.disabled = true;
+  try {
+    const snap = await getDoc(doc(db, 'maps', mapId));
+    if (!snap.exists()) throw new Error('This map no longer exists.');
+    const mapCfg = snap.data();
+    const html = await fetch('play.html').then((r) => r.text());
+    const offlineCfg = await inlineUrlsAsDataUris(mapCfg, (done, total) => {
+      btn.textContent = total ? `⬇ Preparing… ${done}/${total}` : '⬇ Preparing…';
+    });
+    const inline = `<script>window.GM_INLINE_CONFIG = ${JSON.stringify(offlineCfg)};<\/script>\n`;
+    const withConfig = html.replace('<script type="module">', inline + '<script type="module">');
+    const blob = new Blob([withConfig], { type: 'text/html' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${(mapCfg.name || 'game').trim().replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '') || 'game'}.html`;
+    a.click();
+  } catch (err) {
+    alert(`Could not prepare the download: ${err.message}`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalLabel;
+  }
 }
 
 // ---------------------------------------------------------------------
