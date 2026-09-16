@@ -324,6 +324,14 @@
     <p class="hint" id="gameStyleHint" style="display:none;">
       Turn-Based: only one faction can act at a time - everyone else is frozen until their turn comes back around. Control passes automatically when the timer runs out. Mark any computer player below as "Human (hot-seat)" to let a real person take its turn instead of AI; resource income and research keep running for everyone regardless of whose turn it is.
     </p>
+    <div class="row">
+      <div class="field narrow" style="display:flex; align-items:flex-end; padding-bottom:9px;">
+        <label style="display:flex; align-items:center; gap:6px; font-weight:normal; margin:0;">
+          <input type="checkbox" id="fogOfWarEnabled" style="width:auto;"> &#127787;&#65039; Fog of war
+        </label>
+      </div>
+    </div>
+    <p class="hint">Off by default. When on, the minimap only reveals area within a short radius of a player's own units and Home Base - a fixed setting for the whole match, not something a player can turn on or off once playing.</p>
     <div class="field">
       <label>Map background art (optional)</label>
       <div class="upload-slot" data-slot="backgroundImage">
@@ -1707,6 +1715,10 @@ async function buildMapDoc(status) {
     mapSize: document.getElementById('mapSize').value || 'medium',
     gameStyle: document.getElementById('gameStyle').value || 'realtime',
     turnTimerSeconds: Math.max(10, Math.min(60, Number(document.getElementById('turnTimerSeconds').value) || 30)),
+    // Set once here, fixed for the whole match - not a toggle a player
+    // can flip on/off once playing (see play.html's fogOn, now seeded
+    // from this instead of a topbar button).
+    fogOfWar: document.getElementById('fogOfWarEnabled').checked,
     // Extra named resources beyond Gold - each with its own passive
     // income/hour and deposit art (see collectExtraResources) - and
     // which ones (Gold included) hand out a free amount each round -
@@ -2037,6 +2049,7 @@ async function loadExistingMap() {
   document.getElementById('mapSize').value = m.mapSize || 'medium';
   document.getElementById('gameStyle').value = m.gameStyle || 'realtime';
   document.getElementById('turnTimerSeconds').value = m.turnTimerSeconds || 30;
+  document.getElementById('fogOfWarEnabled').checked = !!m.fogOfWar;
   // Must happen before any unit/turret row gets added below - each row's
   // cost checkboxes are built from whatever allResources() returns at
   // that moment (see makeUnitRow/addTurretRow), so extraResources needs

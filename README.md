@@ -49,6 +49,12 @@ appear) — a genuinely separate, self-contained game per map.
    "Controlled by: 🤖 AI / 🧑 Human (hot-seat)" toggle - a human-flagged
    one takes a real turn instead of thinking on its own. Real-Time mode
    never shows either control; every computer player there is always AI.
+2b. **Fog of war** (optional, off by default) — a checkbox right below
+   Game Style. When on, `play.html`'s minimap only reveals area within a
+   short radius of a faction's own units and Home Base. This is a fixed
+   property of the map now, decided here at map-creation time - moved
+   down from a topbar button in `play.html` that let a player flip it
+   on/off mid-match, which no longer exists.
 3. **Resource & mining** — the deposit every home base gets nearby (name,
    size, art - a real "mine" image, separate from the vessel that works
    it) and the mining unit that drains it (name, income/hour, art).
@@ -391,9 +397,13 @@ entirely by one map's saved data:
 - A pannable camera (right-drag) with scroll-wheel zoom (centered on the
   cursor) over a world sized by the map's chosen size, and a minimap that
   both jumps the camera there on click AND, if units are selected, issues
-  them a move order to that point. Also: fog of war (toggle - minimap-only
-  reveal radius around your own units), sound on/off, pause (freezes the
-  whole simulation), Save/Load to a JSON file. The camera can't pan past
+  them a move order to that point. Also: sound on/off, pause (freezes the
+  whole simulation), Save/Load to a JSON file. **Fog of war** (minimap-only
+  reveal radius around a faction's own units and Home Base) is set once
+  on the map itself now (`index.html`'s Fog of War checkbox, Map Basics -
+  off by default) instead of a topbar button a player could flip on/off
+  mid-match - it's a fixed property of the map, the same as Game Style or
+  Map Size, not something to toggle while playing. The camera can't pan past
   the world's own edges any more - it used to be unclamped everywhere
   (right-drag, the minimap-click jump, scroll-zoom's cursor-pivot), so
   drifting past where the background image actually covers (see below)
@@ -539,8 +549,9 @@ entirely by one map's saved data:
   literally true yet for someone with no internet access at all - closing
   that gap would mean bundling the Firebase SDK itself into the
   downloaded file too, not just the map's own art/sound.
-- **Titan Business Pros logo + hidden page** - a small clickable logo in
-  the top-left corner of the topbar, present in every game this maker
+- **Titan Business Pros logo + hidden page** - a clickable logo in
+  the top-left corner of the topbar (96&times;96px - 3&times; its
+  original 32&times;32px size), present in every game this maker
   produces (it lives directly in `play.html`'s own markup, which is
   exactly what "⬇ Download as index.html" packages, so it rides along
   into every exported standalone game with zero extra work). Clicking it

@@ -109,7 +109,7 @@
      (play.html IS the template ⬇ Download as index.html packages, so
      anything here rides along automatically) - clicking it opens the
      hidden page below. */
-  #logoBtn { flex:none; display:block; width:32px; height:32px; border-radius:6px; cursor:pointer; background:none; border:none; padding:0; }
+  #logoBtn { flex:none; display:block; width:96px; height:96px; border-radius:6px; cursor:pointer; background:none; border:none; padding:0; }
   #logoBtn img { width:100%; height:100%; object-fit:contain; display:block; }
 
   /* Hidden page: a full-screen overlay (not a real navigation, so it
@@ -246,7 +246,6 @@
     <div id="topbarActions">
       <button id="pauseBtn">⏸️ Pause</button>
       <button id="soundBtn">🔈 Sound</button>
-      <button id="fogBtn">🌫️ Fog: Off</button>
       <button id="saveBtn">💾 Save</button>
       <label style="background:var(--panel2); border:1px solid var(--border); border-radius:6px; padding:6px 9px; font-size:11px; cursor:pointer;">
         📂 Load<input id="loadInput" type="file" accept=".json" style="display:none;">
@@ -983,7 +982,10 @@ async function main() {
   // target apart from a unit target without extra lookups.
   factions.forEach((f) => { f.isFactionHome = true; });
 
-  let turnTimer = TURN_SECONDS, turnNumber = 1, aiTimer = AI_TICK_SECONDS, fogOn = false;
+  // Set once at map-creation time (index.html's Fog of War checkbox),
+  // fixed for the whole match - no longer a topbar button a player could
+  // flip on/off mid-game.
+  let turnTimer = TURN_SECONDS, turnNumber = 1, aiTimer = AI_TICK_SECONDS, fogOn = !!cfg.fogOfWar;
   let elapsed = 0; // real seconds since the match started - drives the home-base "planet" spin animation only (see drawFactionHome)
 
   // Centers on the middle of a faction's homeworld AND all its own living
@@ -2155,11 +2157,6 @@ async function main() {
     if (soundOn && sounds.music) { sounds.music.loop = true; sounds.music.play().catch(() => {}); }
     else if (sounds.music) sounds.music.pause();
   });
-  document.getElementById('fogBtn').addEventListener('click', () => {
-    fogOn = !fogOn;
-    document.getElementById('fogBtn').textContent = fogOn ? '🌫️ Fog: On' : '🌫️ Fog: Off';
-  });
-
   // ---------------------------------------------------------------------
   // Hidden page - the logo in the top-left corner (present in every game
   // this maker produces, since play.html itself is what ⬇ Download as
