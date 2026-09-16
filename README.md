@@ -167,7 +167,26 @@ line. Only this page has the logo/title/footer treatment so far -
    four again (an unused one just has nothing in its unit list, same as
    if it had never been touched, which was already indistinguishable
    from "removed" as far as `play.html` is concerned).
-4d. **Research Facility** — NOT optional, unlike the four buildings
+4d. **Missile Silo** (optional) — a fifth gated building, same
+   name/art/HP/build-cost shape as Air Base/War Factory/Infantry Post/
+   Helicopter Facility above (including its own **🗑 Remove this
+   building** button), but its unit list below it is a **missile
+   launcher** type, not a normal combat unit: **name**, **launcher art**,
+   **HP**, **Missile HP damage**, **Missile speed**, **missile art** (a
+   *second*, separate upload - the projectile itself, drawn actually
+   traveling to its target, not the stationary launcher's own sprite),
+   and **costs** (the usual per-resource checkboxes). No Range or Weapon
+   field on this row at all - unlike every other unit/turret type, a
+   launcher's range isn't set here; see `play.html`'s own bullet on this
+   further down for why. In `play.html`, a launcher is placed the same
+   way a Gun Turret is (see 4f below) - click **Place**, then click
+   anywhere between 50 and 300 range of your Home Base - rather than
+   produced with a timer like Air Base's own units, but still requires
+   the Missile Silo building itself to already be standing first, unlike
+   Gun Turrets (which have no gating building at all). Leave its launcher
+   list empty and the whole feature is absent from the map, same as the
+   four buildings above.
+4e. **Research Facility** — NOT optional, unlike the buildings
    above: every map has the same built-in research tree (the Research
    tab in `play.html`), so this is the one building every player has to
    construct before they can research anything there at all. Same
@@ -176,16 +195,16 @@ line. Only this page has the logo/title/footer treatment so far -
    required to Finish & Save, not just when some list has entries. It's
    also the one thing every faction can always afford to build with
    nothing else built first - in `play.html`, it gates everything else on
-   this list: Air Base/War Factory/Infantry Post/Helicopter Facility,
-   every unit under them, Gun Turrets, and the Mining Ship are all locked
-   (Build/Place buttons disabled, a "requires Research Facility first"
-   note in their stats line) until a faction's own Research Facility is
-   standing - not just research itself like before. AI factions follow
-   the same rule (an unbuilt Research Facility is the only thing an AI
-   will spend on until it's built), and destroying a faction's Research
-   Facility re-locks everything else again, same as destroying any other
-   gated building re-locks its own units.
-4e. **Gun Turrets** (optional) — shaped differently from the buildings
+   this list: Air Base/War Factory/Infantry Post/Helicopter Facility/
+   Missile Silo, every unit under them, Gun Turrets, and the Mining Ship
+   are all locked (Build/Place buttons disabled, a "requires Research
+   Facility first" note in their stats line) until a faction's own
+   Research Facility is standing - not just research itself like before.
+   AI factions follow the same rule (an unbuilt Research Facility is the
+   only thing an AI will spend on until it's built), and destroying a
+   faction's Research Facility re-locks everything else again, same as
+   destroying any other gated building re-locks its own units.
+4f. **Gun Turrets** (optional) — shaped differently from the buildings
    above: no gating building of its own, no production timer, and no
    Speed field (they're stationary by design - the field doesn't exist
    for these rows at all). Add as many turret types as you want, each
@@ -620,6 +639,35 @@ entirely by one map's saved data:
   it can be selected, destroyed, and targeted by enemies like anything
   else. AI factions place them too, picking a random valid spot in the
   same ring instead of needing a click.
+- **Missile Silo** (optional, gated building - index.html's item 4d):
+  placed exactly like a Gun Turret (same ring, same arm-then-click flow,
+  same speed-0/never-moves shape) but additionally requires the Missile
+  Silo building itself to be built first, and never auto-targets on its
+  own - a player has to click the launcher, then click an enemy, same as
+  giving any other owned unit a normal attack order (no special-cased
+  order-issuing code needed for this at all; an AI-controlled launcher
+  still auto-acquires `nearestEnemy()` like any other AI unit). Its range
+  isn't a field set on the map at all: it starts at 500 and researches up
+  to 1000 then 2000 through two new Research-tab entries (Extended
+  Missile Range, Long-Range Missiles), the same "tiered value driven
+  entirely by research" pattern Gold's own mining rate (600→900→1200)
+  already uses - `missileRange()` reads it fresh every combat tick since
+  it can improve mid-match. What actually makes this different from every
+  other attack in the game: firing doesn't apply damage instantly. It
+  spawns a real, tracked missile (`missiles` array, drawn with its own
+  uploaded art via `drawMissiles()`, separate from the stationary
+  launcher's own sprite) at the launcher's position, which homes in on
+  its target's *live* position every frame at the launcher's own set
+  speed until it's close enough to hit - at which point it applies the
+  launcher's damage and vanishes. If the target dies before the missile
+  arrives, the missile is simply removed with no damage dealt and no
+  retargeting - "it disappears from the screen." A missile belonging to a
+  faction that isn't currently active in Turn-Based mode just holds its
+  current mid-flight position, same freeze every other unit's own
+  movement already gets, and continues from exactly where it left off
+  once that faction's turn comes back around. Destroying a Missile Silo
+  re-locks its launchers from being placed again, same as destroying any
+  other gated building re-locks its own units.
 - **⬇ Download as index.html** - packages the map's data inline into a
   fully standalone copy of this page. This used to only bundle the map's
   *data* (unit stats, names, etc.) while every image/sound field stayed a
@@ -739,8 +787,8 @@ library sees it right where they're about to upload, not only where a
 map creator sets the size.
 **Worlds**, **Bases**, **Resources** (flat, no sub-picker), **Structures**
 (sub-picker: **War Factory**, **Airport**, **Infantry Post**,
-**Helicopter Facility**, **Research Facility**, **Gun Turret** -
-`structures/<type>`), **Sounds** (sub-picker: **Background
+**Helicopter Facility**, **Research Facility**, **Gun Turret**,
+**Missile Silo** - `structures/<type>`), **Sounds** (sub-picker: **Background
 Music**, **Intro Music**, **Attack**, **Building Destroyed**, **Home Base
 Under Attack**, **Game Over** - `sounds/<type>`). Any top-level category
 with `children` in `CATEGORY_TREE` gets this same sub-picker UI - it used

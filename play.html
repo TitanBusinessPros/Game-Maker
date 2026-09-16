@@ -437,6 +437,14 @@ const TECH_TREE = {
   warp_drive: { name: 'Warp Drive Calibration', cost: 450, timeSeconds: 100, prereq: null, effect: 'speed_12' },
   extended_sensors: { name: 'Extended Sensors', cost: 350, timeSeconds: 80, prereq: null, effect: 'vision_50' },
   rapid_repair: { name: 'Rapid Repair Crews', cost: 500, timeSeconds: 100, prereq: null, effect: 'regen' },
+  // Missile Silo launchers start at range 500 with no research needed at
+  // all (same idea as Gold's own base 600/hr mining rate needing no
+  // unlock research, just Mining Operations to build the *unit* in the
+  // first place - here the Missile Silo building itself is that unlock),
+  // then these two chain exactly like Improved Extraction/Deep Mining do
+  // for mining rate - see missileRange() below.
+  missile_range_1000: { name: 'Extended Missile Range', cost: 500, timeSeconds: 90, prereq: null, effect: 'missile_range_1000' },
+  missile_range_2000: { name: 'Long-Range Missiles', cost: 700, timeSeconds: 120, prereq: 'missile_range_1000', effect: 'missile_range_2000' },
 };
 
 const HOMEWORLD_HP_DEFAULT = 2000; // used only as a fallback for a map saved before per-faction home base HP existed
@@ -447,6 +455,7 @@ const UNIT_SIZE = 34;
 const HOMEWORLD_SIZE = 90;
 const DEPOSIT_SIZE = 56;
 const GATED_BUILDING_SIZE = 56;
+const MISSILE_SIZE = 20; // the flying projectile itself, drawn smaller than the stationary launcher that fired it
 const AI_TICK_SECONDS = 6; // medium's value - other difficulties scale it via AI_DIFFICULTY below
 // Per-computer-player difficulty, set on the build page (index.html's
 // "AI Difficulty" select on each Computer Player row). tickSeconds:
@@ -526,9 +535,9 @@ async function main() {
   // 'warFactory') is read by the build panel below to gate them behind
   // that faction actually having built the matching building, and by
   // update()'s production-queue processing.
-  const [airBaseImg, warFactoryImg, infantryPostImg, heliFacilityImg, researchFacilityImg] = await Promise.all([
+  const [airBaseImg, warFactoryImg, infantryPostImg, heliFacilityImg, researchFacilityImg, missileSiloImg] = await Promise.all([
     loadImage(cfg.airBase?.image), loadImage(cfg.warFactory?.image), loadImage(cfg.infantryPost?.image),
-    loadImage(cfg.heliFacility?.image), loadImage(cfg.researchFacility?.image),
+    loadImage(cfg.heliFacility?.image), loadImage(cfg.researchFacility?.image), loadImage(cfg.missileSilo?.image),
   ]);
   // offsetX/offsetY: where each building's art is drawn relative to its
   // faction's homeworld once built (see drawGatedBuildings below) - laid
@@ -544,11 +553,20 @@ async function main() {
     { key: 'infantryPost', cfg: cfg.infantryPost || { name: 'Infantry Post', cost: 150, hp: 2000 }, unitCfgs: cfg.infantryUnits || [], icon: '🪖', img: infantryPostImg, offsetX: 110, offsetY: -60 },
     { key: 'helicopterFacility', cfg: cfg.heliFacility || { name: 'Helicopter Facility', cost: 150, hp: 2000 }, unitCfgs: cfg.heliUnits || [], icon: '🚁', img: heliFacilityImg, offsetX: -110, offsetY: -60 },
     { key: 'researchFacility', cfg: cfg.researchFacility || { name: 'Research Facility', cost: 150, hp: 2000 }, unitCfgs: [], icon: '🔬', img: researchFacilityImg, offsetX: 0, offsetY: 140, alwaysShow: true, gatesResearch: true },
+    // unitCfgs here (cfg.missileUnits) is read ONLY for the generic "does
+    // this building's section have anything in it" / AI-needs-this-
+    // building checks every other GATED_BUILDINGS entry already gets for
+    // free (renderBuildPanel, aiThink's neededBuilding) - its launchers
+    // are deliberately NOT merged into unitDefs below (see missileDefs
+    // further down), same reasoning Gun Turrets already use: they don't
+    // move, aren't produced with a timer, and are placed in a ring around
+    // Home Base instead of spawning next to it.
+    { key: 'missileSilo', cfg: cfg.missileSilo || { name: 'Missile Silo', cost: 150, hp: 2000 }, unitCfgs: cfg.missileUnits || [], icon: '🚀', img: missileSiloImg, offsetX: 0, offsetY: -140 },
   ];
   const buildingCfgByKey = Object.fromEntries(GATED_BUILDINGS.map((b) => [b.key, b.cfg]));
   const unitDefs = [
     ...(cfg.units || []).map((u) => ({ ...u, buildingKey: null })),
-    ...GATED_BUILDINGS.flatMap((b) => b.unitCfgs.map((u) => ({ ...u, buildingKey: b.key }))),
+    ...GATED_BUILDINGS.filter((b) => b.key !== 'missileSilo').flatMap((b) => b.unitCfgs.map((u) => ({ ...u, buildingKey: b.key }))),
   ];
   const unitImages = await Promise.all(unitDefs.map((u) => loadImage(u.imageUrl)));
 
@@ -559,6 +577,21 @@ async function main() {
   // spawn path rather than fitting spawnUnit's assumptions.
   const turretDefs = cfg.gunTurrets || [];
   const turretImages = await Promise.all(turretDefs.map((t) => loadImage(t.imageUrl)));
+
+  // Missile Silo launchers: placed in a ring like Gun Turrets above (see
+  // TURRET_MIN_RANGE/MAX_RANGE reuse in tryPlaceMissileLauncher), but
+  // additionally gated behind the Missile Silo building itself
+  // (fac.built.missileSilo) and never auto-fire when player-controlled -
+  // a human has to click the launcher, then click a target, same as
+  // giving any other unit an attack order (see combatTick's own
+  // isMissileLauncher branch for why that's enough with no extra order-
+  // issuing code). Two images per def, not one: imageUrl is the
+  // stationary launcher's own sprite (drawn via the normal drawUnit()),
+  // missileImageUrl is the flying projectile fired at its target (drawn
+  // by drawMissiles() - see the `missiles` array further down).
+  const missileDefs = cfg.missileUnits || [];
+  const missileLauncherImages = await Promise.all(missileDefs.map((d) => loadImage(d.imageUrl)));
+  const missileProjectileImages = await Promise.all(missileDefs.map((d) => loadImage(d.missileImageUrl)));
 
   // Multiple named resources (index.html's "+ Add resource" under
   // Resource & Mining) - Gold always exists (it's what the Mining Ship
@@ -769,6 +802,14 @@ async function main() {
     if (techBonus(fac, 'mining_900')) return 900;
     return 600;
   }
+  // Missile Silo launchers' range isn't a map-maker-set field at all
+  // (unlike Gun Turrets' Range) - it's fully determined by research, same
+  // pattern as Gold's own mining rate above, just for a different stat.
+  function missileRange(fac) {
+    if (techBonus(fac, 'missile_range_2000')) return 2000;
+    if (techBonus(fac, 'missile_range_1000')) return 1000;
+    return 500;
+  }
   function effectiveStat(fac, base, kind) {
     let v = base;
     if (kind === 'hp' && techBonus(fac, 'hp_15')) v *= 1.15;
@@ -807,6 +848,29 @@ async function main() {
       img: turretImages[defIndex], x, y, alive: true, selected: false,
       orderType: null, moveTarget: null, target: null,
       lockedUntilTurn: 0, facingAngle: 0, weapon: def.weapon || 'laser',
+    };
+    units.push(u);
+    return u;
+  }
+  // Missile Silo launcher - stationary like spawnTurret above (speed 0),
+  // but no .weapon and no static .range: combatTick reads missileRange()
+  // for range dynamically instead (it can improve mid-match via
+  // research), and fires by spawning a real `missiles` entry (see
+  // spawnMissile below) rather than drawing one of fireWeaponEffect's
+  // cosmetic beams. Never auto-targets on its own for a human player -
+  // see combatTick and the per-unit update() loop, neither of which
+  // special-case isMissileLauncher for targeting, only for what firing
+  // actually does once it has a target.
+  function spawnMissileLauncher(factionId, defIndex, x, y) {
+    const fac = factionOf(factionId);
+    const def = missileDefs[defIndex];
+    const hp = Math.round(effectiveStat(fac, def.hp, 'hp'));
+    const u = {
+      id: nextUnitId++, factionId, defIndex, isMiner: false, isMissileLauncher: true,
+      hp, maxHp: hp, attack: def.attack, speed: 0,
+      img: missileLauncherImages[defIndex], x, y, alive: true, selected: false,
+      orderType: null, moveTarget: null, target: null,
+      lockedUntilTurn: 0, facingAngle: 0,
     };
     units.push(u);
     return u;
@@ -906,6 +970,12 @@ async function main() {
   // stays in sync with it.
   let placingTurret = null;
   function setPlacingTurret(v) { placingTurret = v; canvas.style.cursor = v ? 'crosshair' : ''; }
+  // Same idea, separate state - a Missile Silo launcher (index into
+  // missileDefs) placed the same ring-around-Home-Base way as a turret,
+  // but additionally gated by fac.built.missileSilo (see renderBuildPanel
+  // and tryPlaceMissileLauncher).
+  let placingMissile = null;
+  function setPlacingMissile(v) { placingMissile = v; canvas.style.cursor = v ? 'crosshair' : ''; }
 
   // Weapon visual effects - short-lived, purely cosmetic (damage is
   // already applied instantly by combatTick before this ever runs; the
@@ -935,6 +1005,23 @@ async function main() {
   }
 
   const effects = [];
+  // Missile Silo's own in-flight projectiles - a real tracked entity with
+  // actual travel time, unlike everything else in this file (every other
+  // attack is an instant hit plus a purely cosmetic, fixed-duration
+  // `effects` entry). Each one homes in on its target's LIVE position
+  // every frame (see the update() loop further down) until it arrives or
+  // its target is gone, at which point it's just removed - "if the
+  // target is destroyed before the missile makes it there, it disappears
+  // from the screen" rather than exploding on nothing or retargeting.
+  const missiles = [];
+  function spawnMissile(launcher, target) {
+    const def = missileDefs[launcher.defIndex];
+    missiles.push({
+      x: launcher.x, y: launcher.y, factionId: launcher.factionId, target,
+      damage: launcher.attack, speed: (Number(def.missileSpeed) || 4) * MOVE_PX_PER_SPEED,
+      img: missileProjectileImages[launcher.defIndex], facingAngle: 0,
+    });
+  }
   function fireWeaponEffect(u, t) {
     const color = EFFECT_COLORS[Math.max(0, u.defIndex) % EFFECT_COLORS.length];
     const x1 = u.x, y1 = u.y, x2 = t.x, y2 = t.y;
@@ -1064,41 +1151,63 @@ async function main() {
   // the matching change in update()'s per-unit loop, which now also
   // freezes a turret during another faction's turn instead of letting
   // it always auto-fire).
+  // Shared by combatTick's instant-hit path AND a missile's own arrival
+  // (see the missiles-update loop in update() below) - both ultimately
+  // just apply damage to a target and handle its death the same way, the
+  // only difference is WHEN this runs relative to the attack being
+  // ordered (instantly vs. after real travel time).
+  function applyDamageToTarget(t, dmg) {
+    t.hp -= dmg;
+    playSfx(sounds.attack);
+    if (t.hp <= 0) {
+      t.hp = 0;
+      if (t.maxHp === undefined || t.isFactionHome) playSfx(sounds.homeUnderAttack);
+      if (!t.isFactionHome && t.alive !== undefined) { t.alive = false; playSfx(sounds.buildingDestroyed); }
+      // A destroyed Air Base/War Factory/Infantry Post/Helicopter
+      // Facility/Research Facility/Missile Silo actually revokes what it
+      // unlocked - "once that building is gone no troops can be built
+      // from that specific building" - not just decorative HP. Also
+      // cancels whatever was mid-production in its queue (the factory
+      // itself is gone, there's nothing left to finish building it in)
+      // and, if the loss belongs to whoever's turn it currently is,
+      // refreshes the build/research panels immediately instead of
+      // leaving them showing the pre-destruction state (same staleness
+      // bug fixed for the "just built it" direction earlier).
+      if (t.isGatedBuilding) {
+        const owner = factionOf(t.factionId);
+        owner.built[t.buildingKey] = false;
+        owner.buildQueue[t.buildingKey] = [];
+        if (owner === activeFaction) { renderBuildPanel(); renderResearchPanel(); }
+      }
+    }
+  }
   function combatTick(u, dt) {
     const t = u.target;
     if (!t || t.hp <= 0 || t.alive === false) { u.target = null; return; }
     if (isLocked(u)) return;
+    // Missile Silo launchers don't have a map-maker-set .range at all -
+    // theirs comes from research instead (see missileRange above), and
+    // can improve mid-match, so it's read fresh every tick rather than
+    // baked in at spawn time.
+    const range = u.isMissileLauncher ? missileRange(factionOf(u.factionId)) : u.range;
     const dist = Math.hypot(t.x - u.x, t.y - u.y);
     u.facingAngle = facingToward(u, t.x, t.y);
-    if (dist > u.range) {
+    if (dist > range) {
+      // Stationary and can't close the distance - rather than sit here
+      // recomputing the same too-far distance every frame forever, drop
+      // the order so the normal targeting path (human click, or AI's
+      // nearestEnemy() for an AI-controlled silo) gets a fresh shot at
+      // picking something actually in range next time.
+      if (u.isMissileLauncher) { u.target = null; return; }
       const sp = u.speed * MOVE_PX_PER_SPEED;
       u.x += (t.x - u.x) / dist * sp * dt; u.y += (t.y - u.y) / dist * sp * dt;
-    } else {
-      t.hp -= u.attack;
-      fireWeaponEffect(u, t);
-      playSfx(sounds.attack);
+    } else if (u.isMissileLauncher) {
+      spawnMissile(u, t);
       lockUnit(u);
-      if (t.hp <= 0) {
-        t.hp = 0;
-        if (t.maxHp === undefined || t.isFactionHome) playSfx(sounds.homeUnderAttack);
-        if (!t.isFactionHome && t.alive !== undefined) { t.alive = false; playSfx(sounds.buildingDestroyed); }
-        // A destroyed Air Base/War Factory/Infantry Post/Helicopter
-        // Facility/Research Facility actually revokes what it unlocked -
-        // "once that building is gone no troops can be built from that
-        // specific building" - not just decorative HP. Also cancels
-        // whatever was mid-production in its queue (the factory itself
-        // is gone, there's nothing left to finish building it in) and,
-        // if the loss belongs to whoever's turn it currently is,
-        // refreshes the build/research panels immediately instead of
-        // leaving them showing the pre-destruction state (same staleness
-        // bug fixed for the "just built it" direction earlier).
-        if (t.isGatedBuilding) {
-          const owner = factionOf(t.factionId);
-          owner.built[t.buildingKey] = false;
-          owner.buildQueue[t.buildingKey] = [];
-          if (owner === activeFaction) { renderBuildPanel(); renderResearchPanel(); }
-        }
-      }
+    } else {
+      fireWeaponEffect(u, t);
+      applyDamageToTarget(t, u.attack);
+      lockUnit(u);
     }
   }
   // Tag every faction object once so combatTick can tell a homeworld
@@ -1289,6 +1398,22 @@ async function main() {
       spendCosts(fac, getCosts(pick.d));
       spawnTurret(fac.id, pick.i, fac.x + Math.cos(angle) * dist, fac.y + Math.sin(angle) * dist);
     }
+    // Missile Silo launchers: same random-valid-spot placement as Gun
+    // Turrets above, just additionally gated behind the Missile Silo
+    // building itself (turrets have no such gate). Doesn't issue a fire
+    // order here - a placed launcher only ever fires once something
+    // targets it, same as any other AI-controlled attacker (see the
+    // per-unit update() loop's `!fac.isHuman` branch picking
+    // nearestEnemy() and calling combatTick, which drops the order again
+    // if that target turns out to be outside missileRange()).
+    const affordableMissile = missileDefs.map((d, i) => ({ d, i })).filter((x) => canAffordCosts(fac, getCosts(x.d)));
+    if (fac.built.missileSilo && affordableMissile.length && Math.random() < diff.turretChance) {
+      const pick = affordableMissile[Math.floor(Math.random() * affordableMissile.length)];
+      const angle = Math.random() * Math.PI * 2;
+      const dist = TURRET_MIN_RANGE + Math.random() * (TURRET_MAX_RANGE - TURRET_MIN_RANGE);
+      spendCosts(fac, getCosts(pick.d));
+      spawnMissileLauncher(fac.id, pick.i, fac.x + Math.cos(angle) * dist, fac.y + Math.sin(angle) * dist);
+    }
   }
 
   function update(dt) {
@@ -1429,6 +1554,31 @@ async function main() {
         if (u.orderType === 'attack' && u.target) combatTick(u, dt);
         else if (u.orderType === 'move' && u.moveTarget && !isLocked(u)) runMoveOrder(u, dt);
       }
+    }
+
+    // Missiles: same Turn-Based freeze every other unit's movement gets
+    // above (a missile belonging to a faction that isn't active right
+    // now just holds its current position mid-flight until its owner's
+    // turn comes back around - "stops moving if it is turn based"), then
+    // homes in on its target's LIVE position (not a fixed point it was
+    // launched at) until it's close enough to hit, or the target's
+    // already gone (dead or destroyed before it arrived), in which case
+    // it's just removed with no damage and no effect.
+    for (let i = missiles.length - 1; i >= 0; i--) {
+      const m = missiles[i];
+      if (turnMode && m.factionId !== activeIdx) continue;
+      const t = m.target;
+      if (!t || t.hp <= 0 || t.alive === false) { missiles.splice(i, 1); continue; }
+      const dist = Math.hypot(t.x - m.x, t.y - m.y);
+      m.facingAngle = facingToward(m, t.x, t.y);
+      if (dist < 12) {
+        applyDamageToTarget(t, m.damage);
+        effects.push({ kind: 'explosion', x: t.x, y: t.y, color: '#ff5f6d', ttl: 0.35, life: 0.35 });
+        missiles.splice(i, 1);
+        continue;
+      }
+      m.x += (t.x - m.x) / dist * m.speed * dt;
+      m.y += (t.y - m.y) / dist * m.speed * dt;
     }
 
     const aliveTeams = new Set(factions.filter((f) => f.hp > 0).map((f) => f.team));
@@ -1647,7 +1797,7 @@ async function main() {
   // around activeFaction's own Home Base) as two dashed circles, only
   // while placement mode is actually active.
   function drawTurretRangeRing() {
-    if (!placingTurret) return;
+    if (!placingTurret && !placingMissile) return;
     const p = toScreen(activeFaction.x, activeFaction.y);
     ctx.save();
     ctx.strokeStyle = 'rgba(79,220,143,0.85)';
@@ -1656,6 +1806,29 @@ async function main() {
     ctx.beginPath(); ctx.arc(p.x, p.y, TURRET_MIN_RANGE * camera.zoom, 0, 7); ctx.stroke();
     ctx.beginPath(); ctx.arc(p.x, p.y, TURRET_MAX_RANGE * camera.zoom, 0, 7); ctx.stroke();
     ctx.restore();
+  }
+  // In-flight missiles - drawn separately from drawUnit() since they're
+  // not in the `units` array at all (see the `missiles` array above).
+  // Rotates to face its live travel direction, same idea as a unit's own
+  // facingAngle, using the def's own missileImageUrl (not the launcher's
+  // sprite) - falls back to a plain colored dot, same graceful-fallback
+  // treatment every other optional image gets elsewhere in this file.
+  function drawMissiles() {
+    for (const m of missiles) {
+      const p = toScreen(m.x, m.y);
+      const size = MISSILE_SIZE * camera.zoom;
+      if (m.img) {
+        const fit = fittedSize(m.img, size);
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(m.facingAngle || 0);
+        ctx.drawImage(m.img, -fit.w / 2, -fit.h / 2, fit.w, fit.h);
+        ctx.restore();
+      } else {
+        ctx.fillStyle = '#ff5f6d';
+        ctx.beginPath(); ctx.arc(p.x, p.y, size / 2, 0, 7); ctx.fill();
+      }
+    }
   }
   // One draw call per effect kind - all still just canvas shapes fading
   // out over their own `life`, same idea as the original laser-only
@@ -1980,6 +2153,7 @@ async function main() {
     for (const d of extraDeposits) drawExtraDeposit(d);
     for (const f of factions) if (f.hp > 0) drawFactionHome(f);
     for (const u of units) if (u.alive) drawUnit(u);
+    drawMissiles();
     drawEffects();
     drawTurretRangeRing();
 
@@ -2149,10 +2323,22 @@ async function main() {
     setPlacingTurret(null);
     renderBuildPanel();
   }
+  function tryPlaceMissileLauncher(p) {
+    const def = missileDefs[placingMissile.defIndex];
+    const dist = Math.hypot(p.x - activeFaction.x, p.y - activeFaction.y);
+    if (dist < TURRET_MIN_RANGE || dist > TURRET_MAX_RANGE) return;
+    const costs = getCosts(def);
+    if (!canAffordCosts(activeFaction, costs)) { setPlacingMissile(null); renderBuildPanel(); return; }
+    spendCosts(activeFaction, costs);
+    spawnMissileLauncher(activeFaction.id, placingMissile.defIndex, p.x, p.y);
+    setPlacingMissile(null);
+    renderBuildPanel();
+  }
   function handleClick(evt) {
     const r = canvas.getBoundingClientRect();
     const p = toWorld(evt.clientX - r.left, evt.clientY - r.top);
     if (placingTurret) { tryPlaceTurret(p); return; }
+    if (placingMissile) { tryPlaceMissileLauncher(p); return; }
     const own = livingUnits(activeFaction.id).find((u) => Math.hypot(u.x - p.x, u.y - p.y) < (u.isGatedBuilding ? GATED_BUILDING_SIZE : UNIT_SIZE) / 2 + 8);
     if (own) {
       livingUnits(activeFaction.id).forEach((u) => u.selected = false);
@@ -2207,10 +2393,15 @@ async function main() {
     }
     const def = u.isMiner ? { name: cfg.miningUnit?.name || 'Mining Ship' }
       : u.isTurret ? turretDefs[u.defIndex]
+      : u.isMissileLauncher ? missileDefs[u.defIndex]
       : u.isGatedBuilding ? buildingCfgByKey[u.buildingKey]
       : unitDefs[u.defIndex];
     box.style.display = 'block';
-    const statsLine = u.isMiner ? '' : u.isTurret ? ` · ATK ${u.attack} · RNG ${u.range} · stationary` : u.isGatedBuilding ? '' : ` · ATK ${u.attack} · RNG ${u.range} · SPD ${u.speed.toFixed(1)}`;
+    const statsLine = u.isMiner ? ''
+      : u.isTurret ? ` · ATK ${u.attack} · RNG ${u.range} · stationary`
+      : u.isMissileLauncher ? ` · Missile DMG ${u.attack} · RNG ${missileRange(factionOf(u.factionId))} · stationary - click a target to fire`
+      : u.isGatedBuilding ? ''
+      : ` · ATK ${u.attack} · RNG ${u.range} · SPD ${u.speed.toFixed(1)}`;
     textEl.innerHTML = `<strong>${def.name}</strong><br>HP ${Math.round(u.hp)}/${u.maxHp}${statsLine}${isLocked(u) ? '<br><span style="color:var(--warn)">🔒 locked until next turn</span>' : ''}`;
   }
   function showHomeBaseInfo(f) {
@@ -2228,6 +2419,7 @@ async function main() {
   window.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     if (placingTurret) { setPlacingTurret(null); renderBuildPanel(); return; }
+    if (placingMissile) { setPlacingMissile(null); renderBuildPanel(); return; }
     deselectAll();
   });
 
@@ -2388,6 +2580,30 @@ async function main() {
       btn.textContent = isPlacingThis ? 'Click the map… (or Esc)' : 'Place';
       btn.disabled = !hasRF || (!isPlacingThis && !canAffordCosts(activeFaction, turretCosts));
       btn.onclick = () => { setPlacingTurret(isPlacingThis ? null : { defIndex: i }); renderBuildPanel(); };
+      row.appendChild(btn);
+      el.appendChild(row);
+    });
+    // Missile Silo launchers - placed exactly like Gun Turrets above
+    // (same ring, same "Place" arm-then-click flow), but additionally
+    // gated behind the Missile Silo building itself, and its range comes
+    // from missileRange() (research) rather than a def.range field -
+    // there isn't one. Never auto-fires once placed - see combatTick's
+    // isMissileLauncher branch and the per-unit update() loop, which both
+    // leave it going through the same order-issuing path as any other
+    // owned unit (click it, then click a target).
+    const missileSiloBuilt = activeFaction.built.missileSilo;
+    missileDefs.forEach((def, i) => {
+      const row = document.createElement('div');
+      row.className = 'buildRow';
+      const isPlacingThis = placingMissile && placingMissile.defIndex === i;
+      const missileCosts = getCosts(def);
+      const locked = !hasRF || !missileSiloBuilt;
+      const lockReason = !hasRF ? buildingCfgByKey.researchFacility.name : buildingCfgByKey.missileSilo.name;
+      row.innerHTML = `<div class="name">${def.name} 🚀</div><div class="stats">HP ${def.hp} · Missile DMG ${def.attack} · RNG ${missileRange(activeFaction)} · Cost ${costsText(missileCosts)} · place ${TURRET_MIN_RANGE}-${TURRET_MAX_RANGE} range of ${cfg.baseLabel || 'Home Base'}${locked ? ` · requires ${lockReason} first` : ''}</div>`;
+      const btn = document.createElement('button');
+      btn.textContent = isPlacingThis ? 'Click the map… (or Esc)' : 'Place';
+      btn.disabled = locked || (!isPlacingThis && !canAffordCosts(activeFaction, missileCosts));
+      btn.onclick = () => { setPlacingMissile(isPlacingThis ? null : { defIndex: i }); renderBuildPanel(); };
       row.appendChild(btn);
       el.appendChild(row);
     });
@@ -2597,7 +2813,7 @@ async function main() {
     return {
       cfg, turnNumber, turnTimer, activeIdx, hotseatTimer, moveNumber,
       factions: factions.map((f) => ({ id: f.id, resources: f.resources, hp: f.hp, team: f.team, built: f.built, buildQueue: f.buildQueue, researched: [...f.research.researched], active: f.research.active })),
-      units: units.filter((u) => u.alive).map((u) => ({ factionId: u.factionId, defIndex: u.defIndex, isMiner: !!u.isMiner, isTurret: !!u.isTurret, isGatedBuilding: !!u.isGatedBuilding, buildingKey: u.buildingKey, x: u.x, y: u.y, hp: u.hp, maxHp: u.maxHp })),
+      units: units.filter((u) => u.alive).map((u) => ({ factionId: u.factionId, defIndex: u.defIndex, isMiner: !!u.isMiner, isTurret: !!u.isTurret, isMissileLauncher: !!u.isMissileLauncher, isGatedBuilding: !!u.isGatedBuilding, buildingKey: u.buildingKey, x: u.x, y: u.y, hp: u.hp, maxHp: u.maxHp })),
     };
   }
   document.getElementById('saveBtn').addEventListener('click', () => {
@@ -2628,6 +2844,7 @@ async function main() {
     data.units.forEach((u) => {
       const spawned = u.isMiner ? spawnMiner(u.factionId, u.x, u.y)
         : u.isTurret ? spawnTurret(u.factionId, u.defIndex, u.x, u.y)
+        : u.isMissileLauncher ? spawnMissileLauncher(u.factionId, u.defIndex, u.x, u.y)
         : u.isGatedBuilding ? spawnGatedBuildingEntity(factionOf(u.factionId), u.buildingKey)
         : spawnUnit(u.factionId, u.defIndex, u.x, u.y);
       spawned.hp = u.hp; spawned.maxHp = u.maxHp;
@@ -2899,8 +3116,8 @@ async function main() {
   window.__GM_DEBUG = {
     factions, units, deposits, camera, get turnNumber() { return turnNumber; }, toScreen, effects,
     turnMode, get activeFaction() { return activeFaction; }, get hotseatTimer() { return hotseatTimer; },
-    get moveNumber() { return moveNumber; }, GATED_BUILDINGS, turretDefs,
-    get placingTurret() { return placingTurret; },
+    get moveNumber() { return moveNumber; }, GATED_BUILDINGS, turretDefs, missileDefs,
+    get placingTurret() { return placingTurret; }, get placingMissile() { return placingMissile; },
   };
 
   const topbarEl = document.getElementById('topbar');
