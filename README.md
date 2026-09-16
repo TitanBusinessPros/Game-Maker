@@ -619,6 +619,23 @@ Project: `game-maker-ed014`.
   without it every image/sound in Storage was already publicly
   viewable via `<img>`/`<audio>` (those don't need CORS), just not
   readable by JavaScript, which is what fetching-to-inline needs.
+  Every upload also gets a **Cache-Control** header set explicitly
+  (`public, max-age=31536000, immutable`, passed to `uploadBytes()` in
+  both `index.html`'s and `admin.html`'s own `uploadOneFile()`) - Storage's
+  own default for an object with no `cacheControl` metadata is `private,
+  max-age=0` (checked directly against a live object's response
+  headers), meaning a browser re-fetches every image/sound on every
+  single play or map-edit session, from every visitor, with no reuse at
+  all. A year-long cache is safe here specifically because every upload
+  path already includes `Date.now()` (`maps/<uid>/<mapId>/<slot>_<ts>_
+  <name>`, `library/<category>/<ts>_<name>`) - nothing is ever
+  overwritten at the same URL, a re-upload just creates a new path, so a
+  "never revalidate" cache can't ever go stale. The ~427 objects that
+  already existed in Storage before this were backfilled the same way
+  via `gcloud storage objects update gs://game-maker-ed014.firebasestorage.app/**
+  --cache-control="public, max-age=31536000, immutable"` (a new
+  `cacheControl` only applies to uploads made after it's set, not
+  retroactively).
 
 The web config (`apiKey` etc.) is a public client identifier, not a
 secret. `firestore.rules`/`storage.rules` in this repo are deployed via
