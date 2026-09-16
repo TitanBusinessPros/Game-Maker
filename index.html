@@ -1255,6 +1255,10 @@ const WEAPON_OPTIONS = [
   // oldest, most universally-supported emoji there is and reads fine as
   // a whip crack/lash line.
   ['javelin', '🔱 Javelin'], ['whip', '〰️ Whip'],
+  ['meteor', '☄️ Meteor Strike'], ['tornado', '🌪️ Tornado'], ['sonicboom', '💨 Sonic Boom'],
+  ['chainwhip', '⛓️ Chain Whip'], ['sniper', '🎯 Sniper Shot'], ['plasma', '🔮 Plasma Ball'],
+  ['net', '🕸️ Net Toss'], ['void', '⚫ Void Blast'], ['grapple', '🔗 Grapple Hook'],
+  ['nailgun', '📌 Nail Gun'],
 ];
 function weaponOptionsHtml(selected) {
   return WEAPON_OPTIONS.map(([v, label]) => `<option value="${v}" ${(selected || 'laser') === v ? 'selected' : ''}>${label}</option>`).join('');

@@ -936,6 +936,36 @@ async function main() {
       case 'whip':
         effects.push({ kind: 'whip', x1, y1, x2, y2, color, ttl: 0.14, life: 0.14 });
         break;
+      case 'meteor':
+        effects.push({ kind: 'meteor', x1, y1, x2, y2, color, ttl: 0.4, life: 0.4 });
+        break;
+      case 'tornado':
+        effects.push({ kind: 'tornado', x: x2, y: y2, color, ttl: 0.35, life: 0.35 });
+        break;
+      case 'sonicboom':
+        effects.push({ kind: 'sonicboom', x1, y1, x2, y2, color, ttl: 0.25, life: 0.25 });
+        break;
+      case 'chainwhip':
+        effects.push({ kind: 'chainwhip', x1, y1, x2, y2, color, ttl: 0.18, life: 0.18 });
+        break;
+      case 'sniper':
+        effects.push({ kind: 'sniper', x1, y1, x2, y2, color, ttl: 0.15, life: 0.15 });
+        break;
+      case 'plasma':
+        effects.push({ kind: 'plasma', x1, y1, x2, y2, color, ttl: 0.22, life: 0.22 });
+        break;
+      case 'net':
+        effects.push({ kind: 'net', x: x2, y: y2, color, ttl: 0.3, life: 0.3 });
+        break;
+      case 'void':
+        effects.push({ kind: 'void', x: x2, y: y2, color, ttl: 0.3, life: 0.3 });
+        break;
+      case 'grapple':
+        effects.push({ kind: 'grapple', x1, y1, x2, y2, color, ttl: 0.16, life: 0.16 });
+        break;
+      case 'nailgun':
+        effects.push({ kind: 'nailgun', x1, y1, x2, y2, color, ttl: 0.14, life: 0.14 });
+        break;
       default: // 'laser', or anything unrecognized
         effects.push({ kind: 'laser', x1, y1, x2, y2, color, ttl: 0.18, life: 0.18 });
     }
@@ -1727,6 +1757,143 @@ async function main() {
         const midX = (p1.x + p2.x) / 2 - dy * 0.25, midY = (p1.y + p2.y) / 2 + dx * 0.25;
         ctx.lineWidth = 2;
         ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.quadraticCurveTo(midX, midY, p2.x, p2.y); ctx.stroke();
+      } else if (e.kind === 'meteor') {
+        // Same "drawn every frame regardless of progress" approach as
+        // Grenade (curve + growing circle together, not gated on
+        // "arrived yet") but steeper (falling from the sky, not lobbed
+        // sideways) and no dash - a meteor doesn't wobble.
+        const p1 = toScreen(e.x1, e.y1), p2 = toScreen(e.x2, e.y2);
+        const midX = (p1.x + p2.x) / 2, midY = Math.min(p1.y, p2.y) - 70 * camera.zoom;
+        ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.quadraticCurveTo(midX, midY, p2.x, p2.y); ctx.stroke();
+        const mProgress = 1 - e.ttl / e.life;
+        const mRadius = (4 + mProgress * 22) * camera.zoom;
+        ctx.beginPath(); ctx.arc(p2.x, p2.y, mRadius, 0, 7); ctx.stroke();
+      } else if (e.kind === 'tornado') {
+        // Stationary at the target (unlike every travel effect above) -
+        // 3 partial rings at growing radius, each rotating at its own
+        // offset as e.ttl counts down, reading as a spinning funnel
+        // rather than an expanding ring like Shockwave.
+        const p = toScreen(e.x, e.y);
+        const tProgress = 1 - e.ttl / e.life;
+        ctx.lineWidth = 2;
+        for (let i = 0; i < 3; i++) {
+          const r = (5 + i * 6) * camera.zoom;
+          const start = tProgress * 10 + i * 1.2;
+          ctx.beginPath(); ctx.arc(p.x, p.y, r, start, start + 4.2); ctx.stroke();
+        }
+      } else if (e.kind === 'sonicboom') {
+        // A directional blast wave centered on the target, facing back
+        // toward the shooter - unlike Shockwave's omnidirectional rings.
+        const p1 = toScreen(e.x1, e.y1), p2 = toScreen(e.x2, e.y2);
+        const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+        const sbProgress = 1 - e.ttl / e.life;
+        ctx.lineWidth = 2;
+        [0, 0.12].forEach((delay) => {
+          const rp = Math.max(0, sbProgress - delay);
+          if (rp <= 0) return;
+          const r = rp * 22 * camera.zoom;
+          ctx.beginPath(); ctx.arc(p2.x, p2.y, r, angle - 1.1, angle + 1.1); ctx.stroke();
+        });
+      } else if (e.kind === 'chainwhip') {
+        // A longer, snakier cousin of Whip's single smooth lash curve -
+        // several sideways wobbles along the line instead of one bow,
+        // reading as links rather than a single leather crack.
+        const p1 = toScreen(e.x1, e.y1), p2 = toScreen(e.x2, e.y2);
+        const dx = p2.x - p1.x, dy = p2.y - p1.y;
+        const len = Math.hypot(dx, dy) || 1;
+        const nx = -dy / len, ny = dx / len;
+        const LINKS = 5;
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(p1.x, p1.y);
+        for (let i = 1; i <= LINKS; i++) {
+          const t = i / LINKS;
+          const wobble = Math.sin(t * Math.PI * 2.5) * 8 * camera.zoom;
+          ctx.lineTo(p1.x + dx * t + nx * wobble, p1.y + dy * t + ny * wobble);
+        }
+        ctx.stroke();
+      } else if (e.kind === 'sniper') {
+        // A hairline beam (thinner than Laser's) plus a crosshair
+        // reticle at the impact point - the only weapon whose "hit"
+        // marker is precision-themed instead of a blob/burst.
+        const p1 = toScreen(e.x1, e.y1), p2 = toScreen(e.x2, e.y2);
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+        const rr = 6 * camera.zoom;
+        ctx.beginPath(); ctx.arc(p2.x, p2.y, rr, 0, 7); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(p2.x - rr * 1.6, p2.y); ctx.lineTo(p2.x - rr * 0.6, p2.y);
+        ctx.moveTo(p2.x + rr * 0.6, p2.y); ctx.lineTo(p2.x + rr * 1.6, p2.y);
+        ctx.moveTo(p2.x, p2.y - rr * 1.6); ctx.lineTo(p2.x, p2.y - rr * 0.6);
+        ctx.moveTo(p2.x, p2.y + rr * 0.6); ctx.lineTo(p2.x, p2.y + rr * 1.6);
+        ctx.stroke();
+      } else if (e.kind === 'plasma') {
+        // A traveling orb with a soft outer glow (a dimmer, wider circle
+        // under the solid core) instead of Cannonball's plain solid dot.
+        const p1 = toScreen(e.x1, e.y1), p2 = toScreen(e.x2, e.y2);
+        const plProgress = Math.min(1, (1 - e.ttl / e.life) * 1.3);
+        const bx = p1.x + (p2.x - p1.x) * plProgress, by = p1.y + (p2.y - p1.y) * plProgress;
+        const baseAlpha = ctx.globalAlpha;
+        ctx.globalAlpha = baseAlpha * 0.35;
+        ctx.beginPath(); ctx.arc(bx, by, 8 * camera.zoom, 0, 7); ctx.fill();
+        ctx.globalAlpha = baseAlpha;
+        ctx.beginPath(); ctx.arc(bx, by, 3.5 * camera.zoom, 0, 7); ctx.fill();
+      } else if (e.kind === 'net') {
+        // An expanding ring with a few crossing chords through it (reads
+        // as mesh/netting) instead of Shockwave's plain concentric rings.
+        const p = toScreen(e.x, e.y);
+        const nProgress = 1 - e.ttl / e.life;
+        const r = (4 + nProgress * 14) * camera.zoom;
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, 7); ctx.stroke();
+        for (let i = 0; i < 3; i++) {
+          const ang = (i / 3) * Math.PI;
+          ctx.beginPath();
+          ctx.moveTo(p.x + Math.cos(ang) * r, p.y + Math.sin(ang) * r);
+          ctx.lineTo(p.x - Math.cos(ang) * r, p.y - Math.sin(ang) * r);
+          ctx.stroke();
+        }
+      } else if (e.kind === 'void') {
+        // Shrinks and pulls short radiating lines inward as it ages -
+        // the opposite of Explosion's outward burst that grows.
+        const p = toScreen(e.x, e.y);
+        const vProgress = 1 - e.ttl / e.life;
+        const vr = Math.max(2, (18 - vProgress * 14)) * camera.zoom;
+        ctx.beginPath(); ctx.arc(p.x, p.y, vr, 0, 7); ctx.fill();
+        ctx.lineWidth = 1.5;
+        for (let i = 0; i < 5; i++) {
+          const ang = (i / 5) * Math.PI * 2 + vProgress * 3;
+          const dist = Math.max(2, (20 - vProgress * 14)) * camera.zoom;
+          ctx.beginPath();
+          ctx.moveTo(p.x + Math.cos(ang) * dist, p.y + Math.sin(ang) * dist);
+          ctx.lineTo(p.x + Math.cos(ang) * dist * 0.4, p.y + Math.sin(ang) * dist * 0.4);
+          ctx.stroke();
+        }
+      } else if (e.kind === 'grapple') {
+        // A plain travel line like Railgun's, but a two-pronged curved
+        // hook at the tip instead of a flash-circle or arrowhead.
+        const p1 = toScreen(e.x1, e.y1), p2 = toScreen(e.x2, e.y2);
+        const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+        ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+        ctx.save();
+        ctx.translate(p2.x, p2.y); ctx.rotate(angle);
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(-6, -7, -10, -3); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, 0); ctx.quadraticCurveTo(-6, 7, -10, 3); ctx.stroke();
+        ctx.restore();
+      } else if (e.kind === 'nailgun') {
+        // 3 near-parallel tracers with a slight spread instead of
+        // Bullet's single tracer - reads as an automatic burst.
+        const p1 = toScreen(e.x1, e.y1), p2 = toScreen(e.x2, e.y2);
+        const dx = p2.x - p1.x, dy = p2.y - p1.y;
+        const len = Math.hypot(dx, dy) || 1;
+        const nx = -dy / len, ny = dx / len;
+        ctx.lineWidth = 1;
+        [-4, 0, 4].forEach((offset) => {
+          const ox = nx * offset * camera.zoom, oy = ny * offset * camera.zoom;
+          const tx = p1.x + dx * 0.65 + ox, ty = p1.y + dy * 0.65 + oy;
+          ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(p2.x + ox, p2.y + oy); ctx.stroke();
+        });
       }
       ctx.globalAlpha = 1;
     }

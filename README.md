@@ -377,11 +377,11 @@ entirely by one map's saved data:
   target now too - it always had real HP and could always be killed by
   an AI, a player just had no way to actually order an attack on one.
 - Every attack draws a **weapon effect** picked per unit (a **Weapon**
-  dropdown on each unit/turret row in `index.html`, 16 options - defaults
+  dropdown on each unit/turret row in `index.html`, 26 options - defaults
   to Laser, so any map saved before this field existed keeps its
   original beam with no change). Purely cosmetic - it only changes what
   gets drawn, never damage, range, or attack timing, which all still
-  happen the instant the target's in range same as before. All 16 are
+  happen the instant the target's in range same as before. All 26 are
   drawn entirely with canvas shapes (`drawEffects()` in `play.html`) -
   none of them need or use an uploaded image, same as the original laser
   never did; only the unit's own sprite is art you provide. Every type
@@ -408,7 +408,29 @@ entirely by one map's saved data:
   single heavy dot that travels then bursts into a small dust-puff ring
   on arrival), Javelin (like Arrow but a longer shaft and a diamond
   head, reading as a heavier thrown weapon), Whip (a quadratic curve
-  bowed sideways rather than upward - a lash, not a lob).
+  bowed sideways rather than upward - a lash, not a lob; its dropdown
+  icon was originally 🪢, a 2020-era emoji many fonts - Windows
+  especially - have no glyph for, so it showed as a blank box; now
+  〰️, one of the oldest and most universally-supported emoji there
+  is). Ten more again: Meteor Strike (Grenade's arc-plus-growing-circle
+  approach, but steeper and undashed - falling from the sky, not lobbed
+  sideways), Tornado (stationary at the target - 3 partial rings at
+  growing radius, each rotating at its own offset, unlike any
+  travel-based effect), Sonic Boom (a directional blast wave at the
+  target facing back toward the shooter, unlike Shockwave's
+  omnidirectional rings), Chain Whip (Whip's single lash curve stretched
+  into several sideways wobbles - a longer, snakier cousin), Sniper Shot
+  (a hairline beam thinner than Laser's, plus a crosshair reticle on
+  impact instead of a blob/burst), Plasma Ball (a traveling orb with a
+  soft, dimmer outer glow under its solid core, unlike Cannonball's
+  plain dot), Net Toss (an expanding ring with a few crossing chords
+  through it, reading as mesh instead of Shockwave's plain rings), Void
+  Blast (shrinks and pulls short radiating lines inward as it ages - the
+  opposite of Explosion's outward-growing burst), Grapple Hook (a plain
+  travel line like Railgun's, but a two-pronged curved hook at the tip
+  instead of a flash-circle or arrowhead), Nail Gun (3 near-parallel
+  tracers with a slight spread instead of Bullet's single tracer, reading
+  as an automatic burst).
 - Units rotate to face their actual direction of travel - per-unit now,
   via a "Rotate to face movement direction" checkbox on every combat
   unit row in `index.html` (on by default, so existing maps look
