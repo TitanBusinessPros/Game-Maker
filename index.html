@@ -154,7 +154,12 @@
     position: absolute; width: 16px; height: 16px; margin: -8px 0 0 -8px;
     border-radius: 50%; background: var(--accent); border: 2px solid #06121f;
     box-shadow: 0 0 0 2px var(--accent);
+    cursor: pointer;
   }
+  .placement-marker:hover { background: var(--bad); box-shadow: 0 0 0 2px var(--bad); }
+  .placement-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; }
+  .placement-count { font-size: 12px; color: var(--text-dim); }
+  .placement-clear { font-size: 11px; padding: 4px 10px; }
 
   #libraryModal {
     position: fixed; inset: 0; background: rgba(0,0,0,0.7);
@@ -427,15 +432,19 @@
         <div class="meta"><div class="name">No file chosen</div><div class="status">required to finish</div></div>
         <input type="file" accept="image/*" style="width:auto">
       </div>
-      <div class="placement-widget" id="goldPlacementWidget" data-mode="base" data-x="0.5" data-y="0.5">
+      <div class="placement-widget" id="goldPlacementWidget" data-mode="base" data-points="[]">
         <label>Placement</label>
         <div class="placement-toggle">
           <label class="placement-option"><input type="radio" name="place-mode-gold" value="base" checked> 📍 Near each base (default)</label>
           <label class="placement-option"><input type="radio" name="place-mode-gold" value="map"> 🗺️ Place on the map</label>
         </div>
         <div class="placement-map" hidden>
-          <div class="placement-canvas-wrap"><div class="placement-marker" hidden></div></div>
-          <p class="hint" style="margin:6px 0 0;">Click the map to choose one shared spot every faction's Mining Ships travel to and gather from. Upload map background art above (Map Basics) to see it here.</p>
+          <div class="placement-canvas-wrap"></div>
+          <div class="placement-footer">
+            <span class="placement-count"></span>
+            <button type="button" class="btn-secondary placement-clear">Clear all</button>
+          </div>
+          <p class="hint" style="margin:6px 0 0;">Click the map to add one or more shared deposits every faction's Mining Ships travel to and gather from. Click a point to remove just that one. Upload map background art above (Map Basics) to see it here.</p>
         </div>
       </div>
     </div>
@@ -940,14 +949,16 @@ document.querySelectorAll('.upload-slot').forEach(wireUploadSlot);
 // extra resource added below) defaults to "near each base" - the
 // existing play.html behavior, untouched if this is never opened. The
 // alternative, "place on the map," shows the map's own background art
-// (whatever's uploaded/picked under Map Basics above) and a single
-// point (0..1 fractions of it, not pixels - so it scales correctly
+// (whatever's uploaded/picked under Map Basics above) and any number of
+// points (0..1 fractions of it, not pixels - so they scale correctly
 // however big the actual match's world ends up being, same as the
 // background art itself already cover-fits play.html's whole world
-// bounding box) the map-maker clicks to set where that resource's
-// deposit/marker appears for every faction. Gold placed this way is one
-// real shared deposit everyone's Mining Ships travel to and gather
-// from - not a copy per faction - see play.html's own `sharedGoldPos`.
+// bounding box) the map-maker clicks to add. Gold placed this way is one
+// real shared deposit per point, every faction's Mining Ships travel to
+// and gather from whichever is nearest (or wherever manually redirected)
+// - not a copy per faction - see play.html's own `sharedGoldPoints`.
+// Clicking a placed point removes just that one; "Clear all" removes
+// every point for that resource at once.
 // ---------------------------------------------------------------------
 const placementRefreshFns = []; // one per open placement widget, so picking/uploading a new background art live-updates every preview at once
 function currentBackgroundPreviewUrl() {
@@ -959,35 +970,77 @@ function currentBackgroundPreviewUrl() {
 }
 function refreshAllPlacementPreviews() { placementRefreshFns.forEach((fn) => fn()); }
 
+// A map saved by the very first version of this feature stored a single
+// {mode, x, y} - migrated here into the {mode, points: [{x,y}, ...]}
+// shape every widget below actually works with, so an old map still
+// loads its one existing point instead of silently losing it.
+function normalizePlacement(placement) {
+  if (!placement || placement.mode !== 'map') return { mode: 'base', points: [] };
+  if (Array.isArray(placement.points)) return { mode: 'map', points: placement.points };
+  if (typeof placement.x === 'number') return { mode: 'map', points: [{ x: placement.x, y: placement.y }] };
+  return { mode: 'base', points: [] };
+}
+
 function placementWidgetHTML(resourceKey, placement) {
-  const mode = (placement && placement.mode === 'map') ? 'map' : 'base';
-  const x = (placement && typeof placement.x === 'number') ? placement.x : 0.5;
-  const y = (placement && typeof placement.y === 'number') ? placement.y : 0.5;
+  const { mode, points } = normalizePlacement(placement);
   return `
-    <div class="placement-widget" data-mode="${mode}" data-x="${x}" data-y="${y}">
+    <div class="placement-widget" data-mode="${mode}" data-points='${JSON.stringify(points)}'>
       <label>Placement</label>
       <div class="placement-toggle">
         <label class="placement-option"><input type="radio" name="place-mode-${resourceKey}" value="base" ${mode === 'base' ? 'checked' : ''}> 📍 Near each base (default)</label>
         <label class="placement-option"><input type="radio" name="place-mode-${resourceKey}" value="map" ${mode === 'map' ? 'checked' : ''}> 🗺️ Place on the map</label>
       </div>
       <div class="placement-map" ${mode === 'map' ? '' : 'hidden'}>
-        <div class="placement-canvas-wrap"><div class="placement-marker" hidden></div></div>
-        <p class="hint" style="margin:6px 0 0;">Click the map to choose where this resource appears for every player. Upload map background art above (Map Basics) to see it here.</p>
+        <div class="placement-canvas-wrap"></div>
+        <div class="placement-footer">
+          <span class="placement-count"></span>
+          <button type="button" class="btn-secondary placement-clear">Clear all</button>
+        </div>
+        <p class="hint" style="margin:6px 0 0;">Click the map to add a point - every faction's Mining Ships (Gold) or a marker (other resources) appears at every point you add. Click a point to remove just that one. Upload map background art above (Map Basics) to see it here.</p>
       </div>
     </div>`;
 }
 
 // Wires one .placement-widget root (either the fixed #goldPlacementWidget
 // or one generated per extra-resource row) - reads/writes its own state
-// straight from data-mode/data-x/data-y on the root element rather than
+// straight from data-mode/data-points on the root element rather than
 // tracking it separately, same reasoning as every other row in this file
 // (collect straight from the DOM at save time, see readPlacement below).
 function wirePlacementWidget(root) {
   if (!root) return;
   const wrap = root.querySelector('.placement-canvas-wrap');
-  const marker = root.querySelector('.placement-marker');
   const mapSection = root.querySelector('.placement-map');
   const radios = root.querySelectorAll('input[type=radio]');
+  const countEl = root.querySelector('.placement-count');
+  const clearBtn = root.querySelector('.placement-clear');
+
+  function getPoints() {
+    try { return JSON.parse(root.dataset.points || '[]'); } catch { return []; }
+  }
+  function setPoints(points) { root.dataset.points = JSON.stringify(points); }
+
+  function renderMarkers() {
+    const points = getPoints();
+    wrap.querySelectorAll('.placement-marker').forEach((el) => el.remove());
+    points.forEach((p, idx) => {
+      const marker = document.createElement('div');
+      marker.className = 'placement-marker';
+      marker.style.left = (p.x * 100) + '%';
+      marker.style.top = (p.y * 100) + '%';
+      marker.title = 'Click to remove this point';
+      marker.addEventListener('click', (e) => {
+        e.stopPropagation(); // a click on a marker removes it - it must not also count as "add a new point" on the wrap underneath
+        const pts = getPoints();
+        pts.splice(idx, 1);
+        setPoints(pts);
+        syncUI();
+      });
+      wrap.appendChild(marker);
+    });
+    countEl.textContent = points.length
+      ? `${points.length} point${points.length === 1 ? '' : 's'} placed`
+      : 'No points placed yet - click the map to add one';
+  }
 
   function syncUI() {
     const mode = root.dataset.mode || 'base';
@@ -996,10 +1049,7 @@ function wirePlacementWidget(root) {
     if (mode !== 'map') return;
     const url = currentBackgroundPreviewUrl();
     wrap.style.backgroundImage = url ? `url(${url})` : 'none';
-    const x = Number(root.dataset.x) || 0.5, y = Number(root.dataset.y) || 0.5;
-    marker.style.left = (x * 100) + '%';
-    marker.style.top = (y * 100) + '%';
-    marker.hidden = false;
+    renderMarkers();
   }
 
   radios.forEach((r) => r.addEventListener('change', () => {
@@ -1008,11 +1058,16 @@ function wirePlacementWidget(root) {
     syncUI();
   }));
   wrap.addEventListener('click', (e) => {
+    if (e.target !== wrap) return; // a marker's own click handler (above) already handled removing itself
     const rect = wrap.getBoundingClientRect();
-    root.dataset.x = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)).toFixed(4);
-    root.dataset.y = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height)).toFixed(4);
+    const x = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+    const y = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height));
+    const pts = getPoints();
+    pts.push({ x: Number(x.toFixed(4)), y: Number(y.toFixed(4)) });
+    setPoints(pts);
     syncUI();
   });
+  clearBtn.addEventListener('click', () => { setPoints([]); syncUI(); });
 
   placementRefreshFns.push(syncUI);
   syncUI();
@@ -1021,7 +1076,13 @@ function wirePlacementWidget(root) {
 
 function readPlacement(root) {
   if (!root || root.dataset.mode !== 'map') return { mode: 'base' };
-  return { mode: 'map', x: Number(root.dataset.x) || 0.5, y: Number(root.dataset.y) || 0.5 };
+  let points = [];
+  try { points = JSON.parse(root.dataset.points || '[]'); } catch { /* ignore malformed data, treat as empty */ }
+  points = points.filter((p) => p && typeof p.x === 'number' && typeof p.y === 'number');
+  // No points actually placed yet - fall back to the default "near each
+  // base" behavior rather than saving a "map" mode with nothing in it.
+  if (!points.length) return { mode: 'base' };
+  return { mode: 'map', points };
 }
 
 wirePlacementWidget(document.getElementById('goldPlacementWidget'));
@@ -1938,11 +1999,11 @@ async function buildMapDoc(status) {
       size: Number(document.getElementById('resourceSize').value) || 5000,
       image: uploadResults.resourceImage,
       // 'base' (default): one deposit per faction, near its own home
-      // base, exactly as before this existed. 'map': ONE real shared
-      // deposit at this x/y (fractions of the map background, not
+      // base, exactly as before this existed. 'map': a real shared
+      // deposit per placed point (fractions of the map background, not
       // pixels) that every faction's Mining Ships travel to and gather
       // from - see readPlacement/wirePlacementWidget above and
-      // play.html's own sharedGoldPos.
+      // play.html's own sharedGoldPoints.
       placement: readPlacement(document.getElementById('goldPlacementWidget')),
     },
     miningUnit: {
@@ -2292,9 +2353,9 @@ async function loadExistingMap() {
     document.getElementById('resourceSize').value = m.resource.size || 5000;
     if (m.resource.image) showExistingAsset('resourceImage', m.resource.image);
     const goldPlacementRoot = document.getElementById('goldPlacementWidget');
-    goldPlacementRoot.dataset.mode = (m.resource.placement && m.resource.placement.mode === 'map') ? 'map' : 'base';
-    goldPlacementRoot.dataset.x = String(m.resource.placement?.x ?? 0.5);
-    goldPlacementRoot.dataset.y = String(m.resource.placement?.y ?? 0.5);
+    const goldPlacement = normalizePlacement(m.resource.placement);
+    goldPlacementRoot.dataset.mode = goldPlacement.mode;
+    goldPlacementRoot.dataset.points = JSON.stringify(goldPlacement.points);
   }
   // Refresh every placement widget (gold + each extra resource) now that
   // the map's background art and every saved placement are loaded - each

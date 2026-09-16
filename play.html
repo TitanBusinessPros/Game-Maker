@@ -700,31 +700,50 @@ async function main() {
   // index.html's Resource & Mining placement widget: 'base' (default,
   // unset on any map saved before this existed) keeps the original
   // per-faction deposit near each home base, untouched below. 'map' means
-  // the map-maker clicked a spot on the map's own background art -
-  // stored as x/y fractions (0..1) of it, not pixels, so it scales
+  // the map-maker clicked one or more spots on the map's own background
+  // art - stored as x/y fractions (0..1) of it, not pixels, so they scale
   // correctly to whatever this actual match's world bounding box turns
   // out to be (same reasoning the background art's own cover-fit already
-  // uses - see bgDraw below). That single point becomes ONE real shared
-  // Gold deposit every faction's Mining Ships travel to and gather from,
-  // not a copy placed near each base.
-  function placementWorldPos(placement) {
-    if (!placement || placement.mode !== 'map' || typeof placement.x !== 'number') return null;
-    return { x: worldMinX + placement.x * worldW, y: worldMinY + placement.y * worldH };
+  // uses - see bgDraw below). Each point becomes ONE real shared Gold
+  // deposit every faction's Mining Ships travel to and gather from (the
+  // nearest one, to start - see nearestDeposit below), not a copy placed
+  // near each base. `points` also accepts an older single {x,y} shape
+  // (a map saved by the first version of this feature, before it
+  // supported more than one point).
+  function placementWorldPoints(placement) {
+    if (!placement || placement.mode !== 'map') return null;
+    const raw = Array.isArray(placement.points) ? placement.points
+      : (typeof placement.x === 'number' ? [{ x: placement.x, y: placement.y }] : []);
+    const pts = raw.filter((p) => p && typeof p.x === 'number' && typeof p.y === 'number')
+      .map((p) => ({ x: worldMinX + p.x * worldW, y: worldMinY + p.y * worldH }));
+    return pts.length ? pts : null;
   }
-  const sharedGoldPos = placementWorldPos(cfg.resource?.placement);
-  const deposits = factions.map((f) => ({
-    factionId: f.id,
-    x: sharedGoldPos ? sharedGoldPos.x : f.x,
-    y: sharedGoldPos ? sharedGoldPos.y : f.y - 100,
-    size: cfg.resource?.size || 5000,
-  }));
+  const sharedGoldPoints = placementWorldPoints(cfg.resource?.placement);
+  const deposits = sharedGoldPoints
+    ? sharedGoldPoints.map((p) => ({ factionId: null, x: p.x, y: p.y, size: cfg.resource?.size || 5000 }))
+    : factions.map((f) => ({ factionId: f.id, x: f.x, y: f.y - 100, size: cfg.resource?.size || 5000 }));
+  // Nearest-of-the-shared-deposits, used only when Gold is placed on the
+  // map (several real, distinct locations - not one shared point copied
+  // per faction) to decide which one a freshly-built Mining Ship auto-
+  // orders itself toward (see spawnMiner below). Actually being "in
+  // range" for income (see the per-tick loop further down) checks every
+  // shared deposit, not just this nearest one, since a miner can be
+  // manually redirected to any of them afterward.
+  function nearestDeposit(x, y) {
+    let best = null, bestDist = Infinity;
+    for (const d of deposits) {
+      const dist = Math.hypot(d.x - x, d.y - y);
+      if (dist < bestDist) { bestDist = dist; best = d; }
+    }
+    return best;
+  }
   // One deposit marker per extra resource per faction - purely a visual
   // "this is where it comes from" (no range/mining-unit interaction, see
   // the passive income loop in update()), laid out in a row below home
   // base so they don't overlap Gold's own deposit (above home, y-100) or
   // any of the GATED_BUILDINGS (which sit at |offset| <= 140). A resource
-  // placed "on the map" instead gets exactly one shared marker (below)
-  // rather than one of these per faction.
+  // placed "on the map" instead gets one shared marker per placed point
+  // (below) rather than one of these per faction.
   const extraDeposits = factions.flatMap((f) => EXTRA_RESOURCES
     .map((r, i) => ({ r, i }))
     .filter(({ r }) => !(r.placement && r.placement.mode === 'map'))
@@ -733,12 +752,11 @@ async function main() {
       x: f.x + (i - (EXTRA_RESOURCES.length - 1) / 2) * 90, y: f.y + 200,
       img: EXTRA_RESOURCE_IMAGES[i],
     })))
-    .concat(EXTRA_RESOURCES
-      .map((r, i) => ({ r, i, pos: placementWorldPos(r.placement) }))
-      .filter(({ pos }) => pos)
-      .map(({ r, i, pos }) => ({
-        factionId: null, resourceId: r.id, x: pos.x, y: pos.y, img: EXTRA_RESOURCE_IMAGES[i],
-      })));
+    .concat(EXTRA_RESOURCES.flatMap((r, i) => {
+      const pts = placementWorldPoints(r.placement);
+      if (!pts) return [];
+      return pts.map((pos) => ({ factionId: null, resourceId: r.id, x: pos.x, y: pos.y, img: EXTRA_RESOURCE_IMAGES[i] }));
+    }));
 
   const units = [];
   let nextUnitId = 1;
@@ -833,14 +851,18 @@ async function main() {
     }
   }
   function spawnMiner(factionId, x, y) {
-    // Auto-orders itself to its own faction's deposit the moment it's
-    // built - matching the real "a Mining Ship parked within range of a
-    // deposit drains it" mechanic, and giving it an actual reason to move
-    // instead of just sitting at its spawn point forever (see the
-    // isMiner-gated movement fix in update() below - previously nothing
-    // in the whole update loop moved a miner at all, regardless of any
-    // order it held).
-    const deposit = deposits.find((d) => d.factionId === factionId);
+    // Auto-orders itself to a deposit the moment it's built - matching
+    // the real "a Mining Ship parked within range of a deposit drains it"
+    // mechanic, and giving it an actual reason to move instead of just
+    // sitting at its spawn point forever (see the isMiner-gated movement
+    // fix in update() below - previously nothing in the whole update loop
+    // moved a miner at all, regardless of any order it held). Gold placed
+    // on the map (several real, distinct shared deposits) auto-orders
+    // toward whichever one is nearest to this spot - manually redirecting
+    // it to a different one afterward works exactly like any other move
+    // order. Gold left at its "near each base" default keeps ordering
+    // toward this faction's own single deposit, same as always.
+    const deposit = sharedGoldPoints ? nearestDeposit(x, y) : deposits.find((d) => d.factionId === factionId);
     const fac = factionOf(factionId);
     // HP is a real per-map setting now (index.html's "Mining unit HP"
     // field), same effectiveStat() HP-research bonus every other unit
@@ -1312,7 +1334,10 @@ async function main() {
       // currently in range instead of just checking a single ship -
       // each additional miner parked at the deposit adds its own full
       // share of income, same as adding more workers to it should.
-      const deposit = deposits.find((d) => d.factionId === f.id);
+      // Gold placed on the map is checked against every shared deposit,
+      // not just one - a miner parked at any of the placed points earns,
+      // since it could have been sent to whichever is closest at the time.
+      const deposit = sharedGoldPoints ? null : deposits.find((d) => d.factionId === f.id);
       let minersInRange = 0;
       units.forEach((u) => {
         if (!u.alive || u.factionId !== f.id || !u.isMiner) return;
@@ -1322,7 +1347,9 @@ async function main() {
         // miner from being attacked at all if this used that same name.
         // Resource ships are meant to stay a real, killable target the
         // whole time.
-        const inRange = !!deposit && Math.hypot(u.x - deposit.x, u.y - deposit.y) < MINING_RANGE;
+        const inRange = sharedGoldPoints
+          ? deposits.some((d) => Math.hypot(u.x - d.x, u.y - d.y) < MINING_RANGE)
+          : (!!deposit && Math.hypot(u.x - deposit.x, u.y - deposit.y) < MINING_RANGE);
         u.activelyMining = inRange; // read by drawUnit for the live income label
         if (inRange) minersInRange++;
       });

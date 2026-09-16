@@ -104,17 +104,22 @@ line. Only this page has the logo/title/footer treatment so far -
    that resource's deposit/marker appears next to every faction's own
    home base. Place on the map instead shows the map's own background
    art (whatever's uploaded/picked under Map Basics) and lets the
-   map-maker click one spot on it - stored as a fraction of that image
-   (not a pixel position), so it scales correctly however big the map
-   actually ends up being once a real match's home bases are laid out.
-   For Gold specifically, this isn't a copy per faction the way "near
-   each base" is - it's one real, shared deposit every faction's Mining
-   Ships travel to and gather from (still each earning their own full
-   income share while parked in range, same as always - see `play.html`'s
-   own income bullet further down). For an Additional Resource, which was
-   already just a passive-income visual marker with no range to manage,
-   placing it on the map only moves where that one shared marker is
-   drawn - one for the whole map instead of one per faction either way.
+   map-maker click **any number of points** on it, each stored as a
+   fraction of that image (not a pixel position) so they scale correctly
+   however big the map actually ends up being once a real match's home
+   bases are laid out - click an existing point to remove just that one,
+   or **Clear all** to remove every point for that resource at once (a
+   live counter shows how many are currently placed). For Gold
+   specifically, each point isn't a copy per faction the way "near each
+   base" is - it's a real, distinct shared deposit; every faction's
+   Mining Ships (including AI) auto-order toward whichever placed deposit
+   is nearest when built, and a miner parked within range of *any* of
+   them earns its full income share, so several Gold points genuinely
+   means several places to work, not several copies of the same spot (see
+   `play.html`'s own income bullet further down). For an Additional
+   Resource, which was already just a passive-income visual marker with
+   no range to manage, placing it on the map with several points just
+   draws one shared marker per point instead of one per faction.
 4. **Air Base** (optional) — a building for planes/jets/spaceships/etc.
    Give it a name (defaults to "Air Base"), its own **art**, **HP**
    (1000-5000, same range/field as Home Base's), and a build cost, then
@@ -405,18 +410,21 @@ entirely by one map's saved data:
 - **Resource placement** (index.html's Resource & Mining section, item
   3a): every resource defaults to a deposit/marker next to each faction's
   own home base, same as always. A resource placed "on the map" instead
-  has exactly one location for the whole match, stored as a fraction of
-  the map's background art and converted here into a real world position
-  once this match's actual home-base layout (and so its world bounding
-  box, same one the background art itself cover-fits) is known. For Gold,
-  that means every faction's Mining Ships - including AI - auto-order
-  toward, and can be manually redirected toward, the same single shared
-  deposit (spawnMiner's own auto-order and the income-range check both
-  already key off `deposits.find(d => d.factionId === ...)`, so pointing
-  every faction's entry at one shared x/y needed no other change). An
-  Additional Resource placed this way instead of near-base just moves
-  where its one passive-income marker is drawn - it was never anything
-  but a visual marker either way.
+  can have **any number of locations** for the whole match, each stored
+  as a fraction of the map's background art and converted here into a
+  real world position once this match's actual home-base layout (and so
+  its world bounding box, same one the background art itself cover-fits)
+  is known. For Gold, each placed point is a real, distinct shared
+  deposit - every faction's Mining Ships, including AI, auto-order toward
+  whichever one is nearest the moment they're built (`nearestDeposit()`),
+  and can be manually redirected to any other one afterward; income
+  actually flows for a miner parked within range of *any* placed deposit,
+  not just the one it was first sent to (the income loop checks
+  `deposits.some(...)` instead of a single entry once Gold is placed this
+  way). An Additional Resource placed with several points just draws one
+  shared marker per point instead of one per faction - it was never
+  anything but a visual marker either way, so more points there are
+  purely decorative.
 - Every attack draws a **weapon effect** picked per unit (a **Weapon**
   dropdown on each unit/turret row in `index.html`, 26 options - defaults
   to Laser, so any map saved before this field existed keeps its
