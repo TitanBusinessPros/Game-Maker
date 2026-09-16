@@ -23,5 +23,60 @@ service cloud.firestore {
                    && request.auth.token.email == 'adonai4you@gmail.com'
                    && request.auth.token.email_verified == true;
     }
+
+    // Admin-managed bonus list for the download-credit system below -
+    // doc id IS the lowercased email itself (index.html/admin.html both
+    // lowercase before reading/writing this, so an exists() check here
+    // and a client-side membership lookup always agree). Public read is
+    // required, not just convenient - the create rule on /users/{uid}
+    // below has to run its OWN exists() check against this collection to
+    // decide 5 vs 50, and rules can only read what the requesting user
+    // is themselves allowed to read.
+    match /bonusEmails/{email} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.auth.token.email == 'adonai4you@gmail.com'
+                   && request.auth.token.email_verified == true;
+    }
+
+    // One doc per signed-in user, tracking download credits for the "⬇
+    // Download My Game" button in index.html. There's no backend here -
+    // this app is 100% client + these rules - so every anti-cheat
+    // guarantee has to live in the rules themselves, not in trusting
+    // whatever the client sends:
+    //  - create: the STARTING balance must be exactly 5, or exactly 50
+    //    if (and only if) this email is in bonusEmails - a client can't
+    //    just create itself a doc with credits: 9999.
+    //  - update: the new balance must be exactly one less than the
+    //    current balance, and the current balance must already be at
+    //    least 1 - a client can't increase its own balance, skip
+    //    straight to 0 from some higher number, or spend from 0.
+    //  - email is pinned to the signer's own verified token email on
+    //    both create and update (can't write into someone else's uid's
+    //    doc, and can't change which email a doc claims to belong to
+    //    after creation).
+    // The admin account never has a doc here at all - index.html skips
+    // every credit check/decrement for that one email entirely, so
+    // downloads are unlimited and untracked for it, same as the "does
+    // not affect the admin" instruction that created this whole system.
+    match /users/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create: if request.auth != null
+                    && request.auth.uid == uid
+                    && request.auth.token.email_verified == true
+                    && request.resource.data.email == request.auth.token.email
+                    && request.resource.data.keys().hasOnly(['email', 'credits', 'createdAt'])
+                    && (
+                      (exists(/databases/$(database)/documents/bonusEmails/$(request.auth.token.email)) && request.resource.data.credits == 50)
+                      || (!exists(/databases/$(database)/documents/bonusEmails/$(request.auth.token.email)) && request.resource.data.credits == 5)
+                    );
+      allow update: if request.auth != null
+                    && request.auth.uid == uid
+                    && request.auth.token.email_verified == true
+                    && request.resource.data.email == resource.data.email
+                    && request.resource.data.keys().hasOnly(['email', 'credits', 'createdAt'])
+                    && resource.data.credits >= 1
+                    && request.resource.data.credits == resource.data.credits - 1;
+    }
   }
 }

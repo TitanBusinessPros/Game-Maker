@@ -187,7 +187,22 @@ appear) — a genuinely separate, self-contained game per map.
    removing every link to it doesn't delete the page itself - but nothing
    in this app links to it or generates it any more, so nobody encounters
    it through normal use, and no play session against it costs Storage
-   egress unless someone specifically has an old URL saved.
+   egress unless someone specifically has an old URL saved. Clicking
+   **⬇ Download My Game** spends one **download credit** - every account
+   starts with 5, never refilled or reset (an admin-listed email starts
+   with 50 instead - see `admin.html`'s own section below), shown next
+   to your email at the top of the page ("N download credits left").
+   Hitting 0 blocks further downloads with a clear message instead of
+   failing silently. There's no backend in this project - it's 100%
+   client-side plus Firestore/Storage rules - so the actual enforcement
+   against someone just editing their own balance in devtools lives
+   entirely in `firestore.rules`' `/users/{uid}` rules: a new balance can
+   only ever be *created* at exactly 5 (or exactly 50, only if that
+   email's in the bonus list), and can only ever be *updated* to exactly
+   one less than whatever it already was. The admin account is fully
+   exempt - no credits doc, no check, no limit at all, checked the same
+   way every other admin-only action in this project is (`request.auth.token.email`
+   against the one hardcoded admin address, not a client-side flag).
 
 Every upload slot has a **📚 Library** button next to it, pulling from
 whatever the admin has added via `admin.html` (Firestore `libraryItems`
@@ -576,6 +591,15 @@ compresses them the same way `index.html` does, and writes to Firestore
 by the rules below (checked directly: an unauthorized session's write is
 actually rejected, not just hidden in the UI), not just a client check.
 
+This account also manages the **50-credit download list** - its own
+section at the top of the page, a simple add/remove list of emails
+(Firestore `bonusEmails/{email}`, doc id is the lowercased email itself)
+feeding `index.html`'s download-credit system (see that page's "My Maps"
+bullet above). Adding one here only changes what a *new* sign-in starts
+with - it's read once, when that account's own credits doc is first
+created, not re-checked afterward, so adding or removing an email here
+doesn't retroactively change a balance someone already has.
+
 Categories are hierarchical: **Maps** (sub-picker: **Tiny**, **Small**,
 **Medium**, **Large** - `maps/<size>`, so background art actually gets
 filed under the map size it was meant for instead of one flat bucket;
@@ -643,7 +667,14 @@ Project: `game-maker-ed014`.
   sign-in fails with `Error 400: origin_mismatch`.
 - **Firestore** — `maps/{mapId}` (one doc per map) and `libraryItems/{id}`
   (the shared asset library), both public-read; writes locked to the
-  owning `uid` (maps) or the admin email (library) via rules.
+  owning `uid` (maps) or the admin email (library) via rules. Two more
+  collections back the download-credit system: `bonusEmails/{email}`
+  (public-read, admin-only write - the 50-credit list) and `users/{uid}`
+  (a signed-in user can only read/write their own doc; the actual credit
+  math - correct starting value, only ever decrementing by exactly 1,
+  never below 0 - is enforced in the rules themselves, not trusted from
+  the client, since this project has no backend to enforce it any other
+  way).
 - **Storage** — `maps/{uid}/{mapId}/...` for map-specific uploads,
   `library/{category}/...` for the shared library. Same read-public/
   write-locked pattern. Its bucket also has a **CORS policy**

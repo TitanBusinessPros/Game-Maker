@@ -78,6 +78,16 @@
     </div>
 
     <div class="section">
+      <h3 style="margin-top:0;">50-credit download list</h3>
+      <p style="color:var(--text-dim); font-size:12px; margin-top:-8px;">Every account starts with 5 "⬇ Download My Game" credits, spent one per download, never refilled. An email added here starts with 50 instead - only applies the first time that account signs in (doesn't retroactively change a balance someone already has).</p>
+      <div class="row">
+        <div class="field"><input type="text" id="bonusEmailInput" placeholder="someone@example.com"></div>
+        <button type="button" class="btn-primary" id="addBonusEmailBtn">+ Add</button>
+      </div>
+      <div id="bonusEmailList" style="margin-top:10px; display:flex; flex-wrap:wrap; gap:8px;"></div>
+    </div>
+
+    <div class="section">
       <h3 style="margin-top:0;">Add to library</h3>
       <p style="color:var(--text-dim); font-size:12px; margin-top:-8px;">Pick a category and select one or more files (you can multi-select a whole folder). Each file's name becomes its display name.</p>
       <div class="row">
@@ -206,6 +216,48 @@ onAuthStateChanged(auth, (user) => {
   adminView.style.display = 'block';
   document.getElementById('adminEmail').textContent = user.email;
   refreshLibrary();
+  refreshBonusEmails();
+});
+
+// ---------------------------------------------------------------------
+// 50-credit download list (index.html's download-credit system) - one
+// doc per email in the `bonusEmails` collection, doc id IS the
+// lowercased email itself (lowercased here on both add and remove so it
+// always matches what index.html's own lowercase lookup checks against,
+// and what firestore.rules' exists() check compares against the
+// signed-in user's own token email). The actual security - only this
+// admin account can write here, and a user doc can only ever be CREATED
+// at exactly 5 or 50 credits based on this list, never invented at any
+// other number - lives entirely in firestore.rules, not in this page.
+// ---------------------------------------------------------------------
+async function refreshBonusEmails() {
+  const listEl = document.getElementById('bonusEmailList');
+  listEl.innerHTML = '<p style="color:var(--text-dim); font-size:12px;">Loading&hellip;</p>';
+  const snap = await getDocs(collection(db, 'bonusEmails'));
+  if (snap.empty) {
+    listEl.innerHTML = '<p style="color:var(--text-dim); font-size:12px;">No bonus emails yet - everyone starts with 5 credits.</p>';
+    return;
+  }
+  listEl.innerHTML = snap.docs.map((d) => `
+    <span style="display:inline-flex; align-items:center; gap:6px; background:var(--panel-2); border:1px solid var(--border); border-radius:6px; padding:6px 10px; font-size:12px;">
+      ${d.id}
+      <button type="button" class="remove-bonus-email" data-email="${d.id}" style="background:none; border:none; color:var(--bad); cursor:pointer; font-size:13px; padding:0; line-height:1;">&times;</button>
+    </span>
+  `).join('');
+  listEl.querySelectorAll('.remove-bonus-email').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      await deleteDoc(doc(db, 'bonusEmails', btn.dataset.email));
+      refreshBonusEmails();
+    });
+  });
+}
+document.getElementById('addBonusEmailBtn').addEventListener('click', async () => {
+  const input = document.getElementById('bonusEmailInput');
+  const email = input.value.trim().toLowerCase();
+  if (!email || !email.includes('@')) { alert('Enter a valid email address.'); return; }
+  await setDoc(doc(db, 'bonusEmails', email), { addedAt: serverTimestamp() });
+  input.value = '';
+  refreshBonusEmails();
 });
 
 // ---------------------------------------------------------------------

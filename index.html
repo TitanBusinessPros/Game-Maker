@@ -631,7 +631,7 @@ import {
   GoogleAuthProvider, signInWithCredential
 } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
 import {
-  getFirestore, doc, setDoc, getDoc, collection, query, where, getDocs, serverTimestamp, deleteDoc
+  getFirestore, doc, setDoc, getDoc, collection, query, where, getDocs, serverTimestamp, deleteDoc, runTransaction
 } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
 import {
   getStorage, ref as storageRef, uploadBytes, getDownloadURL
@@ -702,8 +702,9 @@ onAuthStateChanged(auth, (user) => {
     userBar.style.display = 'block';
     userBar.innerHTML = `Signed in as ${user.email}` + (user.email === ADMIN_EMAIL
       ? ` &middot; <a href="admin.html" style="color:var(--accent);">&#9881;&#65039; Admin: manage the shared library</a>`
-      : '');
+      : ` &middot; <span id="creditsBadge"></span>`);
     refreshMyMaps();
+    if (user.email !== ADMIN_EMAIL) ensureUserCreditsDoc(user).then(refreshCreditsDisplay);
   } else {
     authGate.style.display = 'flex';
     mainEl.style.display = 'none';
@@ -711,6 +712,64 @@ onAuthStateChanged(auth, (user) => {
     authBadge.textContent = 'Not signed in yet.';
   }
 });
+
+// ---------------------------------------------------------------------
+// Download credits - every account starts with 5 (50 for an email the
+// admin has added to the bonusEmails list in admin.html), spent one per
+// "⬇ Download My Game" click, never replenished or reset. The admin
+// account is exempt entirely - no doc, no check, unlimited downloads
+// (see downloadStandaloneGame below). The real enforcement is in
+// firestore.rules (a client here could send any number it wants -
+// what actually stops a fake/inflated balance is the rule only ever
+// allowing a create at exactly 5 or 50, or an update that's exactly
+// current-minus-one); this code just has to agree with those rules, not
+// invent the security itself.
+// ---------------------------------------------------------------------
+async function ensureUserCreditsDoc(user) {
+  const userRef = doc(db, 'users', user.uid);
+  const existing = await getDoc(userRef);
+  if (existing.exists()) return;
+  const bonusSnap = await getDoc(doc(db, 'bonusEmails', user.email.toLowerCase()));
+  const credits = bonusSnap.exists() ? 50 : 5;
+  try {
+    await setDoc(userRef, { email: user.email, credits, createdAt: serverTimestamp() });
+  } catch (err) {
+    console.error('Could not set up download credits for this account:', err);
+  }
+}
+async function refreshCreditsDisplay() {
+  const el = document.getElementById('creditsBadge');
+  if (!el || !currentUser || currentUser.email === ADMIN_EMAIL) return;
+  const snap = await getDoc(doc(db, 'users', currentUser.uid));
+  const credits = snap.exists() ? (snap.data().credits ?? 0) : 0;
+  el.textContent = `${credits} download credit${credits === 1 ? '' : 's'} left`;
+}
+// Transaction (not a plain read-then-write) so two rapid download clicks
+// can't both read "1 credit left" and both succeed - the second one to
+// actually commit re-reads inside the transaction and correctly sees 0.
+// Returns false (and alerts) without spending anything if already at 0.
+async function spendDownloadCredit() {
+  if (currentUser.email === ADMIN_EMAIL) return true;
+  const userRef = doc(db, 'users', currentUser.uid);
+  try {
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(userRef);
+      const credits = snap.exists() ? (snap.data().credits ?? 0) : 0;
+      if (credits < 1) throw new Error('out-of-credits');
+      tx.update(userRef, { credits: credits - 1 });
+    });
+    refreshCreditsDisplay();
+    return true;
+  } catch (err) {
+    if (err.message === 'out-of-credits') {
+      alert('You’re out of download credits - each account starts with 5 (50 for admin-listed accounts) and they don’t refill.');
+    } else {
+      console.error('Could not spend a download credit:', err);
+      alert('Could not check your download credits right now - please try again.');
+    }
+    return false;
+  }
+}
 
 async function handleGoogleCredential(response) {
   authBadge.textContent = 'Signing in…';
@@ -1932,6 +1991,17 @@ async function inlineUrlsAsDataUris(value, onProgress) {
   return replace(value);
 }
 async function downloadStandaloneGame(mapId, btn) {
+  // Fast pre-check, not the real enforcement (that's spendDownloadCredit's
+  // transaction, right before the file is actually handed over) - just
+  // avoids doing all the fetch/inline work below for someone who's
+  // already visibly at 0, per their own last-known credits.
+  if (currentUser.email !== ADMIN_EMAIL) {
+    const userSnap = await getDoc(doc(db, 'users', currentUser.uid));
+    if (!userSnap.exists() || (userSnap.data().credits ?? 0) < 1) {
+      alert('You’re out of download credits - each account starts with 5 (50 for admin-listed accounts) and they don’t refill.');
+      return;
+    }
+  }
   const originalLabel = btn.textContent;
   btn.disabled = true;
   try {
@@ -1942,6 +2012,9 @@ async function downloadStandaloneGame(mapId, btn) {
     const offlineCfg = await inlineUrlsAsDataUris(mapCfg, (done, total) => {
       btn.textContent = total ? `⬇ Preparing… ${done}/${total}` : '⬇ Preparing…';
     });
+    // Spent only once the file is actually ready - a network hiccup
+    // while fetching art shouldn't cost a credit for nothing.
+    if (!(await spendDownloadCredit())) return;
     const inline = `<script>window.GM_INLINE_CONFIG = ${JSON.stringify(offlineCfg)};<\/script>\n`;
     const withConfig = html.replace('<script type="module">', inline + '<script type="module">');
     const blob = new Blob([withConfig], { type: 'text/html' });
