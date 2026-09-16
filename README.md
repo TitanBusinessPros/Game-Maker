@@ -49,8 +49,18 @@ line. Only this page has the logo/title/footer treatment so far -
    fixed pixel size regardless of world scale.
 2. **Your faction & computer players** — you're always the human player;
    add 1-10 computer-controlled opponents, each with its own name, color,
-   home base art, and **Home Base HP** (1000-5000, per faction - not one
-   fixed value shared by every home base on the map).
+   home base art, **Home Base HP** (1000-5000, per faction - not one
+   fixed value shared by every home base on the map), and **AI
+   Difficulty** (Easy/Medium/Hard/Super Hard, per computer player - see
+   `AI_DIFFICULTY` in `play.html`). It scales three things about that
+   faction's AI, all independent of its actual decision logic (which is
+   identical at every difficulty): how often it gets to act at all
+   (`tickSeconds`, 10s down to 2.5s), a flat bonus/penalty on its Gold +
+   extra-resource income (`incomeMult`, 0.65x-1.65x - the classic RTS
+   "cheating AI" lever), and how often it takes an affordable
+   building/turret/extra-miner opportunity instead of skipping it
+   (`buildingChance`/`turretChance`/`minerChance`). Ignored for a
+   Turn-Based hot-seat "Human"-controlled computer player.
 2a. **Game style** — ⏱️ Real-Time (default, unchanged) or 🔄 Turn-Based
    (hot-seat: 2-11 people share this device, a timer of 10-60s per turn).
    Turn-Based adds a **turn timer** field and, per computer player, a
@@ -583,9 +593,18 @@ entirely by one map's saved data:
   downloaded copy. Content: a starfield backdrop (plain canvas, ~140
   gently twinkling dots, only animates while the page is open) behind the
   logo floating/spinning in a CSS 3D scene, a rotating galaxy and 3
-  rotating planets plus 2 tumbling asteroids and 5 flying ships (real art
-  from the After Earth game, see [[game-maker-references]] for the
-  source folder, resized way down before embedding), then three yes/no
+  rotating planets plus 2 tumbling asteroids (real art from the After
+  Earth game, resized way down before embedding), and 5 ships that fly
+  around and shoot each other. The ships used to be CSS `@keyframes`
+  animations but that left them visibly stuck pinned in the top-left
+  corner on at least some browsers/devices - the animation just never
+  took hold - so they're now driven by a canvas (`#shipBattleCanvas`,
+  `initShipBattle` in `play.html`) instead: each ship drifts and bounces
+  off the screen edges, and on a random cooldown fires a laser beam at a
+  random other ship in its own distinct color (red/blue/yellow/green/
+  pink) plus the After Earth game's own Laser.mp3 sound effect
+  (base64-embedded the same way every other asset here is, respecting
+  the game's sound on/off setting). Then three yes/no
   pitch questions (a $25 website, Google Play/Steam publishing, turning
   the game into a full RTS - "Yes" reveals a `mailto:` line to
   `titanbusinesspros@gmail.com`), and the business's own site/phone as a

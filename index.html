@@ -1607,6 +1607,15 @@ function addComputerRow(data = {}) {
           <option value="human" ${data.controlledBy === 'human' ? 'selected' : ''}>&#129489; Human (hot-seat)</option>
         </select>
       </div>
+      <div class="field narrow">
+        <label>AI Difficulty</label>
+        <select class="c-difficulty">
+          <option value="easy" ${data.difficulty === 'easy' ? 'selected' : ''}>Easy</option>
+          <option value="medium" ${!data.difficulty || data.difficulty === 'medium' ? 'selected' : ''}>Medium</option>
+          <option value="hard" ${data.difficulty === 'hard' ? 'selected' : ''}>Hard</option>
+          <option value="superhard" ${data.difficulty === 'superhard' ? 'selected' : ''}>Super Hard</option>
+        </select>
+      </div>
     </div>
     <div class="field">
       <label>Home Base art</label>
@@ -1679,6 +1688,9 @@ function collectComputers(uploadResults) {
       // setup. Stored regardless of current gameStyle so switching a
       // saved map from Real-Time to Turn-Based later doesn't lose it.
       controlledBy: row.querySelector('.c-controlledby').value,
+      // Ignored by play.html when controlledBy is 'human' - scales how
+      // often aiThink() runs and how aggressively it spends/expands.
+      difficulty: row.querySelector('.c-difficulty').value,
     };
   });
 }
