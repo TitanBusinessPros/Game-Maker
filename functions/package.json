@@ -1,0 +1,15 @@
+{
+  "name": "game-maker-functions",
+  "description": "Cloud Functions for Game-Maker - currently just the Stripe webhook that grants download credits after a $5 purchase",
+  "private": true,
+  "engines": { "node": "22" },
+  "main": "index.js",
+  "scripts": {
+    "deploy": "firebase deploy --only functions"
+  },
+  "dependencies": {
+    "firebase-admin": "^14.4.0",
+    "firebase-functions": "^7.4.0",
+    "stripe": "^22.6.2"
+  }
+}

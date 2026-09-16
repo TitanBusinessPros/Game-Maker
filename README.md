@@ -204,16 +204,30 @@ line. Only this page has the logo/title/footer treatment so far -
    with 50 instead - see `admin.html`'s own section below), shown next
    to your email at the top of the page ("N download credits left").
    Hitting 0 blocks further downloads with a clear message instead of
-   failing silently. There's no backend in this project - it's 100%
-   client-side plus Firestore/Storage rules - so the actual enforcement
-   against someone just editing their own balance in devtools lives
-   entirely in `firestore.rules`' `/users/{uid}` rules: a new balance can
-   only ever be *created* at exactly 5 (or exactly 50, only if that
-   email's in the bonus list), and can only ever be *updated* to exactly
-   one less than whatever it already was. The admin account is fully
-   exempt - no credits doc, no check, no limit at all, checked the same
-   way every other admin-only action in this project is (`request.auth.token.email`
-   against the one hardcoded admin address, not a client-side flag).
+   failing silently. Client-side, the enforcement against someone just
+   editing their own balance in devtools lives entirely in
+   `firestore.rules`' `/users/{uid}` rules: a new balance can only ever
+   be *created* at exactly 5 (or exactly 50, only if that email's in the
+   bonus list), and can only ever be *updated* to exactly one less than
+   whatever it already was - nothing client-side is ever allowed to
+   *increase* it. The admin account is fully exempt - no credits doc, no
+   check, no limit at all, checked the same way every other admin-only
+   action in this project is (`request.auth.token.email` against the one
+   hardcoded admin address, not a client-side flag).
+   Hitting 0 shows a popup instead of just an error - **"Get 10 credits
+   for $5"**, a Stripe Payment Link
+   (`buy.stripe.com/4gM5kE6Br7wscm6efJ7AI0Y`), with `?client_reference_id=<your
+   Firebase uid>` appended so the purchase can be tied back to your
+   account. That's the one thing this project's Firestore rules
+   deliberately *can't* do on their own - rules have no channel to
+   Stripe, so they can't tell "a real payment happened" apart from
+   "someone set their own credits field" no matter how they're written.
+   Actually granting the 10 credits needs something that isn't a rule at
+   all: this project's first real backend, a Cloud Function (see
+   `functions/`, below) that Stripe calls directly once a payment
+   completes, verifies the payment is genuine, and writes the credit
+   grant with the Admin SDK (which bypasses these rules entirely, since
+   it's inherently trusted).
 
 Every upload slot has a **📚 Library** button next to it, pulling from
 whatever the admin has added via `admin.html` (Firestore `libraryItems`
@@ -661,6 +675,44 @@ match - the library's own sound sub-categories.
 read-only) is left in for the same reason as `play.html`'s `__GM_DEBUG` -
 it lets the category grouping/labeling be verified against fabricated
 data without needing a real Google sign-in.
+
+## `functions/` — the Stripe webhook
+
+The only backend code in this project (everything else is static
+HTML/JS/Firebase rules) - a single Cloud Function, `stripeWebhook`, that
+grants 10 download credits after a real $5 Stripe payment. Deployed via
+`firebase deploy --only functions`; live at
+`https://us-central1-game-maker-ed014.cloudfunctions.net/stripeWebhook`,
+registered in the Stripe Dashboard as this Payment Link's webhook
+endpoint, listening for `checkout.session.completed`.
+
+What it actually does, in order: (1) verifies the request's
+`stripe-signature` header against `STRIPE_WEBHOOK_SECRET` (a Firebase
+Functions secret, set via `firebase functions:secrets:set
+STRIPE_WEBHOOK_SECRET` and never committed to this repo - the actual
+security boundary, since without it anyone could POST a fake "payment
+succeeded" body at this URL) - this needs the *raw* request body, which
+Firebase Functions preserves as `req.rawBody` specifically for this; (2)
+ignores anything that isn't a paid `checkout.session.completed`; (3)
+reads `session.client_reference_id` (the Firebase uid `index.html`'s
+buy-credits popup appends to the payment link) to know which account to
+credit - if it's missing, the event is acknowledged but logged for
+manual follow-up rather than silently dropped or endlessly retried; (4)
+checks a `processedStripeSessions/{sessionId}` doc inside a transaction
+before granting anything, so a Stripe retry of the same event (which
+does happen) can't double-grant credits for one payment; (5) increments
+`users/{uid}.credits` by exactly 10 using the Admin SDK (`FieldValue.increment`,
+inside the same transaction) - this is the one piece of this whole
+project that's allowed to *increase* a credits balance, because
+`firestore.rules` can't (and shouldn't) trust a client to report its own
+payment, and the Admin SDK bypasses those rules entirely by design.
+
+`firebase-admin` v14 dropped the old `admin.firestore()`/`admin.initializeApp()`
+namespaced API in favor of modular imports
+(`require('firebase-admin/app')` / `require('firebase-admin/firestore')`)
+- worth knowing since the old form doesn't error, it just silently
+resolves to `undefined` and fails at runtime instead of at `require`
+time, which is exactly what broke the first deploy attempt.
 
 ## Firebase project
 
