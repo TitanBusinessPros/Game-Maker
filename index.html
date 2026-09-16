@@ -424,86 +424,98 @@
 
   <!-- 4. Air Base -->
   <section class="section" id="sec-airbase">
-    <h2><span class="num">4</span> Air Base (optional)</h2>
-    <p class="hint">A building for planes/jets/spaceships/etc. Name it whatever fits (Air Base, Hangar, Spaceport&hellip;), give it its own art, HP, and build cost. The units you add below it can't be built until a player actually builds this first, and each one takes real time to produce (set per unit, 10-100s) instead of appearing instantly. Leave the unit list empty and this whole feature just doesn't show up in-game.</p>
-    <div class="row">
-      <div class="field"><label>Building name</label><input type="text" id="airBaseName" value="Air Base"></div>
-      <div class="field narrow"><label>Building HP</label><input type="number" id="airBaseHp" value="2000" min="1000" max="5000" step="100"></div>
-      <div class="field narrow"><label>Build cost</label><input type="number" id="airBaseCost" value="150" min="0" step="10"></div>
-    </div>
-    <div class="field">
-      <label>Air Base art</label>
-      <div class="upload-slot" data-slot="airBaseImage">
-        <div class="thumb">none</div>
-        <div class="meta"><div class="name">No file chosen</div><div class="status">required if you add any air units below</div></div>
-        <input type="file" accept="image/*" style="width:auto">
+    <h2><span class="num">4</span> Air Base (optional) <button type="button" class="btn-danger building-remove" data-building="airBase" style="font-size:11px; padding:4px 10px; margin-left:8px; vertical-align:middle;">🗑 Remove this building</button></h2>
+    <div id="airBaseBody">
+      <p class="hint">A building for planes/jets/spaceships/etc. Name it whatever fits (Air Base, Hangar, Spaceport&hellip;), give it its own art, HP, and build cost. The units you add below it can't be built until a player actually builds this first, and each one takes real time to produce (set per unit, 10-100s) instead of appearing instantly. Leave the unit list empty and this whole feature just doesn't show up in-game.</p>
+      <div class="row">
+        <div class="field"><label>Building name</label><input type="text" id="airBaseName" value="Air Base"></div>
+        <div class="field narrow"><label>Building HP</label><input type="number" id="airBaseHp" value="2000" min="1000" max="5000" step="100"></div>
+        <div class="field narrow"><label>Build cost</label><input type="number" id="airBaseCost" value="150" min="0" step="10"></div>
       </div>
+      <div class="field">
+        <label>Air Base art</label>
+        <div class="upload-slot" data-slot="airBaseImage">
+          <div class="thumb">none</div>
+          <div class="meta"><div class="name">No file chosen</div><div class="status">required if you add any air units below</div></div>
+          <input type="file" accept="image/*" style="width:auto">
+        </div>
+      </div>
+      <div id="airUnitList"></div>
+      <button type="button" class="btn-add" id="addAirUnitBtn">+ Add an air unit</button>
     </div>
-    <div id="airUnitList"></div>
-    <button type="button" class="btn-add" id="addAirUnitBtn">+ Add an air unit</button>
+    <p class="hint building-removed-note" id="airBaseRemovedNote" style="display:none;">Air Base removed - it won't show up in-game (same as leaving its unit list empty). <button type="button" class="btn-add building-restore" data-building="airBase">+ Add it back</button></p>
   </section>
 
   <!-- 4a. War Factory -->
   <section class="section" id="sec-warfactory">
-    <h2><span class="num">4a</span> War Factory (optional)</h2>
-    <p class="hint">A building for tanks/armored vehicles/etc. Works exactly like Air Base above: name it whatever fits (War Factory, Motor Pool, Armory&hellip;), give it its own art, HP, and build cost. The units you add below it can't be built until a player actually builds this first, and each one takes real time to produce (set per unit, 10-100s) instead of appearing instantly. Leave the unit list empty and this whole feature just doesn't show up in-game.</p>
-    <div class="row">
-      <div class="field"><label>Building name</label><input type="text" id="warFactoryName" value="War Factory"></div>
-      <div class="field narrow"><label>Building HP</label><input type="number" id="warFactoryHp" value="2000" min="1000" max="5000" step="100"></div>
-      <div class="field narrow"><label>Build cost</label><input type="number" id="warFactoryCost" value="150" min="0" step="10"></div>
-    </div>
-    <div class="field">
-      <label>War Factory art</label>
-      <div class="upload-slot" data-slot="warFactoryImage">
-        <div class="thumb">none</div>
-        <div class="meta"><div class="name">No file chosen</div><div class="status">required if you add any war factory units below</div></div>
-        <input type="file" accept="image/*" style="width:auto">
+    <h2><span class="num">4a</span> War Factory (optional) <button type="button" class="btn-danger building-remove" data-building="warFactory" style="font-size:11px; padding:4px 10px; margin-left:8px; vertical-align:middle;">🗑 Remove this building</button></h2>
+    <div id="warFactoryBody">
+      <p class="hint">A building for tanks/armored vehicles/etc. Works exactly like Air Base above: name it whatever fits (War Factory, Motor Pool, Armory&hellip;), give it its own art, HP, and build cost. The units you add below it can't be built until a player actually builds this first, and each one takes real time to produce (set per unit, 10-100s) instead of appearing instantly. Leave the unit list empty and this whole feature just doesn't show up in-game.</p>
+      <div class="row">
+        <div class="field"><label>Building name</label><input type="text" id="warFactoryName" value="War Factory"></div>
+        <div class="field narrow"><label>Building HP</label><input type="number" id="warFactoryHp" value="2000" min="1000" max="5000" step="100"></div>
+        <div class="field narrow"><label>Build cost</label><input type="number" id="warFactoryCost" value="150" min="0" step="10"></div>
       </div>
+      <div class="field">
+        <label>War Factory art</label>
+        <div class="upload-slot" data-slot="warFactoryImage">
+          <div class="thumb">none</div>
+          <div class="meta"><div class="name">No file chosen</div><div class="status">required if you add any war factory units below</div></div>
+          <input type="file" accept="image/*" style="width:auto">
+        </div>
+      </div>
+      <div id="warUnitList"></div>
+      <button type="button" class="btn-add" id="addWarUnitBtn">+ Add a war factory unit</button>
     </div>
-    <div id="warUnitList"></div>
-    <button type="button" class="btn-add" id="addWarUnitBtn">+ Add a war factory unit</button>
+    <p class="hint building-removed-note" id="warFactoryRemovedNote" style="display:none;">War Factory removed - it won't show up in-game (same as leaving its unit list empty). <button type="button" class="btn-add building-restore" data-building="warFactory">+ Add it back</button></p>
   </section>
 
   <!-- 4b. Infantry Post -->
   <section class="section" id="sec-infantrypost">
-    <h2><span class="num">4b</span> Infantry Post (optional)</h2>
-    <p class="hint">A building for foot soldiers/infantry/etc. Works exactly like Air Base and War Factory above: name it whatever fits (Infantry Post, Barracks, Garrison&hellip;), give it its own art, HP, and build cost. The units you add below it can't be built until a player actually builds this first, and each one takes real time to produce (set per unit, 10-100s) instead of appearing instantly. Leave the unit list empty and this whole feature just doesn't show up in-game.</p>
-    <div class="row">
-      <div class="field"><label>Building name</label><input type="text" id="infantryPostName" value="Infantry Post"></div>
-      <div class="field narrow"><label>Building HP</label><input type="number" id="infantryPostHp" value="2000" min="1000" max="5000" step="100"></div>
-      <div class="field narrow"><label>Build cost</label><input type="number" id="infantryPostCost" value="150" min="0" step="10"></div>
-    </div>
-    <div class="field">
-      <label>Infantry Post art</label>
-      <div class="upload-slot" data-slot="infantryPostImage">
-        <div class="thumb">none</div>
-        <div class="meta"><div class="name">No file chosen</div><div class="status">required if you add any infantry units below</div></div>
-        <input type="file" accept="image/*" style="width:auto">
+    <h2><span class="num">4b</span> Infantry Post (optional) <button type="button" class="btn-danger building-remove" data-building="infantryPost" style="font-size:11px; padding:4px 10px; margin-left:8px; vertical-align:middle;">🗑 Remove this building</button></h2>
+    <div id="infantryPostBody">
+      <p class="hint">A building for foot soldiers/infantry/etc. Works exactly like Air Base and War Factory above: name it whatever fits (Infantry Post, Barracks, Garrison&hellip;), give it its own art, HP, and build cost. The units you add below it can't be built until a player actually builds this first, and each one takes real time to produce (set per unit, 10-100s) instead of appearing instantly. Leave the unit list empty and this whole feature just doesn't show up in-game.</p>
+      <div class="row">
+        <div class="field"><label>Building name</label><input type="text" id="infantryPostName" value="Infantry Post"></div>
+        <div class="field narrow"><label>Building HP</label><input type="number" id="infantryPostHp" value="2000" min="1000" max="5000" step="100"></div>
+        <div class="field narrow"><label>Build cost</label><input type="number" id="infantryPostCost" value="150" min="0" step="10"></div>
       </div>
+      <div class="field">
+        <label>Infantry Post art</label>
+        <div class="upload-slot" data-slot="infantryPostImage">
+          <div class="thumb">none</div>
+          <div class="meta"><div class="name">No file chosen</div><div class="status">required if you add any infantry units below</div></div>
+          <input type="file" accept="image/*" style="width:auto">
+        </div>
+      </div>
+      <div id="infantryUnitList"></div>
+      <button type="button" class="btn-add" id="addInfantryUnitBtn">+ Add an infantry unit</button>
     </div>
-    <div id="infantryUnitList"></div>
-    <button type="button" class="btn-add" id="addInfantryUnitBtn">+ Add an infantry unit</button>
+    <p class="hint building-removed-note" id="infantryPostRemovedNote" style="display:none;">Infantry Post removed - it won't show up in-game (same as leaving its unit list empty). <button type="button" class="btn-add building-restore" data-building="infantryPost">+ Add it back</button></p>
   </section>
 
   <!-- 4c. Helicopter Facility -->
   <section class="section" id="sec-helifacility">
-    <h2><span class="num">4c</span> Helicopter Facility (optional)</h2>
-    <p class="hint">A building for helicopters. Works exactly like Air Base and War Factory above: name it whatever fits (Helicopter Facility, Helipad, Chopper Base&hellip;), give it its own art, HP, and build cost. The units you add below it can't be built until a player actually builds this first, and each one takes real time to produce (set per unit, 10-100s) instead of appearing instantly. Leave the unit list empty and this whole feature just doesn't show up in-game.</p>
-    <div class="row">
-      <div class="field"><label>Building name</label><input type="text" id="heliFacilityName" value="Helicopter Facility"></div>
-      <div class="field narrow"><label>Building HP</label><input type="number" id="heliFacilityHp" value="2000" min="1000" max="5000" step="100"></div>
-      <div class="field narrow"><label>Build cost</label><input type="number" id="heliFacilityCost" value="150" min="0" step="10"></div>
-    </div>
-    <div class="field">
-      <label>Helicopter Facility art</label>
-      <div class="upload-slot" data-slot="heliFacilityImage">
-        <div class="thumb">none</div>
-        <div class="meta"><div class="name">No file chosen</div><div class="status">required if you add any helicopter units below</div></div>
-        <input type="file" accept="image/*" style="width:auto">
+    <h2><span class="num">4c</span> Helicopter Facility (optional) <button type="button" class="btn-danger building-remove" data-building="heliFacility" style="font-size:11px; padding:4px 10px; margin-left:8px; vertical-align:middle;">🗑 Remove this building</button></h2>
+    <div id="heliFacilityBody">
+      <p class="hint">A building for helicopters. Works exactly like Air Base and War Factory above: name it whatever fits (Helicopter Facility, Helipad, Chopper Base&hellip;), give it its own art, HP, and build cost. The units you add below it can't be built until a player actually builds this first, and each one takes real time to produce (set per unit, 10-100s) instead of appearing instantly. Leave the unit list empty and this whole feature just doesn't show up in-game.</p>
+      <div class="row">
+        <div class="field"><label>Building name</label><input type="text" id="heliFacilityName" value="Helicopter Facility"></div>
+        <div class="field narrow"><label>Building HP</label><input type="number" id="heliFacilityHp" value="2000" min="1000" max="5000" step="100"></div>
+        <div class="field narrow"><label>Build cost</label><input type="number" id="heliFacilityCost" value="150" min="0" step="10"></div>
       </div>
+      <div class="field">
+        <label>Helicopter Facility art</label>
+        <div class="upload-slot" data-slot="heliFacilityImage">
+          <div class="thumb">none</div>
+          <div class="meta"><div class="name">No file chosen</div><div class="status">required if you add any helicopter units below</div></div>
+          <input type="file" accept="image/*" style="width:auto">
+        </div>
+      </div>
+      <div id="heliUnitList"></div>
+      <button type="button" class="btn-add" id="addHeliUnitBtn">+ Add a helicopter unit</button>
     </div>
-    <div id="heliUnitList"></div>
-    <button type="button" class="btn-add" id="addHeliUnitBtn">+ Add a helicopter unit</button>
+    <p class="hint building-removed-note" id="heliFacilityRemovedNote" style="display:none;">Helicopter Facility removed - it won't show up in-game (same as leaving its unit list empty). <button type="button" class="btn-add building-restore" data-building="heliFacility">+ Add it back</button></p>
   </section>
 
   <!-- 4d. Research Facility -->
@@ -1206,6 +1218,43 @@ document.getElementById('addInfantryUnitBtn').addEventListener('click', () => ad
 document.getElementById('addHeliUnitBtn').addEventListener('click', () => addHeliUnitRow());
 
 // ---------------------------------------------------------------------
+// "🗑 Remove this building" - a map-maker who only wants, say, 2 of the
+// 4 optional buildings (Air Base/War Factory/Infantry Post/Helicopter
+// Facility) can collapse the ones they don't want off the build screen
+// entirely, instead of just leaving an unused section sitting there
+// empty. Removing one clears its unit list - already the ONLY thing
+// that actually makes a building "absent" in play.html (see
+// checklistGaps' comment and GATED_BUILDINGS' own unitCfgs.length
+// check), so this is purely a build-screen decluttering convenience,
+// not a new concept play.html needs to know about at all. Not
+// persisted across reloads/saves on purpose - it only hides the section
+// for the rest of THIS editing session; reopening the map later shows
+// all four again (empty ones simply have nothing in their unit list,
+// same as if they'd never been touched), since there was no existing
+// per-building "removed" flag to hang this off of and no map data
+// actually changes by hiding a section.
+// ---------------------------------------------------------------------
+const OPTIONAL_BUILDINGS = {
+  airBase: airUnitList, warFactory: warUnitList,
+  infantryPost: infantryUnitList, heliFacility: heliUnitList,
+};
+document.querySelectorAll('.building-remove').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const key = btn.dataset.building;
+    OPTIONAL_BUILDINGS[key].innerHTML = '';
+    document.getElementById(`${key}Body`).style.display = 'none';
+    document.getElementById(`${key}RemovedNote`).style.display = 'block';
+  });
+});
+document.querySelectorAll('.building-restore').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const key = btn.dataset.building;
+    document.getElementById(`${key}Body`).style.display = '';
+    document.getElementById(`${key}RemovedNote`).style.display = 'none';
+  });
+});
+
+// ---------------------------------------------------------------------
 // Gun Turrets: a repeatable row like the unit lists above, but no art-
 // gated building, no production timer - just name/art/hp/attack/range/
 // cost. No Speed field at all (not "speed 0", the field just doesn't
@@ -1794,19 +1843,19 @@ async function refreshMyMaps() {
     const m = d.data();
     const li = document.createElement('li');
     const tagClass = m.status === 'complete' ? 'complete' : 'draft';
-    // "⬇ Download My Game" is the primary action for a finished map now -
-    // produces the same standalone, fully offline HTML file play.html's
-    // own download button does, straight from here, no detour through
-    // the live Firebase-backed play page needed at all (see
-    // downloadStandaloneGame below). The live link still exists - it's
-    // not possible to actually remove play.html?map=... itself, since
-    // that's the page, not a button - so it stays reachable as a small
-    // secondary "🔗 Live link" next to it, for anyone who specifically
-    // wants a shareable link instead of a file (it auto-updates if the
-    // map is edited later; a downloaded file is a frozen snapshot).
+    // "⬇ Download My Game" is the ONLY way to actually play a finished
+    // map from this list now - produces the same standalone, fully
+    // offline HTML file play.html's own download button does, straight
+    // from here, no detour through the live Firebase-backed play page
+    // at all (see downloadStandaloneGame below). No link to
+    // play.html?map=<id> is shown anywhere in this UI any more, at the
+    // map-maker's request. That page itself still technically exists
+    // (nothing about removing a button deletes it) and would still work
+    // for anyone who already has that exact URL from before, but nothing
+    // in this app links to it or generates it any more, so nobody
+    // encounters it through normal use.
     const actions = m.status === 'complete'
-      ? `<button type="button" class="btn-primary download-game" data-id="${d.id}">⬇ Download My Game</button>
-         <a class="btn-secondary" style="text-decoration:none; padding:8px 14px; font-size:13px; border-radius:6px; display:inline-block;" href="play.html?map=${d.id}" target="_blank" rel="noopener">🔗 Live link</a>`
+      ? `<button type="button" class="btn-primary download-game" data-id="${d.id}">⬇ Download My Game</button>`
       : '';
     li.innerHTML = `
       <span>${escapeAttr(m.name || 'Untitled Map')} <span class="tag ${tagClass}">${m.status}</span></span>

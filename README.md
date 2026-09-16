@@ -108,7 +108,18 @@ appear) — a genuinely separate, self-contained game per map.
    Units" checklist item entirely - a finished map now needs at least
    one unit under one of these four instead (that old section still
    exists in `index.html`'s code, hidden, purely so a map made before
-   this change keeps working).
+   this change keeps working). Each of the four has a **🗑 Remove this
+   building** button in its own header, for a map-maker who only wants
+   some of them (e.g. 2 of the 4) rather than filling in a section they
+   don't plan to use - clicking it clears that building's unit list (the
+   only thing that actually makes a building "absent" from the game at
+   all - see `checklistGaps`/`GATED_BUILDINGS`' own `unitCfgs.length`
+   check, unchanged) and collapses the section to a one-line "removed -
+   **+ Add it back**" note. Not persisted - it only hides the section for
+   the rest of that editing session; reopening the map later shows all
+   four again (an unused one just has nothing in its unit list, same as
+   if it had never been touched, which was already indistinguishable
+   from "removed" as far as `play.html` is concerned).
 4d. **Research Facility** — NOT optional, unlike the four buildings
    above: every map has the same built-in research tree (the Research
    tab in `play.html`), so this is the one building every player has to
@@ -161,23 +172,22 @@ appear) — a genuinely separate, self-contained game per map.
    round concept, it fires on the existing 90s cosmetic turn-clock
    instead.
 6. **My Maps** — every map saved under your signed-in account, draft or
-   finished, with Edit/Delete plus, for a finished map, two ways to
-   actually play it: **⬇ Download My Game** (primary) and a smaller
-   secondary **🔗 Live link**. Download produces the exact same
-   standalone, fully-offline HTML file `play.html`'s own download button
-   does (`inlineUrlsAsDataUris()`, reimplemented here so it runs straight
-   from the map list - fetch the map's saved data, base64-inline every
+   finished, with Edit/Delete plus, for a finished map, **⬇ Download My
+   Game** - the only way this app offers to actually play a finished map
+   any more, at the map-maker's request (no live-play link is shown or
+   generated anywhere in this UI). Produces the exact same standalone,
+   fully-offline HTML file `play.html`'s own download button does
+   (`inlineUrlsAsDataUris()`, reimplemented here so it runs straight from
+   the map list - fetch the map's saved data, base64-inline every
    art/sound URL it references, fetch `play.html`'s own source, inject
-   the result via `window.GM_INLINE_CONFIG`), without ever having to
-   open the live play page first. The Live link still opens
-   `play.html?map=<id>` same as before - kept reachable but no longer
-   the primary action, since a download is a frozen snapshot (won't
-   reflect a later edit to the map) while the live link always shows the
-   current saved version and costs real Storage egress on every visit
-   (see the Firebase project section below for what that means at
-   scale). Removing the emphasis on the live link doesn't remove the
-   *page* itself - `play.html?map=<id>` keeps working for anyone who
-   has that URL, whether or not the Download button exists.
+   the result via `window.GM_INLINE_CONFIG`), without ever having to open
+   the live Firebase-backed play page at all. That page
+   (`play.html?map=<id>`) still technically exists and would still work
+   for anyone who already has that exact URL from before this change -
+   removing every link to it doesn't delete the page itself - but nothing
+   in this app links to it or generates it any more, so nobody encounters
+   it through normal use, and no play session against it costs Storage
+   egress unless someone specifically has an old URL saved.
 
 Every upload slot has a **📚 Library** button next to it, pulling from
 whatever the admin has added via `admin.html` (Firestore `libraryItems`
