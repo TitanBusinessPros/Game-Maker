@@ -26,6 +26,14 @@ appear) — a genuinely separate, self-contained game per map.
 
 ## `index.html` — the checklist
 
+The page header shows the Titan Business Pros logo (top-left, same
+96&times;96px art `play.html` uses) next to a centered **"Titan Game
+Maker"** title (previously just "Game Maker"), and the page ends with a
+footer: "Created by Titan Business Pros LLC", the business phone number
+and `www.oklahoma.marketing` (linked), and an Oklahoma City/copyright
+line. Only this page has the logo/title/footer treatment so far -
+`admin.html` and `play.html` haven't been touched the same way.
+
 1. **Map basics** — name, what to call a home base (Home Base/Planet/
    Island/etc, defaults to "Home Base"), and a **map size** (Tiny /
    Small = 3× Tiny / Medium = 2× Small / Large = 2× Medium — actually
@@ -722,3 +730,13 @@ as the project owner) - not something GitHub Pages hosting does for you.
 ## Hosting
 
 Static site on GitHub Pages (source = `main`, path `/`). No build step.
+
+## License
+
+All rights reserved by Titan Business Pros LLC - see [`LICENSE`](LICENSE).
+This repo is public so the source is viewable, but that doesn't grant a
+license to use it: commercial use of the code, and commercial use of any
+map/game created with it (including a downloaded standalone HTML file),
+both require the LICENSE file's terms - in short, personal/educational/
+evaluation use only unless Titan Business Pros LLC grants a commercial
+license in writing.
