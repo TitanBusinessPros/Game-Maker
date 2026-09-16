@@ -97,6 +97,24 @@ line. Only this page has the logo/title/footer treatment so far -
    derived from its name, same reasoning as `admin.html`'s category ids -
    a unit's saved cost is keyed by that id, so renaming the resource
    later must not orphan it.
+3a. **Placement** — every resource (Gold's own deposit, plus each
+   Additional Resource) has its own **📍 Near each base (default)** /
+   **🗺️ Place on the map** toggle right under its own art upload. Near
+   each base is the original behavior, completely unchanged - a copy of
+   that resource's deposit/marker appears next to every faction's own
+   home base. Place on the map instead shows the map's own background
+   art (whatever's uploaded/picked under Map Basics) and lets the
+   map-maker click one spot on it - stored as a fraction of that image
+   (not a pixel position), so it scales correctly however big the map
+   actually ends up being once a real match's home bases are laid out.
+   For Gold specifically, this isn't a copy per faction the way "near
+   each base" is - it's one real, shared deposit every faction's Mining
+   Ships travel to and gather from (still each earning their own full
+   income share while parked in range, same as always - see `play.html`'s
+   own income bullet further down). For an Additional Resource, which was
+   already just a passive-income visual marker with no range to manage,
+   placing it on the map only moves where that one shared marker is
+   drawn - one for the whole map instead of one per faction either way.
 4. **Air Base** (optional) — a building for planes/jets/spaceships/etc.
    Give it a name (defaults to "Air Base"), its own **art**, **HP**
    (1000-5000, same range/field as Home Base's), and a build cost, then
@@ -376,6 +394,29 @@ entirely by one map's saved data:
   neglect its army. And an enemy's miner is a real click-to-attack
   target now too - it always had real HP and could always be killed by
   an AI, a player just had no way to actually order an attack on one.
+  Your own miners are a real click-and-box-select-able unit too now (a
+  leftover exclusion had silently kept them out of both the drag-box and
+  single-click selection paths, so a player had no way to manually
+  redirect one at all - only the auto-order-on-build ever moved it,
+  reported once Gold's deposit could be placed somewhere other than
+  right next to base, where a miner stuck on a bad path actually needed
+  manual rerouting). Selecting one and giving a move/attack order works
+  exactly like any other unit from here.
+- **Resource placement** (index.html's Resource & Mining section, item
+  3a): every resource defaults to a deposit/marker next to each faction's
+  own home base, same as always. A resource placed "on the map" instead
+  has exactly one location for the whole match, stored as a fraction of
+  the map's background art and converted here into a real world position
+  once this match's actual home-base layout (and so its world bounding
+  box, same one the background art itself cover-fits) is known. For Gold,
+  that means every faction's Mining Ships - including AI - auto-order
+  toward, and can be manually redirected toward, the same single shared
+  deposit (spawnMiner's own auto-order and the income-range check both
+  already key off `deposits.find(d => d.factionId === ...)`, so pointing
+  every faction's entry at one shared x/y needed no other change). An
+  Additional Resource placed this way instead of near-base just moves
+  where its one passive-income marker is drawn - it was never anything
+  but a visual marker either way.
 - Every attack draws a **weapon effect** picked per unit (a **Weapon**
   dropdown on each unit/turret row in `index.html`, 26 options - defaults
   to Laser, so any map saved before this field existed keeps its

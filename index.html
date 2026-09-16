@@ -139,6 +139,23 @@
     font-size: 11px; padding: 6px 10px; white-space: nowrap;
   }
 
+  .placement-widget { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .placement-toggle { display: flex; flex-wrap: wrap; gap: 14px; margin: 6px 0 0; }
+  .placement-option { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text); font-weight: normal; cursor: pointer; }
+  .placement-option input { width: auto; margin: 0; }
+  .placement-map { margin-top: 10px; }
+  .placement-canvas-wrap {
+    position: relative; width: 100%; aspect-ratio: 16 / 9;
+    background: #0b0e14 center/cover no-repeat;
+    border: 1px solid var(--border); border-radius: 8px;
+    cursor: crosshair; overflow: hidden;
+  }
+  .placement-marker {
+    position: absolute; width: 16px; height: 16px; margin: -8px 0 0 -8px;
+    border-radius: 50%; background: var(--accent); border: 2px solid #06121f;
+    box-shadow: 0 0 0 2px var(--accent);
+  }
+
   #libraryModal {
     position: fixed; inset: 0; background: rgba(0,0,0,0.7);
     z-index: 100; display: flex; align-items: center; justify-content: center;
@@ -409,6 +426,17 @@
         <div class="thumb">none</div>
         <div class="meta"><div class="name">No file chosen</div><div class="status">required to finish</div></div>
         <input type="file" accept="image/*" style="width:auto">
+      </div>
+      <div class="placement-widget" id="goldPlacementWidget" data-mode="base" data-x="0.5" data-y="0.5">
+        <label>Placement</label>
+        <div class="placement-toggle">
+          <label class="placement-option"><input type="radio" name="place-mode-gold" value="base" checked> 📍 Near each base (default)</label>
+          <label class="placement-option"><input type="radio" name="place-mode-gold" value="map"> 🗺️ Place on the map</label>
+        </div>
+        <div class="placement-map" hidden>
+          <div class="placement-canvas-wrap"><div class="placement-marker" hidden></div></div>
+          <p class="hint" style="margin:6px 0 0;">Click the map to choose one shared spot every faction's Mining Ships travel to and gather from. Upload map background art above (Map Basics) to see it here.</p>
+        </div>
       </div>
     </div>
     <div class="row">
@@ -908,6 +936,104 @@ function wireUploadSlot(slot) {
 document.querySelectorAll('.upload-slot').forEach(wireUploadSlot);
 
 // ---------------------------------------------------------------------
+// Resource placement: every resource (Gold's own deposit, plus each
+// extra resource added below) defaults to "near each base" - the
+// existing play.html behavior, untouched if this is never opened. The
+// alternative, "place on the map," shows the map's own background art
+// (whatever's uploaded/picked under Map Basics above) and a single
+// point (0..1 fractions of it, not pixels - so it scales correctly
+// however big the actual match's world ends up being, same as the
+// background art itself already cover-fits play.html's whole world
+// bounding box) the map-maker clicks to set where that resource's
+// deposit/marker appears for every faction. Gold placed this way is one
+// real shared deposit everyone's Mining Ships travel to and gather
+// from - not a copy per faction - see play.html's own `sharedGoldPos`.
+// ---------------------------------------------------------------------
+const placementRefreshFns = []; // one per open placement widget, so picking/uploading a new background art live-updates every preview at once
+function currentBackgroundPreviewUrl() {
+  const slot = document.querySelector('.upload-slot[data-slot="backgroundImage"]');
+  const input = slot && slot.querySelector('input[type=file]');
+  const file = input && input.files[0];
+  if (file) return URL.createObjectURL(file);
+  return existingAssetUrls.backgroundImage || null;
+}
+function refreshAllPlacementPreviews() { placementRefreshFns.forEach((fn) => fn()); }
+
+function placementWidgetHTML(resourceKey, placement) {
+  const mode = (placement && placement.mode === 'map') ? 'map' : 'base';
+  const x = (placement && typeof placement.x === 'number') ? placement.x : 0.5;
+  const y = (placement && typeof placement.y === 'number') ? placement.y : 0.5;
+  return `
+    <div class="placement-widget" data-mode="${mode}" data-x="${x}" data-y="${y}">
+      <label>Placement</label>
+      <div class="placement-toggle">
+        <label class="placement-option"><input type="radio" name="place-mode-${resourceKey}" value="base" ${mode === 'base' ? 'checked' : ''}> 📍 Near each base (default)</label>
+        <label class="placement-option"><input type="radio" name="place-mode-${resourceKey}" value="map" ${mode === 'map' ? 'checked' : ''}> 🗺️ Place on the map</label>
+      </div>
+      <div class="placement-map" ${mode === 'map' ? '' : 'hidden'}>
+        <div class="placement-canvas-wrap"><div class="placement-marker" hidden></div></div>
+        <p class="hint" style="margin:6px 0 0;">Click the map to choose where this resource appears for every player. Upload map background art above (Map Basics) to see it here.</p>
+      </div>
+    </div>`;
+}
+
+// Wires one .placement-widget root (either the fixed #goldPlacementWidget
+// or one generated per extra-resource row) - reads/writes its own state
+// straight from data-mode/data-x/data-y on the root element rather than
+// tracking it separately, same reasoning as every other row in this file
+// (collect straight from the DOM at save time, see readPlacement below).
+function wirePlacementWidget(root) {
+  if (!root) return;
+  const wrap = root.querySelector('.placement-canvas-wrap');
+  const marker = root.querySelector('.placement-marker');
+  const mapSection = root.querySelector('.placement-map');
+  const radios = root.querySelectorAll('input[type=radio]');
+
+  function syncUI() {
+    const mode = root.dataset.mode || 'base';
+    radios.forEach((r) => { r.checked = r.value === mode; });
+    mapSection.hidden = mode !== 'map';
+    if (mode !== 'map') return;
+    const url = currentBackgroundPreviewUrl();
+    wrap.style.backgroundImage = url ? `url(${url})` : 'none';
+    const x = Number(root.dataset.x) || 0.5, y = Number(root.dataset.y) || 0.5;
+    marker.style.left = (x * 100) + '%';
+    marker.style.top = (y * 100) + '%';
+    marker.hidden = false;
+  }
+
+  radios.forEach((r) => r.addEventListener('change', () => {
+    if (!r.checked) return;
+    root.dataset.mode = r.value;
+    syncUI();
+  }));
+  wrap.addEventListener('click', (e) => {
+    const rect = wrap.getBoundingClientRect();
+    root.dataset.x = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width)).toFixed(4);
+    root.dataset.y = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height)).toFixed(4);
+    syncUI();
+  });
+
+  placementRefreshFns.push(syncUI);
+  syncUI();
+  return syncUI;
+}
+
+function readPlacement(root) {
+  if (!root || root.dataset.mode !== 'map') return { mode: 'base' };
+  return { mode: 'map', x: Number(root.dataset.x) || 0.5, y: Number(root.dataset.y) || 0.5 };
+}
+
+wirePlacementWidget(document.getElementById('goldPlacementWidget'));
+// Any upload-slot change (a new file picked, or a library asset chosen
+// via selectLibraryAsset below) can only ever affect an OPEN placement
+// widget's background preview - harmless no-op otherwise - so this just
+// refreshes all of them rather than trying to know which slot matters.
+document.querySelectorAll('.upload-slot input[type=file]').forEach((input) => {
+  input.addEventListener('change', refreshAllPlacementPreviews);
+});
+
+// ---------------------------------------------------------------------
 // Shared asset library: existing After Earth art/sound, pre-uploaded once
 // to Storage under library/ (public read, never client-writable - see
 // storage.rules). Picking one of these needs no upload at all, so it's
@@ -1056,6 +1182,7 @@ function selectLibraryAsset(item) {
     }
   }
   existingAssetUrls[slotKey] = item.url;
+  refreshAllPlacementPreviews();
   libraryModal.hidden = true;
 }
 
@@ -1474,6 +1601,7 @@ function addExtraResourceRow(r) {
       <div class="meta"><div class="name">No file chosen</div><div class="status">deposit art shown near each home base (optional)</div></div>
       <input type="file" accept="image/*" style="width:auto">
     </div>
+    ${placementWidgetHTML(r.id, r.placement)}
   `;
   row.querySelector('.resource-name').addEventListener('input', () => {
     r.name = row.querySelector('.resource-name').value;
@@ -1482,10 +1610,14 @@ function addExtraResourceRow(r) {
   row.querySelector('.remove-unit').addEventListener('click', () => {
     delete existingAssetUrls[r.id];
     extraResources = extraResources.filter((x) => x.id !== r.id);
+    const idx = placementRefreshFns.indexOf(syncPlacement);
+    if (idx !== -1) placementRefreshFns.splice(idx, 1);
     row.remove();
     refreshAllCostUI();
   });
   wireUploadSlot(row.querySelector('.upload-slot'));
+  row.querySelector('.upload-slot input[type=file]').addEventListener('change', refreshAllPlacementPreviews);
+  const syncPlacement = wirePlacementWidget(row.querySelector('.placement-widget'));
   document.getElementById('extraResourcesList').appendChild(row);
   if (r.image) showExistingAsset(r.id, r.image);
   return row;
@@ -1509,6 +1641,7 @@ function collectExtraResources(uploadResults) {
       name: row.querySelector('.resource-name').value.trim() || 'Resource',
       incomePerHour: Number(row.querySelector('.resource-rate').value) || 300,
       image: uploadResults[id] || null,
+      placement: readPlacement(row.querySelector('.placement-widget')),
     };
   });
 }
@@ -1805,6 +1938,13 @@ async function buildMapDoc(status) {
       name: document.getElementById('resourceName').value.trim() || 'Gold Mine',
       size: Number(document.getElementById('resourceSize').value) || 5000,
       image: uploadResults.resourceImage,
+      // 'base' (default): one deposit per faction, near its own home
+      // base, exactly as before this existed. 'map': ONE real shared
+      // deposit at this x/y (fractions of the map background, not
+      // pixels) that every faction's Mining Ships travel to and gather
+      // from - see readPlacement/wirePlacementWidget above and
+      // play.html's own sharedGoldPos.
+      placement: readPlacement(document.getElementById('goldPlacementWidget')),
     },
     miningUnit: {
       name: document.getElementById('miningUnitName').value.trim() || 'Mining Ship',
@@ -2152,7 +2292,17 @@ async function loadExistingMap() {
     document.getElementById('resourceName').value = m.resource.name || 'Gold Mine';
     document.getElementById('resourceSize').value = m.resource.size || 5000;
     if (m.resource.image) showExistingAsset('resourceImage', m.resource.image);
+    const goldPlacementRoot = document.getElementById('goldPlacementWidget');
+    goldPlacementRoot.dataset.mode = (m.resource.placement && m.resource.placement.mode === 'map') ? 'map' : 'base';
+    goldPlacementRoot.dataset.x = String(m.resource.placement?.x ?? 0.5);
+    goldPlacementRoot.dataset.y = String(m.resource.placement?.y ?? 0.5);
   }
+  // Refresh every placement widget (gold + each extra resource) now that
+  // the map's background art and every saved placement are loaded - each
+  // extra-resource widget synced itself off whatever background existed
+  // at the moment its row was added above, which was before backgroundImage
+  // was restored just above.
+  refreshAllPlacementPreviews();
   if (m.miningUnit) {
     document.getElementById('miningUnitName').value = m.miningUnit.name || 'Mining Ship';
     document.getElementById('miningRate').value = m.miningUnit.ratePerHour || 600;

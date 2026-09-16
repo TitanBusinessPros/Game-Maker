@@ -697,17 +697,48 @@ async function main() {
   const worldMaxY = Math.max(...factions.map((f) => f.y)) + 400;
   const worldW = worldMaxX - worldMinX, worldH = worldMaxY - worldMinY;
 
-  const deposits = factions.map((f) => ({ factionId: f.id, x: f.x, y: f.y - 100, size: cfg.resource?.size || 5000 }));
+  // index.html's Resource & Mining placement widget: 'base' (default,
+  // unset on any map saved before this existed) keeps the original
+  // per-faction deposit near each home base, untouched below. 'map' means
+  // the map-maker clicked a spot on the map's own background art -
+  // stored as x/y fractions (0..1) of it, not pixels, so it scales
+  // correctly to whatever this actual match's world bounding box turns
+  // out to be (same reasoning the background art's own cover-fit already
+  // uses - see bgDraw below). That single point becomes ONE real shared
+  // Gold deposit every faction's Mining Ships travel to and gather from,
+  // not a copy placed near each base.
+  function placementWorldPos(placement) {
+    if (!placement || placement.mode !== 'map' || typeof placement.x !== 'number') return null;
+    return { x: worldMinX + placement.x * worldW, y: worldMinY + placement.y * worldH };
+  }
+  const sharedGoldPos = placementWorldPos(cfg.resource?.placement);
+  const deposits = factions.map((f) => ({
+    factionId: f.id,
+    x: sharedGoldPos ? sharedGoldPos.x : f.x,
+    y: sharedGoldPos ? sharedGoldPos.y : f.y - 100,
+    size: cfg.resource?.size || 5000,
+  }));
   // One deposit marker per extra resource per faction - purely a visual
   // "this is where it comes from" (no range/mining-unit interaction, see
   // the passive income loop in update()), laid out in a row below home
   // base so they don't overlap Gold's own deposit (above home, y-100) or
-  // any of the GATED_BUILDINGS (which sit at |offset| <= 140).
-  const extraDeposits = factions.flatMap((f) => EXTRA_RESOURCES.map((r, i) => ({
-    factionId: f.id, resourceId: r.id,
-    x: f.x + (i - (EXTRA_RESOURCES.length - 1) / 2) * 90, y: f.y + 200,
-    img: EXTRA_RESOURCE_IMAGES[i],
-  })));
+  // any of the GATED_BUILDINGS (which sit at |offset| <= 140). A resource
+  // placed "on the map" instead gets exactly one shared marker (below)
+  // rather than one of these per faction.
+  const extraDeposits = factions.flatMap((f) => EXTRA_RESOURCES
+    .map((r, i) => ({ r, i }))
+    .filter(({ r }) => !(r.placement && r.placement.mode === 'map'))
+    .map(({ r, i }) => ({
+      factionId: f.id, resourceId: r.id,
+      x: f.x + (i - (EXTRA_RESOURCES.length - 1) / 2) * 90, y: f.y + 200,
+      img: EXTRA_RESOURCE_IMAGES[i],
+    })))
+    .concat(EXTRA_RESOURCES
+      .map((r, i) => ({ r, i, pos: placementWorldPos(r.placement) }))
+      .filter(({ pos }) => pos)
+      .map(({ r, i, pos }) => ({
+        factionId: null, resourceId: r.id, x: pos.x, y: pos.y, img: EXTRA_RESOURCE_IMAGES[i],
+      })));
 
   const units = [];
   let nextUnitId = 1;
@@ -2062,7 +2093,7 @@ async function main() {
         const x0 = Math.min(dragStart.x, evt.clientX) - r.left, x1 = Math.max(dragStart.x, evt.clientX) - r.left;
         const y0 = Math.min(dragStart.y, evt.clientY) - r.top, y1 = Math.max(dragStart.y, evt.clientY) - r.top;
         const w0 = toWorld(x0, y0), w1 = toWorld(x1, y1);
-        const picked = livingUnits(activeFaction.id).filter((u) => !u.isMiner && u.x >= w0.x && u.x <= w1.x && u.y >= w0.y && u.y <= w1.y);
+        const picked = livingUnits(activeFaction.id).filter((u) => u.x >= w0.x && u.x <= w1.x && u.y >= w0.y && u.y <= w1.y);
         if (picked.length) {
           livingUnits(activeFaction.id).forEach((u) => u.selected = false);
           picked.forEach((u) => u.selected = true);
@@ -2095,7 +2126,7 @@ async function main() {
     const r = canvas.getBoundingClientRect();
     const p = toWorld(evt.clientX - r.left, evt.clientY - r.top);
     if (placingTurret) { tryPlaceTurret(p); return; }
-    const own = livingUnits(activeFaction.id).find((u) => !u.isMiner && Math.hypot(u.x - p.x, u.y - p.y) < (u.isGatedBuilding ? GATED_BUILDING_SIZE : UNIT_SIZE) / 2 + 8);
+    const own = livingUnits(activeFaction.id).find((u) => Math.hypot(u.x - p.x, u.y - p.y) < (u.isGatedBuilding ? GATED_BUILDING_SIZE : UNIT_SIZE) / 2 + 8);
     if (own) {
       livingUnits(activeFaction.id).forEach((u) => u.selected = false);
       own.selected = true;
