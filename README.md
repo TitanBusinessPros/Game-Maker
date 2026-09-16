@@ -209,7 +209,15 @@ entirely by one map's saved data:
 - **Two game styles**, picked at map-creation time:
   - **Real-Time** (default) - a 90-second cosmetic turn clock; a unit
     that attacks fires exactly once, then locks (can't take a new move
-    or attack order) until that clock's next turn.
+    or attack order) until that clock's next turn. Nobody has to sit
+    out the full 90s just to act again, though - the same **⏭ Skip
+    Turn** button Turn-Based uses (renamed "⏭ Skip to Next Turn" here)
+    ends the current clock-turn immediately on demand, via the same
+    `advanceRealTimeClock()` the natural countdown itself calls when it
+    runs out. Whatever ends the clock-turn - the timer or a skip -
+    clears every unit's lock the same way, Gun Turrets included, since
+    they share this exact mechanism now too (see the Gun Turrets bullet
+    further down).
   - **Turn-Based (hot-seat)** - 2-11 people share this device. Only the
     active faction's units can act at all (move/attack/build/research
     via the panel) - everyone else, AI factions included, is completely
@@ -252,7 +260,21 @@ entirely by one map's saved data:
   unless someone had gone back into the editor beforehand - there was no
   way for a group of people to just sit down and divide up the factions
   themselves at play time. Now anyone launching the map picks who's
-  actually playing right there.
+  actually playing right there. Every computer player also gets an
+  **"In match"** checkbox, checked by default - unchecking one leaves
+  that computer player out of this particular playthrough entirely
+  (its other controls on that row gray out and disable, since there's
+  nothing to pick for a faction that isn't playing) without having to
+  go back into `index.html` and delete it from the map itself. An
+  excluded faction gets `hp = 0` the instant Start Match is clicked,
+  which is all it takes to make it behave as already-defeated
+  everywhere else in this file (never drawn, never targeted, skipped by
+  turn rotation and AI, already excluded from win/loss checks) - no
+  separate "excluded" concept needed anywhere else. The "needs at least
+  one other faction on a different team" rule only counts factions
+  that are actually still in the match - excluding everyone still
+  correctly blocks Start Match with the same "nothing to fight" error,
+  it just doesn't count an excluded faction's team either way.
 - **Real player control**: left-drag a box to select multiple units,
   click to move or attack. Issuing an order deselects automatically -
   a unit doesn't stay glued to your next click the way it used to. A

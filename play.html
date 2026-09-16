@@ -93,6 +93,7 @@
   }
   .allyRow .swatch { width:16px; height:16px; border-radius:50%; flex:none; }
   .allyRow .name { flex:1; }
+  .allyRow.excluded-row { opacity:0.45; }
   .team-toggle { display:flex; gap:4px; flex:none; }
   .team-toggle button {
     background:var(--panel); color:var(--dim); border:1px solid var(--border); border-radius:6px;
@@ -983,7 +984,7 @@ async function main() {
   factions.forEach((f) => { f.isFactionHome = true; });
 
   let turnTimer = TURN_SECONDS, turnNumber = 1, aiTimer = AI_TICK_SECONDS, fogOn = false;
-  let elapsed = 0; // real seconds since the match started - drives turret attack cooldowns only (see combatTick)
+  let elapsed = 0; // real seconds since the match started - drives the home-base "planet" spin animation only (see drawFactionHome)
 
   // Centers on the middle of a faction's homeworld AND all its own living
   // units, not just the homeworld - advanceTurn() used to snap straight
@@ -1051,15 +1052,33 @@ async function main() {
       // reported as "the user's troops are still locked" every time
       // their turn comes back around, since by the time anyone looked
       // it had already silently used and burned its one attack. Turrets
-      // are exempt - they were never gated by attackedThisTurn at all
-      // (their own real-time cooldown), and re-acquire a target every
-      // frame regardless, so clearing theirs here would do nothing
-      // useful. Move orders are left alone - those legitimately span
-      // multiple turns for a unit still travelling toward a far target.
+      // are exempt from just this part (though attackedThisTurn above
+      // still resets for them same as everyone else, since they now
+      // share the same once-per-turn lock too) - they re-acquire a
+      // target every frame on their own regardless of orderType, so
+      // clearing theirs here would do nothing useful either way. Move
+      // orders are left alone - those legitimately span multiple turns
+      // for a unit still travelling toward a far target.
       if (!u.isTurret && u.orderType === 'attack') { u.orderType = null; u.target = null; }
     });
     renderBuildPanel();
     renderResearchPanel();
+  }
+
+  // Real-Time mode's equivalent of advanceTurn() - there's no per-faction
+  // turn here, just one shared 90s cosmetic clock, so this just resets
+  // it and bumps turnNumber, which is what actually clears every unit's
+  // (turret included, since they share the same lock now) "one attack
+  // per turn" lock - isLocked() compares turnNumber against a unit's own
+  // lockedUntilTurn, so this is the only thing that ever unlocks anyone
+  // in this mode. Called both when the clock naturally runs out AND by
+  // the Skip Turn button (see boot below) - a map-maker asked not to be
+  // stuck waiting out the full 90s just to let units act again, so Skip
+  // ends the current clock-turn immediately on demand instead.
+  function advanceRealTimeClock() {
+    turnTimer = TURN_SECONDS;
+    turnNumber++;
+    applyResourceGrants();
   }
 
   function startResearch(fac, id) {
@@ -1156,7 +1175,7 @@ async function main() {
       if (hotseatTimer <= 0) advanceTurn();
     } else {
       turnTimer -= dt;
-      if (turnTimer <= 0) { turnTimer = TURN_SECONDS; turnNumber++; applyResourceGrants(); }
+      if (turnTimer <= 0) advanceRealTimeClock();
     }
 
     for (const f of factions) {
@@ -2352,6 +2371,17 @@ async function main() {
   const teamErrorEl = document.getElementById('teamSelectError');
   const TEAM_LETTERS = Array.from({ length: factions.length }, (_, i) => String.fromCharCode(65 + i)); // 'A', 'B', ... one per faction that exists
   const pickedTeam = {}; // factionId -> one of TEAM_LETTERS, for computer players only
+  // factionId -> true if this computer player is left out of THIS match
+  // entirely (a per-playthrough choice, made right here - the map still
+  // has however many computer players index.html defined; this just
+  // skips a given one for this one launch). An excluded faction gets
+  // hp = 0 the moment the match starts (see startMatchBtn below) instead
+  // of a team, reusing every "this faction is already defeated" code
+  // path that already exists throughout this file (turn rotation skips
+  // it, it's never drawn, never targeted, never processed by aiThink,
+  // wins/losses already only ever count hp > 0 factions) rather than
+  // inventing a second, parallel "excluded" concept anywhere else.
+  const pickedExcluded = {};
   // factionId -> 'human' | 'ai', for computer players only. Seeded from
   // whatever index.html set as a default (cfg's controlledBy per
   // faction), but this screen is the REAL, live decision - whoever's
@@ -2399,9 +2429,16 @@ async function main() {
     // against whoever's on Team A. Either way it's just a starting
     // point - any select below can be changed to any letter.
     pickedTeam[fid] = turnMode ? TEAM_LETTERS[fid] : 'B';
+    pickedExcluded[fid] = false; // included by default - map-maker already chose to add this computer player
     const teamOptions = TEAM_LETTERS.map((letter) => `<option value="${letter}" ${pickedTeam[fid] === letter ? 'selected' : ''}>Team ${letter}</option>`).join('');
     const teamSelectStyle = 'background:var(--panel); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:6px 8px; font-size:12px; font-weight:600; cursor:pointer;';
-    row.innerHTML = `<span class="swatch" style="background:${color}"></span><span class="name">${name}</span>${controlToggle}<select class="team-select" data-fid="${fid}" style="${teamSelectStyle}">${teamOptions}</select>`;
+    // "In match" - lets whoever's launching leave a given computer
+    // player out of THIS playthrough entirely, without having to go
+    // back into index.html and delete it from the map. Unchecking it
+    // grays out and disables that row's other controls (nothing to pick
+    // a team/control for if it isn't playing) - re-checking restores
+    // them exactly as they were.
+    row.innerHTML = `<span class="swatch" style="background:${color}"></span><span class="name">${name}</span><label class="team-toggle" style="display:flex; align-items:center; gap:4px; font-weight:normal; cursor:pointer;"><input type="checkbox" class="include-check" data-fid="${fid}" checked style="width:auto;"> In match</label>${controlToggle}<select class="team-select" data-fid="${fid}" style="${teamSelectStyle}">${teamOptions}</select>`;
     allyListEl.appendChild(row);
   }
   renderTeamRow(player.name, player.color, player.id, true);
@@ -2409,8 +2446,15 @@ async function main() {
 
   allyListEl.addEventListener('change', (e) => {
     const sel = e.target.closest('select.team-select');
-    if (!sel) return;
-    pickedTeam[Number(sel.dataset.fid)] = sel.value;
+    if (sel) { pickedTeam[Number(sel.dataset.fid)] = sel.value; return; }
+    const includeCb = e.target.closest('input.include-check');
+    if (includeCb) {
+      const fid = Number(includeCb.dataset.fid);
+      pickedExcluded[fid] = !includeCb.checked;
+      const row = includeCb.closest('.allyRow');
+      row.classList.toggle('excluded-row', !includeCb.checked);
+      row.querySelectorAll('select.team-select, button[data-cfid]').forEach((el) => { el.disabled = !includeCb.checked; });
+    }
   });
   allyListEl.addEventListener('click', (e) => {
     const controlBtn = e.target.closest('button[data-cfid]');
@@ -2425,10 +2469,13 @@ async function main() {
   teamScreenEl.classList.add('show');
   startMatchBtn.addEventListener('click', () => {
     // Generalized from "at least one has to be on B": at least one OTHER
-    // faction just needs a team different from yours - it can be its own
-    // letter (free-for-all) or grouped with other factions, doesn't
-    // matter which, as long as not literally everyone is on Team A.
-    const distinctTeams = new Set(['A', ...Object.values(pickedTeam)]);
+    // faction that's actually IN this match just needs a team different
+    // from yours - it can be its own letter (free-for-all) or grouped
+    // with other factions, doesn't matter which, as long as not
+    // literally every included faction is on Team A. An excluded
+    // faction's picked team doesn't count either way - it's not playing.
+    const includedTeams = factions.filter((f, i) => i !== 0 && !pickedExcluded[f.id]).map((f) => pickedTeam[f.id]);
+    const distinctTeams = new Set(['A', ...includedTeams]);
     if (distinctTeams.size < 2) {
       teamErrorEl.style.display = 'block';
       return;
@@ -2436,6 +2483,16 @@ async function main() {
     player.team = 'A';
     factions.forEach((f, i) => {
       if (i === 0) return;
+      if (pickedExcluded[f.id]) {
+        // Left out of this match entirely - hp 0 reuses every "this
+        // faction is already defeated" code path elsewhere in this file
+        // (never drawn, never targeted, skipped by turn rotation and
+        // aiThink, already excluded from every win/loss check) instead
+        // of a second, parallel "excluded" concept. team is left null;
+        // nothing ever reads a dead faction's team for anything.
+        f.hp = 0;
+        return;
+      }
       f.team = pickedTeam[f.id];
       // The real, final say on human-vs-AI - overrides whatever
       // index.html set as a default, per the note above.
@@ -2454,18 +2511,23 @@ async function main() {
     const help = document.getElementById('turnModeHelp');
     help.style.display = 'block';
     help.innerHTML = `🔄 <strong>Turn-Based mode:</strong> only the faction named at the top can act right now - everyone else is frozen. You get ${TURN_TIMER_SECONDS}s, then control passes to the next faction automatically. Resource income and research keep running in the background for everyone, turn or no turn.`;
-    // Voluntarily end the active faction's turn early instead of
-    // waiting out the full timer - same effect as hotseatTimer running
-    // out (advanceTurn() doesn't care why it's being called), just
-    // player-triggered. Only shown/wired at all in Turn-Based mode -
-    // Real-Time has no per-player turn to skip.
-    const skipBtn = document.getElementById('skipTurnBtn');
-    skipBtn.style.display = 'inline-block';
-    skipBtn.addEventListener('click', () => {
-      if (gameOver || paused || !matchStarted) return;
-      advanceTurn();
-    });
   }
+  // Voluntarily end the current turn early instead of waiting out the
+  // full timer - same effect as it running out on its own (neither
+  // advanceTurn() nor advanceRealTimeClock() cares why it's being
+  // called), just player-triggered. Shown in both modes now: Turn-Based
+  // ends the active faction's own window; Real-Time ends the shared 90s
+  // clock, which is the only thing that clears any unit's (turrets
+  // included, since they share the same lock) one-attack-per-turn lock
+  // in that mode - a map-maker didn't want everyone stuck waiting out
+  // the full 90s just to act again.
+  const skipBtn = document.getElementById('skipTurnBtn');
+  skipBtn.style.display = 'inline-block';
+  skipBtn.textContent = turnMode ? '⏭ Skip Turn' : '⏭ Skip to Next Turn';
+  skipBtn.addEventListener('click', () => {
+    if (gameOver || paused || !matchStarted) return;
+    if (turnMode) advanceTurn(); else advanceRealTimeClock();
+  });
   statusEl.style.display = 'none';
   appEl.classList.add('ready');
 
