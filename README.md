@@ -682,9 +682,19 @@ The only backend code in this project (everything else is static
 HTML/JS/Firebase rules) - a single Cloud Function, `stripeWebhook`, that
 grants 10 download credits after a real $5 Stripe payment. Deployed via
 `firebase deploy --only functions`; live at
-`https://us-central1-game-maker-ed014.cloudfunctions.net/stripeWebhook`,
+`https://us-central1-game-maker-ed014.cloudfunctions.net/stripeWebhook`
+(2nd-gen functions also get a `*.run.app` URL - both resolve to the same
+function; the `cloudfunctions.net` one is what's registered in Stripe),
 registered in the Stripe Dashboard as this Payment Link's webhook
-endpoint, listening for `checkout.session.completed`.
+endpoint, listening for **two** events: `checkout.session.completed`
+*and* `checkout.session.async_payment_succeeded`. Both are needed, not
+just the first - instant payment methods (cards) are already `paid` by
+the time `completed` fires, but delayed-confirmation methods (bank
+debits, some buy-now-pay-later options) fire `completed` first with
+`payment_status: 'unpaid'`, then the actual paid confirmation arrives
+later as the separate `async_payment_succeeded` event. Listening for
+`completed` alone would silently never grant credits for any payment
+method that doesn't confirm instantly.
 
 What it actually does, in order: (1) verifies the request's
 `stripe-signature` header against `STRIPE_WEBHOOK_SECRET` (a Firebase
@@ -693,7 +703,8 @@ STRIPE_WEBHOOK_SECRET` and never committed to this repo - the actual
 security boundary, since without it anyone could POST a fake "payment
 succeeded" body at this URL) - this needs the *raw* request body, which
 Firebase Functions preserves as `req.rawBody` specifically for this; (2)
-ignores anything that isn't a paid `checkout.session.completed`; (3)
+ignores anything that isn't one of those two event types with
+`payment_status: 'paid'`; (3)
 reads `session.client_reference_id` (the Firebase uid `index.html`'s
 buy-credits popup appends to the payment link) to know which account to
 credit - if it's missing, the event is acknowledged but logged for

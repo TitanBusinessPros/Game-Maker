@@ -55,14 +55,26 @@ exports.stripeWebhook = onRequest({ secrets: [stripeWebhookSecret], cors: false 
     return;
   }
 
-  if (event.type !== 'checkout.session.completed') {
+  // checkout.session.completed covers instant payment methods (cards) -
+  // payment_status is already 'paid' by the time this fires. Some
+  // payment methods (bank debits, certain buy-now-pay-later options)
+  // don't confirm instantly: completed fires first with payment_status
+  // 'unpaid', and the actual paid confirmation arrives later as this
+  // second, separate event instead. Both land here and are handled
+  // identically from this point on - whichever one actually represents
+  // "money has cleared" for a given payment method.
+  if (event.type !== 'checkout.session.completed' && event.type !== 'checkout.session.async_payment_succeeded') {
     res.status(200).send('ignored'); // ack so Stripe doesn't retry - just not an event this function acts on
     return;
   }
 
   const session = event.data.object;
   if (session.payment_status !== 'paid') {
-    res.status(200).send('not paid');
+    // Normal for a fresh checkout.session.completed on a delayed payment
+    // method - not an error, just not payable yet. The
+    // async_payment_succeeded event for this same session will arrive
+    // once it actually clears and grant credits then.
+    res.status(200).send('not paid yet');
     return;
   }
 
