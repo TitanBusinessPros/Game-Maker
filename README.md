@@ -172,23 +172,23 @@ appear) — a genuinely separate, self-contained game per map.
    round concept, it fires on the existing 90s cosmetic turn-clock
    instead.
 6. **My Maps** — every map saved under your signed-in account, draft or
-   finished, with Edit/Delete plus, for a finished map, **⬇ Download My
-   Game** - the only way this app offers to actually play a finished map
-   any more, at the map-maker's request (no live-play link is shown or
-   generated anywhere in this UI). Produces the exact same standalone,
-   fully-offline HTML file `play.html`'s own download button does
+   finished, with Edit/Delete plus, for a finished map, two separate
+   actions: **▶ Test Play** and **⬇ Download My Game**. Test Play is
+   free, instant, and unlimited - a plain link straight to the live,
+   Firebase-backed `play.html?map=<id>`, exactly like this app always
+   had, with zero credit cost - because testing your own map while
+   building it (including trying Turn-Based hot-seat with real people by
+   picking Human on that page's own Team Select screen) is a normal part
+   of making a map, not "an audience playing the finished game," and
+   shouldn't be gated behind credits or a download. Download My Game is
+   the separate, credit-gated path for actually distributing a finished
+   map - it produces a standalone, fully-offline HTML file
    (`inlineUrlsAsDataUris()`, reimplemented here so it runs straight from
    the map list - fetch the map's saved data, base64-inline every
    art/sound URL it references, fetch `play.html`'s own source, inject
-   the result via `window.GM_INLINE_CONFIG`), without ever having to open
-   the live Firebase-backed play page at all. That page
-   (`play.html?map=<id>`) still technically exists and would still work
-   for anyone who already has that exact URL from before this change -
-   removing every link to it doesn't delete the page itself - but nothing
-   in this app links to it or generates it any more, so nobody encounters
-   it through normal use, and no play session against it costs Storage
-   egress unless someone specifically has an old URL saved. Clicking
-   **⬇ Download My Game** spends one **download credit** - every account
+   the result via `window.GM_INLINE_CONFIG`) someone else can play with
+   zero further Firebase cost, however many times, however many people.
+   Clicking it spends one **download credit** - every account
    starts with 5, never refilled or reset (an admin-listed email starts
    with 50 instead - see `admin.html`'s own section below), shown next
    to your email at the top of the page ("N download credits left").

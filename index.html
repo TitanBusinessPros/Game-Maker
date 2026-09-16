@@ -1902,19 +1902,22 @@ async function refreshMyMaps() {
     const m = d.data();
     const li = document.createElement('li');
     const tagClass = m.status === 'complete' ? 'complete' : 'draft';
-    // "⬇ Download My Game" is the ONLY way to actually play a finished
-    // map from this list now - produces the same standalone, fully
-    // offline HTML file play.html's own download button does, straight
-    // from here, no detour through the live Firebase-backed play page
-    // at all (see downloadStandaloneGame below). No link to
-    // play.html?map=<id> is shown anywhere in this UI any more, at the
-    // map-maker's request. That page itself still technically exists
-    // (nothing about removing a button deletes it) and would still work
-    // for anyone who already has that exact URL from before, but nothing
-    // in this app links to it or generates it any more, so nobody
-    // encounters it through normal use.
+    // Two separate things, on purpose:
+    // - "▶ Test Play" - free, instant, unlimited, straight to the live
+    //   play.html?map=<id> page. For the map-maker testing/iterating on
+    //   their own map (including trying Turn-Based hot-seat with real
+    //   people, choosing Human on the Team Select screen there) - this
+    //   is a normal, necessary part of BUILDING a map, not "an audience
+    //   playing the finished game," and shouldn't cost a download credit
+    //   or require downloading a file just to check your own work.
+    // - "⬇ Download My Game" - the credit-gated, fully-offline
+    //   standalone file, for actually distributing/publishing the
+    //   finished map (see downloadStandaloneGame below). This is the
+    //   one that costs Firebase egress/credits, since it's meant to be
+    //   handed to other people.
     const actions = m.status === 'complete'
-      ? `<button type="button" class="btn-primary download-game" data-id="${d.id}">⬇ Download My Game</button>`
+      ? `<a class="btn-secondary" style="text-decoration:none; padding:8px 14px; font-size:13px; border-radius:6px; display:inline-block;" href="play.html?map=${d.id}" target="_blank" rel="noopener">▶ Test Play</a>
+         <button type="button" class="btn-primary download-game" data-id="${d.id}">⬇ Download My Game</button>`
       : '';
     li.innerHTML = `
       <span>${escapeAttr(m.name || 'Untitled Map')} <span class="tag ${tagClass}">${m.status}</span></span>
