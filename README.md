@@ -172,17 +172,14 @@ appear) — a genuinely separate, self-contained game per map.
    round concept, it fires on the existing 90s cosmetic turn-clock
    instead.
 6. **My Maps** — every map saved under your signed-in account, draft or
-   finished, with Edit/Delete plus, for a finished map, two separate
-   actions: **▶ Test Play** and **⬇ Download My Game**. Test Play is
-   free, instant, and unlimited - a plain link straight to the live,
-   Firebase-backed `play.html?map=<id>`, exactly like this app always
-   had, with zero credit cost - because testing your own map while
-   building it (including trying Turn-Based hot-seat with real people by
-   picking Human on that page's own Team Select screen) is a normal part
-   of making a map, not "an audience playing the finished game," and
-   shouldn't be gated behind credits or a download. Download My Game is
-   the separate, credit-gated path for actually distributing a finished
-   map - it produces a standalone, fully-offline HTML file
+   finished, with Edit/Delete plus, for a finished map, **⬇ Download My
+   Game** - the ONLY action here, at the map-maker's explicit and
+   repeated instruction: no live gameplay link anywhere in this UI, for
+   anyone, including the map-maker's own testing. No `play.html?map=<id>`
+   link is generated or shown by this app at all any more - trying a map
+   (Turn-Based human players included, via that page's own Team Select
+   screen) means downloading it first, same as anyone else would.
+   Download produces a standalone, fully-offline HTML file
    (`inlineUrlsAsDataUris()`, reimplemented here so it runs straight from
    the map list - fetch the map's saved data, base64-inline every
    art/sound URL it references, fetch `play.html`'s own source, inject

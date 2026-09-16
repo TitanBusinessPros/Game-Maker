@@ -1902,22 +1902,14 @@ async function refreshMyMaps() {
     const m = d.data();
     const li = document.createElement('li');
     const tagClass = m.status === 'complete' ? 'complete' : 'draft';
-    // Two separate things, on purpose:
-    // - "▶ Test Play" - free, instant, unlimited, straight to the live
-    //   play.html?map=<id> page. For the map-maker testing/iterating on
-    //   their own map (including trying Turn-Based hot-seat with real
-    //   people, choosing Human on the Team Select screen there) - this
-    //   is a normal, necessary part of BUILDING a map, not "an audience
-    //   playing the finished game," and shouldn't cost a download credit
-    //   or require downloading a file just to check your own work.
-    // - "⬇ Download My Game" - the credit-gated, fully-offline
-    //   standalone file, for actually distributing/publishing the
-    //   finished map (see downloadStandaloneGame below). This is the
-    //   one that costs Firebase egress/credits, since it's meant to be
-    //   handed to other people.
+    // "⬇ Download My Game" is the ONLY action here, on purpose, at the
+    // map-maker's explicit and repeated instruction: no live gameplay
+    // link, anywhere in this UI, including for the map-maker's own
+    // testing. No play.html?map=<id> link is generated or shown by this
+    // app at all - trying a map (Turn-Based human players included)
+    // means downloading it, same as anyone else would.
     const actions = m.status === 'complete'
-      ? `<a class="btn-secondary" style="text-decoration:none; padding:8px 14px; font-size:13px; border-radius:6px; display:inline-block;" href="play.html?map=${d.id}" target="_blank" rel="noopener">▶ Test Play</a>
-         <button type="button" class="btn-primary download-game" data-id="${d.id}">⬇ Download My Game</button>`
+      ? `<button type="button" class="btn-primary download-game" data-id="${d.id}">⬇ Download My Game</button>`
       : '';
     li.innerHTML = `
       <span>${escapeAttr(m.name || 'Untitled Map')} <span class="tag ${tagClass}">${m.status}</span></span>
