@@ -1807,6 +1807,10 @@ function addTurretRow(data = {}) {
       <div class="field narrow"><label>Range</label><input type="number" class="u-range" value="${data.range ?? 500}" min="0"></div>
       <div class="field narrow"><label>Weapon</label><select class="u-weapon">${weaponOptionsHtml(data.weapon)}</select></div>
     </div>
+    <label style="display:flex; align-items:center; gap:6px; font-weight:normal; margin:8px 0 0;">
+      <input type="checkbox" class="u-auto-attack" ${data.autoAttack !== false ? 'checked' : ''} style="width:auto;">
+      Auto Attack (fires on its own at whatever comes into range - uncheck and a player has to click the turret, then click an enemy, same as commanding any other unit)
+    </label>
     <div class="field" style="margin-top:6px;">
       <label>Cost</label>
       <div class="u-costs"></div>
@@ -1853,6 +1857,10 @@ function addMissileUnitRow(data = {}) {
       <div class="field narrow"><label>Missile HP damage</label><input type="number" class="u-attack" value="${data.attack ?? 300}" min="0"></div>
       <div class="field narrow"><label>Missile speed</label><input type="number" class="u-missile-speed" value="${data.missileSpeed ?? 4}" min="0.1" step="0.1"></div>
     </div>
+    <label style="display:flex; align-items:center; gap:6px; font-weight:normal; margin:8px 0 0;">
+      <input type="checkbox" class="u-auto-attack" ${data.autoAttack !== false ? 'checked' : ''} style="width:auto;">
+      Auto Attack (an AI-controlled faction's launcher fires on its own at whatever comes into range - a human player always has to click the launcher, then click an enemy, either way; uncheck to stop AI factions from auto-firing it too)
+    </label>
     <div class="field" style="margin-top:10px;">
       <label>Missile art (the projectile itself, shown traveling to its target)</label>
       <div class="upload-slot" data-slot="${id}_missile">
@@ -2359,6 +2367,7 @@ function collectTurrets(uploadResults) {
       range: Number(row.querySelector('.u-range').value) || 0,
       costs: currentCostsFromRow(row),
       weapon: row.querySelector('.u-weapon').value || 'laser',
+      autoAttack: row.querySelector('.u-auto-attack').checked,
     };
   });
 }
@@ -2378,6 +2387,7 @@ function collectMissileUnits(uploadResults) {
       missileSpeed: Number(row.querySelector('.u-missile-speed').value) || 4,
       missileImageUrl: uploadResults[`${id}_missile`] || null,
       missileRotateToFace: row.querySelector('.u-missile-rotate').checked,
+      autoAttack: row.querySelector('.u-auto-attack').checked,
       costs: currentCostsFromRow(row),
     };
   });

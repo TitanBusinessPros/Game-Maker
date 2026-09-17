@@ -247,7 +247,12 @@ line. Only this page has the logo/title/footer treatment so far -
    checkbox (on by default - the launcher itself never rotates at all,
    regardless of this checkbox or of what it's firing at; this only
    controls whether the *projectile's* own sprite turns to face the
-   direction it's flying), and **costs** (the usual
+   direction it's flying), an **Auto Attack** checkbox (on by default,
+   same meaning as Gun Turrets' own - see 4h below - though it only ever
+   actually changes anything for an AI-controlled faction's launcher,
+   since a human player's launcher was already always manual-only either
+   way; unchecking it just means an AI faction's launcher never fires on
+   its own either), and **costs** (the usual
    per-resource checkboxes). No Range or Weapon field on this row at all
    - unlike every other
    unit/turret type, a launcher's range isn't set here; see `play.html`'s
@@ -284,17 +289,26 @@ line. Only this page has the logo/title/footer treatment so far -
    Speed field (they're stationary by design - the field doesn't exist
    for these rows at all). Add as many turret types as you want, each
    with name/art/hp/attack/range/**costs**/**weapon** (same per-resource
-   cost checkboxes and Weapon dropdown as every other unit type). In
+   cost checkboxes and Weapon dropdown as every other unit type) plus an
+   **Auto Attack** checkbox (on by default, so an existing map's turrets
+   keep firing on their own exactly like before this checkbox existed) -
+   unchecking it means a turret of that type never picks its own target,
+   for either a human or an AI-controlled faction; a player still
+   commands it exactly like any other unit (click the turret, then click
+   an enemy), it just no longer opens fire the instant something wanders
+   into range on its own. In
    `play.html`, building one
    doesn't spawn it next to your Home Base like every other unit -
    instead it arms a placement mode, and you click anywhere between 50
    and 300 range of your own Home Base (shown as a dashed ring while
    placing) to put it there; cost is only actually deducted on a
    successful placement, and Esc (or clicking the button again) cancels
-   for free. Once placed a turret never moves and auto-fires at
-   whatever enemy comes into its range on its own - no order needed,
-   though you can still click it and manually retarget it like a normal
-   unit if you want to override that. AI factions place turrets the
+   for free. Once placed a turret never moves - with Auto Attack on
+   (the default) it fires at whatever enemy comes into its range on its
+   own, no order needed, though you can still click it and manually
+   retarget it like a normal unit if you want to override that; with
+   Auto Attack off, it only ever fires at a target a player explicitly
+   gives it. AI factions place turrets the
    same way, just picking a random valid spot instead of needing a
    click.
 5. **Sounds** — background music, intro music, attack/building-destroyed/
@@ -803,12 +817,18 @@ entirely by one map's saved data:
   placement mode), and Esc or clicking the button again cancels for
   free before you've spent anything. A placed turret has speed 0 (so
   combatTick's own chase-toward-target math always computes zero
-  movement - it just can't fire until something wanders into range) and
+  movement - it just can't fire until something wanders into range) and,
+  with index.html's own Auto Attack checkbox left on (the default),
   auto-acquires the nearest enemy on its own every frame regardless of
   who owns it or whether it's AI- or human-controlled, rather than
   waiting for a click the way a normal unit does - though clicking it
   and giving it an explicit target still overrides that, same as
-  commanding any other unit. It never visually rotates at all, whether
+  commanding any other unit. With Auto Attack off instead, it never picks
+  a target on its own at all - the per-unit update loop simply skips
+  calling `nearestEnemy()` for it - and only ever fires at whatever a
+  player explicitly clicked it and an enemy to attack; an AI faction
+  whose turret has this off just never fires it, since there's no AI
+  equivalent of a player's click. It never visually rotates at all, whether
   idle or actively firing - confirmed by screenshotting an isolated test
   sprite made to fire at a target directly below it: the math that turns
   it to face that direction is completely correct, but rotating a single
@@ -833,11 +853,16 @@ entirely by one map's saved data:
 - **Missile Silo** (optional, gated building - index.html's item 4f):
   placed exactly like a Gun Turret (same ring, same arm-then-click flow,
   same speed-0/never-moves shape) but additionally requires the Missile
-  Silo building itself to be built first, and never auto-targets on its
-  own - a player has to click the launcher, then click an enemy, same as
-  giving any other owned unit a normal attack order (no special-cased
-  order-issuing code needed for this at all; an AI-controlled launcher
-  still auto-acquires `nearestEnemy()` like any other AI unit). Its range
+  Silo building itself to be built first. A human player always has to
+  click the launcher, then click an enemy, same as giving any other owned
+  unit a normal attack order, regardless of Auto Attack (no special-cased
+  order-issuing code needed for this at all). An AI-controlled launcher
+  auto-acquires `nearestEnemy()` like any other AI unit UNLESS
+  index.html's Auto Attack checkbox was turned off for that launcher type
+  (on by default), in which case an AI faction's launcher just never
+  fires it at all - there's no AI equivalent of a player's click, so
+  turning this off only ever makes sense as a deliberate "AI factions
+  never use this" map design choice. Its range
   isn't a field set on the map at all: it starts at 500 and researches up
   to 1000 then 2000 through two new Research-tab entries (Extended
   Missile Range, Long-Range Missiles), the same "tiered value driven

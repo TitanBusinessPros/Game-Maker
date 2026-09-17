@@ -1006,7 +1006,15 @@ async function main() {
       // turns upside down and looks like shit"). Same fix already applied
       // to the Missile Silo launcher for the same reason - the body just
       // stays in its placed pose regardless of what it's firing at.
+      // index.html's "Auto Attack" checkbox (defaults on, so a turret
+      // saved before this field existed keeps auto-firing exactly like
+      // before) - read by the per-unit update() loop below, which only
+      // self-acquires a fresh target via nearestEnemy() while this is
+      // true. A manually-clicked target (any selected unit's normal
+      // click-to-attack order, unchanged) still fires normally either
+      // way - this only stops it from ever picking its OWN target.
       lockedUntilTurn: 0, facingAngle: 0, weapon: def.weapon || 'laser', rotateToFace: false,
+      autoAttack: def.autoAttack !== false,
     };
     units.push(u);
     return u;
@@ -1034,7 +1042,14 @@ async function main() {
       // (spawnMissile's own facingAngle) shows travel direction, so the
       // static structure stays put (map-maker request: "it tilts sideways
       // and aims at the target, we need it to stay still").
+      // index.html's "Auto Attack" checkbox (defaults on) - only affects
+      // an AI-controlled faction's own launcher, which otherwise
+      // auto-acquires a target the same way any other AI unit does (see
+      // the per-unit update() loop's generic !fac.isHuman branch); a
+      // human player's launcher was already always manual-only regardless
+      // of this field, unchanged.
       lockedUntilTurn: 0, facingAngle: 0, rotateToFace: false,
+      autoAttack: def.autoAttack !== false,
     };
     units.push(u);
     return u;
@@ -1796,15 +1811,22 @@ async function main() {
       if (turnMode && fac.id !== activeIdx) continue;
       if (u.isTurret) {
         // Never moves (speed 0, so combatTick's own out-of-range chase
-        // math always computes zero displacement), and always
+        // math always computes zero displacement), and by default
         // auto-acquires a target instead of waiting on a human player's
-        // click the way a normal owned unit would - unchanged. What DID
-        // change: it only gets its one attack during its own faction's
-        // turn now, via the freeze above and isLocked/lockUnit inside
+        // click the way a normal owned unit would - unless index.html's
+        // "Auto Attack" checkbox was turned off for this turret type
+        // (u.autoAttack === false), in which case it never picks its own
+        // target at all and only ever fires at whatever a player
+        // explicitly clicked it and an enemy to attack (the same generic
+        // click-to-order flow every other selected unit already uses in
+        // handleClick - unaffected by this checkbox, and still what keeps
+        // firing at that same target turn after turn until it dies). It
+        // only gets its one attack during its own faction's turn either
+        // way, via the freeze above and isLocked/lockUnit inside
         // combatTick, same as every other unit - it used to fire
         // continuously on its own real-time cooldown regardless of
         // whose turn it was.
-        if (!u.target || u.target.hp <= 0 || u.target.alive === false) u.target = nearestEnemy(u);
+        if (u.autoAttack !== false && (!u.target || u.target.hp <= 0 || u.target.alive === false)) u.target = nearestEnemy(u);
         if (u.target) combatTick(u, dt);
         continue;
       }
@@ -1834,7 +1856,16 @@ async function main() {
         // player-commanded unit.
         if (u.orderType === 'move' && u.moveTarget) runMoveOrder(u, dt);
       } else if (!fac.isHuman) {
-        if (!u.target) u.target = nearestEnemy(u);
+        // A Missile Silo launcher's own "Auto Attack" checkbox only ever
+        // matters here - an AI faction's launcher otherwise auto-acquires
+        // exactly like any other AI-controlled unit; turning it off makes
+        // an AI-owned launcher never fire on its own (there's no AI
+        // equivalent of a player's manual click, so it just sits idle - a
+        // deliberate map-maker choice, same as leaving it unchecked for a
+        // Gun Turret above). Regular combat units have no .autoAttack
+        // field at all, so `undefined !== false` keeps this a no-op for
+        // every unit type except missile launchers.
+        if (u.autoAttack !== false && !u.target) u.target = nearestEnemy(u);
         combatTick(u, dt);
       } else {
         if (u.orderType === 'attack' && u.target) combatTick(u, dt);
