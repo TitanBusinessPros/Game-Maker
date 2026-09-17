@@ -775,8 +775,8 @@ items uploaded under the old flat `maps` category before this change
 still show up, just under "Other" rather than being sorted into a size -
 they were never tagged with one), **Characters** (sub-picker:
 **Space Ships**, **Navy Ships**, **Planes and Jets**, **Helicopters**,
-**Infantry**, **Artillery**, **Missiles** - stored as `characters/<type>`
-- **Army Men** removed as its own sub-category since it was redundant
+**Infantry**, **Artillery**, **Missiles**, **Tanks** - stored as
+`characters/<type>` - **Army Men** removed as its own sub-category since it was redundant
 with Infantry; anything already uploaded under the old
 `characters/army_men` id still shows up, just under "Other" now instead
 of a named sub-category), giving the Missile Silo's own launcher/missile
