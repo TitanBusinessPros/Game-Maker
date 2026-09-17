@@ -522,6 +522,27 @@ const AI_DIFFICULTY = {
 };
 const MINING_RANGE = 80; // how close a Mining Ship has to be to its deposit to actually earn resources
 const TURRET_MIN_RANGE = 50, TURRET_MAX_RANGE = 300; // valid placement ring around a faction's own Home Base
+// A gated building's own production queue (Air Base/War Factory/Infantry
+// Post/Helicopter Facility/Navy Harbor) - per building INSTANCE, not per
+// unit type, so queueing 10 Tanks fills the whole War Factory's queue
+// the same as 10 mixed units would. Once full, Queue is disabled/labeled
+// "Queue full" for every unit under that building until the front item
+// finishes and the queue shortens again.
+const MAX_QUEUE_PER_BUILDING = 10;
+// Production timers can now run up to 120 minutes (index.html's
+// Production time field, 10-7200s) - showing that as a raw seconds count
+// while it ticks down would be unreadable ("7198s left…"), so both the
+// live countdown and the unit list's own "builds in…" stat go through
+// this instead. Under a minute it's still just "Ns" (unchanged from
+// before this existed - see the 30s jet example this was reported with).
+function formatDuration(totalSeconds) {
+  const s = Math.max(0, Math.ceil(totalSeconds));
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60), remS = s % 60;
+  if (m < 60) return remS ? `${m}m ${remS}s` : `${m}m`;
+  const h = Math.floor(m / 60), remM = m % 60;
+  return remM ? `${h}h ${remM}m` : `${h}h`;
+}
 const MAP_SIZE_MULTIPLIER = { tiny: 1, small: 3, medium: 6, large: 12 };
 const BASE_HOME_RADIUS = 420;
 
@@ -583,9 +604,9 @@ async function main() {
   // 'warFactory') is read by the build panel below to gate them behind
   // that faction actually having built the matching building, and by
   // update()'s production-queue processing.
-  const [airBaseImg, warFactoryImg, infantryPostImg, heliFacilityImg, researchFacilityImg, missileSiloImg] = await Promise.all([
+  const [airBaseImg, warFactoryImg, infantryPostImg, heliFacilityImg, navyHarborImg, researchFacilityImg, missileSiloImg] = await Promise.all([
     loadImage(cfg.airBase?.image), loadImage(cfg.warFactory?.image), loadImage(cfg.infantryPost?.image),
-    loadImage(cfg.heliFacility?.image), loadImage(cfg.researchFacility?.image), loadImage(cfg.missileSilo?.image),
+    loadImage(cfg.heliFacility?.image), loadImage(cfg.navyHarbor?.image), loadImage(cfg.researchFacility?.image), loadImage(cfg.missileSilo?.image),
   ]);
   // offsetX/offsetY: where each building's art is drawn relative to its
   // faction's homeworld once built (see drawGatedBuildings below) - laid
@@ -609,6 +630,7 @@ async function main() {
     // (🪢 -> 〰️) elsewhere in this project.
     { key: 'infantryPost', cfg: cfg.infantryPost || { name: 'Infantry Post', cost: 150, hp: 2000 }, unitCfgs: cfg.infantryUnits || [], icon: '💂', img: infantryPostImg, offsetX: 110, offsetY: -60 },
     { key: 'helicopterFacility', cfg: cfg.heliFacility || { name: 'Helicopter Facility', cost: 150, hp: 2000 }, unitCfgs: cfg.heliUnits || [], icon: '🚁', img: heliFacilityImg, offsetX: -110, offsetY: -60 },
+    { key: 'navyHarbor', cfg: cfg.navyHarbor || { name: 'Navy Harbor', cost: 150, hp: 2000 }, unitCfgs: cfg.navyUnits || [], icon: '⚓', img: navyHarborImg, offsetX: 220, offsetY: 0 },
     { key: 'researchFacility', cfg: cfg.researchFacility || { name: 'Research Facility', cost: 150, hp: 2000 }, unitCfgs: [], icon: '🔬', img: researchFacilityImg, offsetX: 0, offsetY: 140, alwaysShow: true, gatesResearch: true },
     // unitCfgs here (cfg.missileUnits) is read ONLY for the generic "does
     // this building's section have anything in it" / AI-needs-this-
@@ -972,6 +994,12 @@ async function main() {
   function startProduction(fac, defIndex) {
     const def = unitDefs[defIndex];
     if (def.buildingKey) {
+      // See MAX_QUEUE_PER_BUILDING - the build panel already disables
+      // Queue once full, this is the same check server-side-of-the-
+      // client-only-game (i.e. the actual enforcement, not just the UI
+      // hint) so nothing - AI included, since aiThink calls this same
+      // function - can ever push past the cap.
+      if (fac.buildQueue[def.buildingKey].length >= MAX_QUEUE_PER_BUILDING) return;
       fac.buildQueue[def.buildingKey].push({ defIndex, remaining: Math.max(1, Number(def.prodTime) || 30) });
     } else {
       spawnUnit(fac.id, defIndex, fac.x + 40 + (Math.random() - 0.5) * 60, fac.y + (Math.random() - 0.5) * 60);
@@ -1441,7 +1469,12 @@ async function main() {
       spendGold(fac, neededBuilding.cfg.cost); fac.built[neededBuilding.key] = true;
       spawnGatedBuildingEntity(fac, neededBuilding.key);
     } else if (unitDefs.length) {
-      const affordable = unitDefs.map((d, i) => ({ d, i })).filter((x) => canAffordCosts(fac, getCosts(x.d)) && (!x.d.buildingKey || fac.built[x.d.buildingKey]));
+      // Also excludes a unit whose own building's queue is already at
+      // MAX_QUEUE_PER_BUILDING - startProduction would silently no-op on
+      // a full queue (see its own comment), and gold's already spent by
+      // the time that check would run, so this has to happen before
+      // spendCosts below, not after.
+      const affordable = unitDefs.map((d, i) => ({ d, i })).filter((x) => canAffordCosts(fac, getCosts(x.d)) && (!x.d.buildingKey || (fac.built[x.d.buildingKey] && fac.buildQueue[x.d.buildingKey].length < MAX_QUEUE_PER_BUILDING)));
       if (affordable.length) {
         const pick = affordable[Math.floor(Math.random() * affordable.length)];
         spendCosts(fac, getCosts(pick.d));
@@ -2562,7 +2595,7 @@ async function main() {
     const built = activeFaction.built[b.key];
     const queue = activeFaction.buildQueue[b.key];
     if (built && queue.length) {
-      return `Producing ${unitDefs[queue[0].defIndex].name}… ${Math.ceil(queue[0].remaining)}s left${queue.length > 1 ? ` · ${queue.length - 1} queued` : ''}`;
+      return `Producing ${unitDefs[queue[0].defIndex].name}… ${formatDuration(queue[0].remaining)} left${queue.length > 1 ? ` · ${queue.length - 1} queued` : ''}`;
     }
     // Every other building requires Research Facility to already be
     // built first (see the hasResearchFacility gate in renderBuildPanel/
@@ -2656,11 +2689,12 @@ async function main() {
       // "Build" units below used to skip this check entirely.
       const locked = !hasRF || (building && !activeFaction.built[building.key]);
       const lockReason = !hasRF ? buildingCfgByKey.researchFacility.name : (building ? building.cfg.name : '');
+      const queueFull = building && activeFaction.buildQueue[building.key].length >= MAX_QUEUE_PER_BUILDING;
       const unitCosts = getCosts(def);
-      row.innerHTML = `<div class="name">${def.name}${building ? ' ' + building.icon : ''}</div><div class="stats">HP ${def.hp} · ATK ${def.attack} · RNG ${def.range} · SPD ${def.speed} · Cost ${costsText(unitCosts)}${building ? ` · builds in ${def.prodTime}s` : ''}${locked ? ` · requires ${lockReason}` : ''}</div>`;
+      row.innerHTML = `<div class="name">${def.name}${building ? ' ' + building.icon : ''}</div><div class="stats">HP ${def.hp} · ATK ${def.attack} · RNG ${def.range} · SPD ${def.speed} · Cost ${costsText(unitCosts)}${building ? ` · builds in ${formatDuration(def.prodTime)}` : ''}${locked ? ` · requires ${lockReason}` : (queueFull ? ` · queue full (${MAX_QUEUE_PER_BUILDING}/${MAX_QUEUE_PER_BUILDING})` : '')}</div>`;
       const btn = document.createElement('button');
-      btn.textContent = locked ? 'Locked' : (building ? 'Queue' : 'Build');
-      btn.disabled = locked || !canAffordCosts(activeFaction, unitCosts);
+      btn.textContent = locked ? 'Locked' : (queueFull ? 'Queue full' : (building ? 'Queue' : 'Build'));
+      btn.disabled = locked || queueFull || !canAffordCosts(activeFaction, unitCosts);
       btn.onclick = () => { spendCosts(activeFaction, unitCosts); startProduction(activeFaction, i); renderBuildPanel(); };
       row.appendChild(btn);
       el.appendChild(row);

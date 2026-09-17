@@ -160,9 +160,14 @@ line. Only this page has the logo/title/footer treatment so far -
    checkbox, on by default, that turns off a unit's sprite always
    turning to face where it's headed - see `play.html`'s own bullet on
    this further down), plus one more field each: **production time**
-   (10-100s) - `play.html` won't let anyone build those specific units
-   until they've actually built this first, and each one then takes
-   that many real seconds to produce instead of appearing instantly.
+   (10 seconds up to 120 minutes) - `play.html` won't let anyone build
+   those specific units until they've actually built this first, and each
+   one then takes that long to produce instead of appearing instantly -
+   shown live as a countdown on the building's own build-panel row (e.g.
+   "Producing Jet… 30s left", counting down to 0), formatted as
+   hours/minutes once it's over a minute so a long timer doesn't read as
+   an unreadable raw seconds count. Each building's own queue holds up to
+   10 units at once - see item 4d's own bullet above.
    Leave its unit list empty and the whole feature is simply absent from
    the map, same as never adding it.
 4a. **War Factory** (optional) — a second building, identical in every
@@ -171,20 +176,30 @@ line. Only this page has the logo/title/footer treatment so far -
    way to Air Base/War Factory, for foot soldiers/infantry/etc.
 4c. **Helicopter Facility** (optional) — a fourth building, identical in
    every way again, for helicopters.
-   All four of these (Air Base/War Factory/Infantry Post/Helicopter
-   Facility) share the exact same shape: own name (with its own
-   sensible default), own art, own HP, own build cost, and a unit list
-   with per-unit production time - fully independent of each other (a
-   faction can have any combination, including none; every building
-   with units queued produces in parallel, none of them compete for a
-   shared timer). Together they replaced the old standalone "Combat
-   Units" checklist item entirely - a finished map now needs at least
-   one unit under one of these four instead (that old section still
-   exists in `index.html`'s code, hidden, purely so a map made before
-   this change keeps working). Each of the four has a **🗑 Remove this
-   building** button in its own header, for a map-maker who only wants
-   some of them (e.g. 2 of the 4) rather than filling in a section they
-   don't plan to use - clicking it clears that building's unit list (the
+4d. **Navy Harbor** (optional) — a fifth building, identical in every way
+   again, for ships/submarines/etc.
+   All five of these (Air Base/War Factory/Infantry Post/Helicopter
+   Facility/Navy Harbor) share the exact same shape: own name (with its
+   own sensible default), own art, own HP, own build cost, and a unit
+   list with per-unit **production time** (now **10 seconds up to 120
+   minutes**, not capped at 100s any more - a build panel row showing a
+   raw seconds count at that scale would be unreadable, so `play.html`'s
+   own countdown and this stat line both show it as e.g. "1h 30m" instead
+   of "5400s", falling back to plain seconds under a minute, unchanged
+   from before) - fully independent of each other (a faction can have any
+   combination, including none; every building with units queued produces
+   in parallel, none of them compete for a shared timer, and each
+   building's own queue holds **up to 10 units** at once - once full, its
+   remaining unit rows show "Queue full" and can't be queued again until
+   the front item finishes and the queue shortens). Together they
+   replaced the old standalone "Combat Units" checklist item entirely - a
+   finished map now needs at least one unit under one of these five
+   instead (that old section still exists in `index.html`'s code, hidden,
+   purely so a map made before this change keeps working). Each of the
+   five has a **🗑 Remove this building** button in its own header, for a
+   map-maker who only wants some of them (e.g. 2 of the 5) rather than
+   filling in a section they don't plan to use - clicking it clears that
+   building's unit list (the
    only thing that actually makes a building "absent" from the game at
    all - see `checklistGaps`/`GATED_BUILDINGS`' own `unitCfgs.length`
    check, unchanged) and collapses the section to a one-line "removed -
@@ -193,10 +208,10 @@ line. Only this page has the logo/title/footer treatment so far -
    four again (an unused one just has nothing in its unit list, same as
    if it had never been touched, which was already indistinguishable
    from "removed" as far as `play.html` is concerned).
-4d. **Missile Silo** (optional) — a fifth gated building, same
+4e. **Missile Silo** (optional) — a sixth gated building, same
    name/art/HP/build-cost shape as Air Base/War Factory/Infantry Post/
-   Helicopter Facility above (including its own **🗑 Remove this
-   building** button), but its unit list below it is a **missile
+   Helicopter Facility/Navy Harbor above (including its own **🗑 Remove
+   this building** button), but its unit list below it is a **missile
    launcher** type, not a normal combat unit: **name**, **launcher art**,
    **HP**, **Missile HP damage**, **Missile speed**, **missile art** (a
    *second*, separate upload - the projectile itself, drawn actually
@@ -205,14 +220,15 @@ line. Only this page has the logo/title/footer treatment so far -
    field on this row at all - unlike every other unit/turret type, a
    launcher's range isn't set here; see `play.html`'s own bullet on this
    further down for why. In `play.html`, a launcher is placed the same
-   way a Gun Turret is (see 4f below) - click **Place**, then click
+   way a Gun Turret is (see 4g below) - click **Place**, then click
    anywhere between 50 and 300 range of your Home Base - rather than
-   produced with a timer like Air Base's own units, but still requires
-   the Missile Silo building itself to already be standing first, unlike
-   Gun Turrets (which have no gating building at all). Leave its launcher
-   list empty and the whole feature is absent from the map, same as the
-   four buildings above.
-4e. **Research Facility** — NOT optional, unlike the buildings
+   produced with a timer (and so not subject to the 10-unit queue cap
+   either, it isn't a queue at all) like Air Base's own units, but still
+   requires the Missile Silo building itself to already be standing
+   first, unlike Gun Turrets (which have no gating building at all).
+   Leave its launcher list empty and the whole feature is absent from the
+   map, same as the five buildings above.
+4f. **Research Facility** — NOT optional, unlike the buildings
    above: every map has the same built-in research tree (the Research
    tab in `play.html`), so this is the one building every player has to
    construct before they can research anything there at all. Same
@@ -222,15 +238,16 @@ line. Only this page has the logo/title/footer treatment so far -
    also the one thing every faction can always afford to build with
    nothing else built first - in `play.html`, it gates everything else on
    this list: Air Base/War Factory/Infantry Post/Helicopter Facility/
-   Missile Silo, every unit under them, Gun Turrets, and the Mining Ship
-   are all locked (Build/Place buttons disabled, a "requires Research
-   Facility first" note in their stats line) until a faction's own
-   Research Facility is standing - not just research itself like before.
-   AI factions follow the same rule (an unbuilt Research Facility is the
-   only thing an AI will spend on until it's built), and destroying a
-   faction's Research Facility re-locks everything else again, same as
-   destroying any other gated building re-locks its own units.
-4f. **Gun Turrets** (optional) — shaped differently from the buildings
+   Navy Harbor/Missile Silo, every unit under them, Gun Turrets, and the
+   Mining Ship are all locked (Build/Place buttons disabled, a "requires
+   Research Facility first" note in their stats line) until a faction's
+   own Research Facility is standing - not just research itself like
+   before. AI factions follow the same rule (an unbuilt Research Facility
+   is the only thing an AI will spend on until it's built), and
+   destroying a faction's Research Facility re-locks everything else
+   again, same as destroying any other gated building re-locks its own
+   units.
+4g. **Gun Turrets** (optional) — shaped differently from the buildings
    above: no gating building of its own, no production timer, and no
    Speed field (they're stationary by design - the field doesn't exist
    for these rows at all). Add as many turret types as you want, each
@@ -606,25 +623,32 @@ entirely by one map's saved data:
   array rather than the `units` array everything else is clickable
   through, so this never worked before; the click still issues an attack
   order too if you have units selected and it's an enemy's.
-- **Air Base, War Factory, Infantry Post, Helicopter Facility** (all
-  optional, set on the map): a faction-owned buildable structure that
-  has to be built before any of its own units can be, exactly like the
-  Mining Ship's "requires Mining Operations research" pattern. In the
-  Build panel each shows as a one-time purchase ("Build" → "Already
-  built"); its units show as 🔒 Locked with a "requires <building
-  name>" note until that faction actually builds it - even for AI
-  factions, who prioritize building whichever one they still need about
-  half the time they can afford it rather than picking a random unit.
-  Once built, its units queue for production instead of spawning
+- **Air Base, War Factory, Infantry Post, Helicopter Facility, Navy
+  Harbor** (all optional, set on the map): a faction-owned buildable
+  structure that has to be built before any of its own units can be,
+  exactly like the Mining Ship's "requires Mining Operations research"
+  pattern. In the Build panel each shows as a one-time purchase ("Build"
+  → "Already built"); its units show as 🔒 Locked with a "requires
+  <building name>" note until that faction actually builds it - even for
+  AI factions, who prioritize building whichever one they still need
+  about half the time they can afford it rather than picking a random
+  unit. Once built, its units queue for production instead of spawning
   instantly: clicking one starts a real countdown (its own per-unit
-  production time, 10-100s, set on the map) shown right on the
-  building's own build-panel row ("Producing Tank… 24s left · 2
-  queued"), and the unit only actually appears once that timer runs
-  out. Only the front item of each building's queue ticks - so a
-  faction with several of these buildings produces one unit per
-  building at the same time, none of them competing for a shared timer
-  - and like research/mining income, queues keep progressing regardless
-  of whose turn it is in Turn-Based mode. A map with no units defined
+  production time, 10 seconds up to 120 minutes, set on the map) shown
+  right on the building's own build-panel row ("Producing Tank… 24s left
+  · 2 queued", or "Producing Battleship… 1h 30m left" for a long timer -
+  `formatDuration()` switches to h/m once it's a minute or more so this
+  never reads as a raw, unreadable seconds count), and the unit only
+  actually appears once that timer runs out. Each building's own queue
+  holds **up to `MAX_QUEUE_PER_BUILDING` (10) units at once** - Queue
+  disables itself (and every unit under that building shows "queue full
+  (10/10)") once it's at the cap, for the player and AI alike, until the
+  front item finishes and the queue shortens again. Only the front item
+  of each building's queue ticks - so a faction with several of these
+  buildings produces one unit per building at the same time, none of
+  them competing for a shared timer - and like research/mining income,
+  queues keep progressing regardless of whose turn it is in Turn-Based
+  mode. A map with no units defined
   under a given building never shows any of it at all for that
   building. Once built, the building spawns as a **real, attackable
   entity** at a fixed offset near its faction's homeworld (each building
@@ -696,7 +720,7 @@ entirely by one map's saved data:
   it can be selected, destroyed, and targeted by enemies like anything
   else. AI factions place them too, picking a random valid spot in the
   same ring instead of needing a click.
-- **Missile Silo** (optional, gated building - index.html's item 4d):
+- **Missile Silo** (optional, gated building - index.html's item 4e):
   placed exactly like a Gun Turret (same ring, same arm-then-click flow,
   same speed-0/never-moves shape) but additionally requires the Missile
   Silo building itself to be built first, and never auto-targets on its
@@ -837,7 +861,7 @@ they were never tagged with one), **Characters** (sub-picker:
 with Infantry; anything already uploaded under the old
 `characters/army_men` id still shows up, just under "Other" now instead
 of a named sub-category), giving the Missile Silo's own launcher/missile
-art uploads (index.html item 4d) a dedicated place in the shared library
+art uploads (index.html item 4e) a dedicated place in the shared library
 alongside every other character-art type
 Picking a Maps sub-category also shows a hint line with that size's
 recommended-art note (same "capped at 768px, stretched ~N× to cover the
@@ -848,7 +872,7 @@ map creator sets the size.
 **Worlds**, **Bases**, **Resources** (flat, no sub-picker), **Structures**
 (sub-picker: **War Factory**, **Airport**, **Infantry Post**,
 **Helicopter Facility**, **Research Facility**, **Gun Turret**,
-**Missile Silo** - `structures/<type>`), **Sounds** (sub-picker: **Background
+**Missile Silo**, **Navy Harbor** - `structures/<type>`), **Sounds** (sub-picker: **Background
 Music**, **Intro Music**, **Attack**, **Building Destroyed**, **Home Base
 Under Attack**, **Game Over** - `sounds/<type>`). Any top-level category
 with `children` in `CATEGORY_TREE` gets this same sub-picker UI - it used

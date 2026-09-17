@@ -629,9 +629,33 @@
     <p class="hint building-removed-note" id="heliFacilityRemovedNote" style="display:none;">Helicopter Facility removed - it won't show up in-game (same as leaving its unit list empty). <button type="button" class="btn-add building-restore" data-building="heliFacility">+ Add it back</button></p>
   </section>
 
-  <!-- 4d. Missile Silo -->
+  <!-- 4d. Navy Harbor -->
+  <section class="section" id="sec-navyharbor">
+    <h2><span class="num">4d</span> Navy Harbor (optional) <button type="button" class="btn-danger building-remove" data-building="navyHarbor" style="font-size:11px; padding:4px 10px; margin-left:8px; vertical-align:middle;">🗑 Remove this building</button></h2>
+    <div id="navyHarborBody">
+      <p class="hint">A building for ships/submarines/etc. Works exactly like Air Base and War Factory above: name it whatever fits (Navy Harbor, Shipyard, Naval Dock&hellip;), give it its own art, HP, and build cost. The units you add below it can't be built until a player actually builds this first, and each one takes real time to produce (set per unit, 10s-120min) instead of appearing instantly. Leave the unit list empty and this whole feature just doesn't show up in-game.</p>
+      <div class="row">
+        <div class="field"><label>Building name</label><input type="text" id="navyHarborName" value="Navy Harbor"></div>
+        <div class="field narrow"><label>Building HP</label><input type="number" id="navyHarborHp" value="2000" min="1000" max="5000" step="100"></div>
+        <div class="field narrow"><label>Build cost</label><input type="number" id="navyHarborCost" value="150" min="0" step="10"></div>
+      </div>
+      <div class="field">
+        <label>Navy Harbor art</label>
+        <div class="upload-slot" data-slot="navyHarborImage">
+          <div class="thumb">none</div>
+          <div class="meta"><div class="name">No file chosen</div><div class="status">required if you add any navy units below</div></div>
+          <input type="file" accept="image/*" style="width:auto">
+        </div>
+      </div>
+      <div id="navyUnitList"></div>
+      <button type="button" class="btn-add" id="addNavyUnitBtn">+ Add a navy unit</button>
+    </div>
+    <p class="hint building-removed-note" id="navyHarborRemovedNote" style="display:none;">Navy Harbor removed - it won't show up in-game (same as leaving its unit list empty). <button type="button" class="btn-add building-restore" data-building="navyHarbor">+ Add it back</button></p>
+  </section>
+
+  <!-- 4e. Missile Silo -->
   <section class="section" id="sec-missilesilo">
-    <h2><span class="num">4d</span> Missile Silo (optional) <button type="button" class="btn-danger building-remove" data-building="missileSilo" style="font-size:11px; padding:4px 10px; margin-left:8px; vertical-align:middle;">🗑 Remove this building</button></h2>
+    <h2><span class="num">4e</span> Missile Silo (optional) <button type="button" class="btn-danger building-remove" data-building="missileSilo" style="font-size:11px; padding:4px 10px; margin-left:8px; vertical-align:middle;">🗑 Remove this building</button></h2>
     <div id="missileSiloBody">
       <p class="hint">A stationary long-range launcher. Works like Air Base above for the building itself - name it whatever fits (Missile Silo, Launch Bay&hellip;), give it its own art, HP, and build cost. The launcher you add below it is placed differently from Air Base's own units though: like a Gun Turret, building one arms a placement mode - click anywhere between 50 and 300 range of your Home Base to place it there. It never moves once placed, and never fires on its own: click it, then click an enemy, to send a missile at that target. The missile takes real time to travel there (set the missile's own speed per launcher, below) and locks onto whatever it was fired at - if that target is destroyed before the missile arrives, it just disappears from the screen instead of exploding on nothing. Its range starts at 500 and researches up to 1000 then 2000 in-game (see the Research tab) - not a field set here, same idea as Gold's own mining rate upgrading through research. Leave the launcher list empty and this whole feature just doesn't show up in-game.</p>
       <div class="row">
@@ -653,9 +677,9 @@
     <p class="hint building-removed-note" id="missileSiloRemovedNote" style="display:none;">Missile Silo removed - it won't show up in-game (same as leaving its launcher list empty). <button type="button" class="btn-add building-restore" data-building="missileSilo">+ Add it back</button></p>
   </section>
 
-  <!-- 4e. Research Facility -->
+  <!-- 4f. Research Facility -->
   <section class="section" id="sec-researchfacility">
-    <h2><span class="num">4e</span> Research Facility</h2>
+    <h2><span class="num">4f</span> Research Facility</h2>
     <p class="hint">Not optional like the buildings above - every map has a research tree (see the Research tab in-game), so this is the one building every player has to build before they can start researching ANYTHING at all. Name it whatever fits (Research Facility, Lab, Observatory&hellip;) and give it its own art, HP, and build cost.</p>
     <div class="row">
       <div class="field"><label>Building name</label><input type="text" id="researchFacilityName" value="Research Facility"></div>
@@ -672,9 +696,9 @@
     </div>
   </section>
 
-  <!-- 4f. Gun Turrets -->
+  <!-- 4g. Gun Turrets -->
   <section class="section" id="sec-turrets">
-    <h2><span class="num">4f</span> Gun Turrets (optional)</h2>
+    <h2><span class="num">4g</span> Gun Turrets (optional)</h2>
     <p class="hint">Stationary defenses - not built next to your Home Base automatically like other units. Instead, in-game, building one puts you into a placement mode: click anywhere between 50 and 300 range of your Home Base to place it there. It never moves once placed (Speed is ignored for these), and fires on its own at whatever enemy comes into range. Add as many turret types as you want; leave the list empty and this feature just doesn't show up in-game.</p>
     <div id="turretList"></div>
     <button type="button" class="btn-add" id="addTurretBtn">+ Add a turret</button>
@@ -1192,6 +1216,7 @@ const CATEGORY_LABELS = {
   'structures/research_facility': 'Research Facility',
   'structures/gun_turret': 'Gun Turret',
   'structures/missile_silo': 'Missile Silo',
+  'structures/navy_harbor': 'Navy Harbor',
   'sounds/music': 'Background Music',
   'sounds/intro': 'Intro Music',
   'sounds/attack': 'Attack',
@@ -1204,7 +1229,7 @@ const CATEGORY_ORDER = [
   'maps',
   'characters/space_ships', 'characters/navy_ships', 'characters/jets', 'characters/helicopters', 'characters/infantry', 'characters/artillery', 'characters/missiles', 'characters/tanks',
   'worlds', 'bases', 'resources',
-  'structures/war_factory', 'structures/airport', 'structures/infantry_post', 'structures/helicopter_facility', 'structures/research_facility', 'structures/gun_turret', 'structures/missile_silo',
+  'structures/war_factory', 'structures/airport', 'structures/infantry_post', 'structures/helicopter_facility', 'structures/research_facility', 'structures/gun_turret', 'structures/missile_silo', 'structures/navy_harbor',
   'sounds/music', 'sounds/intro', 'sounds/attack', 'sounds/building_destroyed', 'sounds/home_under_attack', 'sounds/endgame', 'sounds',
 ];
 
@@ -1244,6 +1269,7 @@ const SLOT_CATEGORY_HINTS = {
   warFactoryImage: 'structures/war_factory',
   infantryPostImage: 'structures/infantry_post',
   heliFacilityImage: 'structures/helicopter_facility',
+  navyHarborImage: 'structures/navy_harbor',
   researchFacilityImage: 'structures/research_facility',
   missileSiloImage: 'structures/missile_silo',
   soundMusic: 'sounds/music',
@@ -1260,6 +1286,7 @@ const SLOT_PREFIX_CATEGORY_HINTS = [
   [/^warunit_/, 'characters/tanks'],
   [/^infunit_/, 'characters/infantry'],
   [/^heliunit_/, 'characters/helicopters'],
+  [/^navyunit_/, 'characters/navy_ships'],
   [/^turret_/, 'structures/gun_turret'],
   // Missile Silo rows have two upload slots each - the launcher's own
   // sprite (missile_N) and a second, separate one for the projectile
@@ -1547,6 +1574,7 @@ const airUnitList = document.getElementById('airUnitList');
 const warUnitList = document.getElementById('warUnitList');
 const infantryUnitList = document.getElementById('infantryUnitList');
 const heliUnitList = document.getElementById('heliUnitList');
+const navyUnitList = document.getElementById('navyUnitList');
 const turretList = document.getElementById('turretList');
 const missileUnitList = document.getElementById('missileUnitList');
 const unitCounterState = { n: 0 };
@@ -1554,6 +1582,7 @@ const airUnitCounterState = { n: 0 };
 const warUnitCounterState = { n: 0 };
 const infantryUnitCounterState = { n: 0 };
 const heliUnitCounterState = { n: 0 };
+const navyUnitCounterState = { n: 0 };
 const turretCounterState = { n: 0 };
 const missileUnitCounterState = { n: 0 };
 
@@ -1608,7 +1637,7 @@ function makeUnitRow(list, idPrefix, counterState, data = {}, gated = false) {
       <div class="field narrow"><label>Attack</label><input type="number" class="u-attack" value="${data.attack ?? 200}" min="0"></div>
       <div class="field narrow"><label>Range</label><input type="number" class="u-range" value="${data.range ?? 500}" min="0"></div>
       <div class="field narrow"><label>Speed</label><input type="number" class="u-speed" value="${data.speed ?? 2}" min="0" step="0.1"></div>
-      ${gated ? `<div class="field narrow"><label>Production time (s)</label><input type="number" class="u-prodtime" value="${data.prodTime ?? 30}" min="10" max="100" step="5"></div>` : ''}
+      ${gated ? `<div class="field narrow"><label>Production time (s, 10-7200 = up to 120 min)</label><input type="number" class="u-prodtime" value="${data.prodTime ?? 30}" min="10" max="7200" step="5"></div>` : ''}
       <div class="field narrow"><label>Weapon</label><select class="u-weapon">${weaponOptionsHtml(data.weapon)}</select></div>
     </div>
     <label style="display:flex; align-items:center; gap:6px; font-weight:normal; margin:8px 0 0;">
@@ -1639,6 +1668,7 @@ function addAirUnitRow(data = {}) { return makeUnitRow(airUnitList, 'airunit', a
 function addWarUnitRow(data = {}) { return makeUnitRow(warUnitList, 'warunit', warUnitCounterState, data, true); }
 function addInfantryUnitRow(data = {}) { return makeUnitRow(infantryUnitList, 'infunit', infantryUnitCounterState, data, true); }
 function addHeliUnitRow(data = {}) { return makeUnitRow(heliUnitList, 'heliunit', heliUnitCounterState, data, true); }
+function addNavyUnitRow(data = {}) { return makeUnitRow(navyUnitList, 'navyunit', navyUnitCounterState, data, true); }
 
 // addUnitBtn/addUnitRow have no visible way to be reached any more (see
 // #sec-units above) - the listener and default-Cruiser auto-add are
@@ -1654,6 +1684,7 @@ document.getElementById('addAirUnitBtn').addEventListener('click', () => addAirU
 document.getElementById('addWarUnitBtn').addEventListener('click', () => addWarUnitRow());
 document.getElementById('addInfantryUnitBtn').addEventListener('click', () => addInfantryUnitRow());
 document.getElementById('addHeliUnitBtn').addEventListener('click', () => addHeliUnitRow());
+document.getElementById('addNavyUnitBtn').addEventListener('click', () => addNavyUnitRow());
 
 // ---------------------------------------------------------------------
 // "🗑 Remove this building" - a map-maker who only wants, say, 2 of the
@@ -1675,7 +1706,7 @@ document.getElementById('addHeliUnitBtn').addEventListener('click', () => addHel
 const OPTIONAL_BUILDINGS = {
   airBase: airUnitList, warFactory: warUnitList,
   infantryPost: infantryUnitList, heliFacility: heliUnitList,
-  missileSilo: missileUnitList,
+  navyHarbor: navyUnitList, missileSilo: missileUnitList,
 };
 document.querySelectorAll('.building-remove').forEach((btn) => {
   btn.addEventListener('click', () => {
@@ -2109,7 +2140,7 @@ function setSaveStatus(text, cls) {
 
 const FIXED_UPLOAD_SLOTS = [
   'backgroundImage', 'goodBaseImage', 'resourceImage', 'miningUnitImage',
-  'airBaseImage', 'warFactoryImage', 'infantryPostImage', 'heliFacilityImage', 'researchFacilityImage', 'missileSiloImage',
+  'airBaseImage', 'warFactoryImage', 'infantryPostImage', 'heliFacilityImage', 'navyHarborImage', 'researchFacilityImage', 'missileSiloImage',
   'soundMusic', 'soundIntro', 'soundAttack', 'soundBuildingDestroyed', 'soundHomeUnderAttack', 'soundEndgame',
 ];
 
@@ -2157,12 +2188,12 @@ function collectUnitRows(list, uploadResults) {
       weapon: row.querySelector('.u-weapon').value || 'laser',
       rotateToFace: row.querySelector('.u-rotate').checked,
     };
-    // Only Air Base/War Factory rows have the production-time field at
-    // all (see makeUnitRow's `gated` flag) - clamp it the same way
+    // Only gated-building rows have the production-time field at all
+    // (see makeUnitRow's `gated` flag) - clamp it the same way
     // clampHomeworldHp clamps HP, so an out-of-range value typed in
     // can't silently produce a unit that builds faster/slower than the
-    // 10-100s the field promises.
-    if (prodEl) base.prodTime = Math.max(10, Math.min(100, Number(prodEl.value) || 30));
+    // 10s-120min (7200s) the field promises.
+    if (prodEl) base.prodTime = Math.max(10, Math.min(7200, Number(prodEl.value) || 30));
     return base;
   });
 }
@@ -2171,6 +2202,7 @@ function collectAirUnits(uploadResults) { return collectUnitRows(airUnitList, up
 function collectWarUnits(uploadResults) { return collectUnitRows(warUnitList, uploadResults); }
 function collectInfantryUnits(uploadResults) { return collectUnitRows(infantryUnitList, uploadResults); }
 function collectHeliUnits(uploadResults) { return collectUnitRows(heliUnitList, uploadResults); }
+function collectNavyUnits(uploadResults) { return collectUnitRows(navyUnitList, uploadResults); }
 // Not collectUnitRows - turret rows have no .u-speed input at all (see
 // addTurretRow), so reusing the same reader would throw on a null
 // querySelector result instead of just reading a real 0.
@@ -2215,18 +2247,20 @@ async function buildMapDoc(status) {
   const warUnitSlots = Array.from(warUnitList.querySelectorAll('.unit-row')).map((row) => row.dataset.unitId);
   const infantryUnitSlots = Array.from(infantryUnitList.querySelectorAll('.unit-row')).map((row) => row.dataset.unitId);
   const heliUnitSlots = Array.from(heliUnitList.querySelectorAll('.unit-row')).map((row) => row.dataset.unitId);
+  const navyUnitSlots = Array.from(navyUnitList.querySelectorAll('.unit-row')).map((row) => row.dataset.unitId);
   const turretSlots = Array.from(turretList.querySelectorAll('.unit-row')).map((row) => row.dataset.unitId);
   // Two upload-slot ids per row (launcher + missile art) - see
   // addMissileUnitRow/collectMissileUnits.
   const missileUnitSlots = Array.from(missileUnitList.querySelectorAll('.unit-row')).flatMap((row) => [row.dataset.unitId, `${row.dataset.unitId}_missile`]);
   const computerSlots = Array.from(computerList.querySelectorAll('.computer-row')).map((row) => row.dataset.computerId);
   const resourceSlots = Array.from(document.querySelectorAll('#extraResourcesList .resource-row')).map((row) => row.dataset.resourceId);
-  const uploadResults = await uploadSlotsWithLimit([...FIXED_UPLOAD_SLOTS, ...unitSlots, ...airUnitSlots, ...warUnitSlots, ...infantryUnitSlots, ...heliUnitSlots, ...turretSlots, ...missileUnitSlots, ...computerSlots, ...resourceSlots]);
+  const uploadResults = await uploadSlotsWithLimit([...FIXED_UPLOAD_SLOTS, ...unitSlots, ...airUnitSlots, ...warUnitSlots, ...infantryUnitSlots, ...heliUnitSlots, ...navyUnitSlots, ...turretSlots, ...missileUnitSlots, ...computerSlots, ...resourceSlots]);
   const units = collectUnits(uploadResults);
   const airUnits = collectAirUnits(uploadResults);
   const warUnits = collectWarUnits(uploadResults);
   const infantryUnits = collectInfantryUnits(uploadResults);
   const heliUnits = collectHeliUnits(uploadResults);
+  const navyUnits = collectNavyUnits(uploadResults);
   const gunTurrets = collectTurrets(uploadResults);
   const missileUnits = collectMissileUnits(uploadResults);
   const computers = collectComputers(uploadResults);
@@ -2315,6 +2349,13 @@ async function buildMapDoc(status) {
       image: uploadResults.heliFacilityImage,
     },
     heliUnits,
+    navyHarbor: {
+      name: document.getElementById('navyHarborName').value.trim() || 'Navy Harbor',
+      hp: clampHomeworldHp(document.getElementById('navyHarborHp').value),
+      cost: Number(document.getElementById('navyHarborCost').value) || 150,
+      image: uploadResults.navyHarborImage,
+    },
+    navyUnits,
     // NOT optional - see its section hint. Research is a built-in
     // mechanic on every map (the Research tab / TECH_TREE, not
     // map-maker-defined data like the buildings above), so unlike Air
@@ -2369,8 +2410,8 @@ function checklistGaps(mapDoc) {
   // same as always). What replaces "at least one combat unit" is "at
   // least one buildable unit somewhere" - Air Base and War Factory
   // count now too.
-  if ([mapDoc.units, mapDoc.airUnits, mapDoc.warUnits, mapDoc.infantryUnits, mapDoc.heliUnits].every((list) => list.length === 0)) {
-    gaps.push('at least one unit (Air Base / War Factory / Infantry Post / Helicopter Facility - Combat Units is no longer used)');
+  if ([mapDoc.units, mapDoc.airUnits, mapDoc.warUnits, mapDoc.infantryUnits, mapDoc.heliUnits, mapDoc.navyUnits].every((list) => list.length === 0)) {
+    gaps.push('at least one unit (Air Base / War Factory / Infantry Post / Helicopter Facility / Navy Harbor - Combat Units is no longer used)');
   }
   mapDoc.units.forEach((u, i) => { if (!u.imageUrl) gaps.push(`unit #${i + 1} (${u.name}) art`); });
   // Same pattern 4 times: a gated building's own art (and each of its
@@ -2380,6 +2421,7 @@ function checklistGaps(mapDoc) {
   [
     ['airBase', 'airUnits'], ['warFactory', 'warUnits'],
     ['infantryPost', 'infantryUnits'], ['heliFacility', 'heliUnits'],
+    ['navyHarbor', 'navyUnits'],
   ].forEach(([buildingKey, unitsKey]) => {
     const units = mapDoc[unitsKey];
     if (!units.length) return;
@@ -2710,6 +2752,16 @@ async function loadExistingMap() {
   if (Array.isArray(m.heliUnits) && m.heliUnits.length) {
     heliUnitList.innerHTML = '';
     m.heliUnits.forEach((u) => addHeliUnitRow(u));
+  }
+  if (m.navyHarbor) {
+    document.getElementById('navyHarborName').value = m.navyHarbor.name || 'Navy Harbor';
+    document.getElementById('navyHarborHp').value = m.navyHarbor.hp || 2000;
+    document.getElementById('navyHarborCost').value = m.navyHarbor.cost || 150;
+    if (m.navyHarbor.image) showExistingAsset('navyHarborImage', m.navyHarbor.image);
+  }
+  if (Array.isArray(m.navyUnits) && m.navyUnits.length) {
+    navyUnitList.innerHTML = '';
+    m.navyUnits.forEach((u) => addNavyUnitRow(u));
   }
   if (m.researchFacility) {
     document.getElementById('researchFacilityName').value = m.researchFacility.name || 'Research Facility';
