@@ -70,10 +70,11 @@ service cloud.firestore {
                     && request.auth.token.email_verified == true
                     && request.resource.data.email == request.auth.token.email
                     && request.resource.data.keys().hasOnly(['email', 'credits', 'createdAt'])
-                    && (
-                      (exists(/databases/$(database)/documents/bonusEmails/$(request.auth.token.email)) && request.resource.data.credits == 50)
-                      || (!exists(/databases/$(database)/documents/bonusEmails/$(request.auth.token.email)) && request.resource.data.credits == 3)
-                    );
+                    && request.resource.data.credits ==
+                        (exists(/databases/$(database)/documents/bonusEmails/$(request.auth.token.email)) ? 50 : 3)
+                        + (exists(/databases/$(database)/documents/pendingCreditGrants/$(request.auth.token.email))
+                            ? get(/databases/$(database)/documents/pendingCreditGrants/$(request.auth.token.email)).data.amount
+                            : 0);
       allow update: if request.auth != null
                     && request.auth.uid == uid
                     && request.auth.token.email_verified == true
@@ -81,6 +82,25 @@ service cloud.firestore {
                     && request.resource.data.keys().hasOnly(['email', 'credits', 'createdAt'])
                     && request.resource.data.credits >= 0
                     && request.resource.data.credits < resource.data.credits;
+    }
+
+    // admin.html's "Grant download credits" action queues a grant here,
+    // by email, for an account that has never signed in yet (no uid
+    // exists to credit a /users/{uid} doc directly). Only the
+    // grantCredits Cloud Function (Admin SDK, bypasses these rules
+    // entirely) is ever allowed to create/increase one of these docs -
+    // there's deliberately no client write path at all, so nobody can
+    // queue themselves free credits by writing this collection directly.
+    // The doc is consumed (folded into the starting balance, then
+    // deleted) by ensureUserCreditsDoc in index.html the moment that
+    // email actually signs in for the first time - see the /users/{uid}
+    // create rule above, which reads the amount here the same way it
+    // already reads bonusEmails.
+    match /pendingCreditGrants/{email} {
+      allow read: if true;
+      allow delete: if request.auth != null
+                    && request.auth.token.email_verified == true
+                    && request.auth.token.email == email;
     }
 
     // The Game Producer's own saved-in-progress projects (producer.html's

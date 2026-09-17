@@ -80,12 +80,23 @@
 
     <div class="section">
       <h3 style="margin-top:0;">50-credit download list</h3>
-      <p style="color:var(--text-dim); font-size:12px; margin-top:-8px;">Every account starts with 5 "⬇ Download My Game" credits, spent one per download, never refilled. An email added here starts with 50 instead - only applies the first time that account signs in (doesn't retroactively change a balance someone already has).</p>
+      <p style="color:var(--text-dim); font-size:12px; margin-top:-8px;">Every account starts with 3 "⬇ Download My Game" credits, spent one per download, never refilled. An email added here starts with 50 instead - only applies the first time that account signs in (doesn't retroactively change a balance someone already has).</p>
       <div class="row">
         <div class="field"><input type="text" id="bonusEmailInput" placeholder="someone@example.com"></div>
         <button type="button" class="btn-primary" id="addBonusEmailBtn">+ Add</button>
       </div>
       <div id="bonusEmailList" style="margin-top:10px; display:flex; flex-wrap:wrap; gap:8px;"></div>
+    </div>
+
+    <div class="section">
+      <h3 style="margin-top:0;">Grant download credits</h3>
+      <p style="color:var(--text-dim); font-size:12px; margin-top:-8px;">Add credits to one specific account on top of whatever it already has - unlike the bonus list above, this works for an account that's already used some (or all) of its starting credits, and for an email that has never signed in at all (those wait and get applied automatically the moment that email does sign in for the first time).</p>
+      <div class="row">
+        <div class="field"><input type="text" id="grantEmailInput" placeholder="someone@example.com"></div>
+        <div class="field" style="flex:none; width:100px;"><input type="text" inputmode="numeric" id="grantAmountInput" placeholder="Amount"></div>
+        <button type="button" class="btn-primary" id="grantCreditsBtn">Grant</button>
+      </div>
+      <div id="grantCreditsStatus" style="font-size:12px; color:var(--text-dim); margin-top:6px;"></div>
     </div>
 
     <div class="section">
@@ -136,6 +147,9 @@ import {
 import {
   getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject
 } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-storage.js";
+import {
+  getFunctions, httpsCallable
+} from "https://www.gstatic.com/firebasejs/10.13.2/firebase-functions.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAJ-zJW3Z25mGucMA-hnO67yn-7Q5VgF1c",
@@ -153,6 +167,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
+const functions = getFunctions(app);
 
 const signedOutView = document.getElementById('signedOutView');
 const deniedView = document.getElementById('deniedView');
@@ -259,6 +274,47 @@ document.getElementById('addBonusEmailBtn').addEventListener('click', async () =
   await setDoc(doc(db, 'bonusEmails', email), { addedAt: serverTimestamp() });
   input.value = '';
   refreshBonusEmails();
+});
+
+// ---------------------------------------------------------------------
+// Grant download credits to one specific account - unlike the bonus list
+// above (which only ever affects a NEW account's starting balance),
+// this can top up an account that's already spent some/all of its
+// credits. firestore.rules' own /users/{uid} update rule only ever lets
+// a balance go DOWN, by design (no backend otherwise to stop a client
+// just inventing itself more) - so actually raising one has to go
+// through the grantCredits Cloud Function instead, which runs under the
+// Admin SDK and is the only other thing (besides the Stripe webhook)
+// allowed to do that. That function also handles an email that's never
+// signed in at all (no Firebase Auth account yet to credit) by queuing
+// the grant for whenever it does - see functions/index.js.
+// ---------------------------------------------------------------------
+const grantCreditsFn = httpsCallable(functions, 'grantCredits');
+document.getElementById('grantCreditsBtn').addEventListener('click', async () => {
+  const emailInput = document.getElementById('grantEmailInput');
+  const amountInput = document.getElementById('grantAmountInput');
+  const statusEl = document.getElementById('grantCreditsStatus');
+  const btn = document.getElementById('grantCreditsBtn');
+  const email = emailInput.value.trim().toLowerCase();
+  const amount = parseInt(amountInput.value, 10);
+  if (!email || !email.includes('@')) { alert('Enter a valid email address.'); return; }
+  if (!Number.isInteger(amount) || amount < 1) { alert('Enter a whole number of credits to add.'); return; }
+  btn.disabled = true;
+  statusEl.style.color = 'var(--text-dim)';
+  statusEl.textContent = 'Granting…';
+  try {
+    const result = await grantCreditsFn({ email, amount });
+    statusEl.style.color = 'var(--ok)';
+    statusEl.textContent = result.data.status === 'pending'
+      ? `✓ Queued ${amount} credit(s) for ${email} - added automatically the first time that account signs in.`
+      : `✓ Added ${amount} credit(s) to ${email}'s account.`;
+    emailInput.value = '';
+    amountInput.value = '';
+  } catch (err) {
+    statusEl.style.color = 'var(--bad)';
+    statusEl.textContent = `Failed: ${err.message}`;
+  }
+  btn.disabled = false;
 });
 
 // ---------------------------------------------------------------------

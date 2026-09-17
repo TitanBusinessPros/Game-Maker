@@ -1,4 +1,4 @@
-const { onRequest } = require('firebase-functions/v2/https');
+const { onRequest, onCall, HttpsError } = require('firebase-functions/v2/https');
 const { defineSecret } = require('firebase-functions/params');
 const logger = require('firebase-functions/logger');
 // firebase-admin v14 dropped the old admin.firestore()/admin.initializeApp()
@@ -7,10 +7,17 @@ const logger = require('firebase-functions/logger');
 // require time, which is what actually broke the first deploy attempt.
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+const { getAuth } = require('firebase-admin/auth');
 const Stripe = require('stripe');
 
 initializeApp();
 const db = getFirestore();
+
+// Duplicated from index.html/admin.html's own ADMIN_EMAIL - this is the
+// actual security boundary for grantCredits below (checked off the
+// caller's own verified ID token, same as every other admin-only action
+// in this project), not just a client-side check.
+const ADMIN_EMAIL = 'adonai4you@gmail.com';
 
 // Set once via: firebase functions:secrets:set STRIPE_WEBHOOK_SECRET
 // (the "Signing secret" Stripe shows when you register this function's
@@ -116,4 +123,67 @@ exports.stripeWebhook = onRequest({ secrets: [stripeWebhookSecret], cors: false 
     ? `Granted ${CREDITS_PER_PURCHASE} credits to uid ${uid} for session ${session.id}`
     : `Session ${session.id} already processed - skipped duplicate delivery`);
   res.status(200).send('ok');
+});
+
+// admin.html's "Grant download credits" action. This is the only other
+// place (besides the Stripe webhook above) allowed to *increase* a
+// /users/{uid} credits balance - firestore.rules' own update rule only
+// ever allows that field to go down, by design, since there's no backend
+// to trust a client's own claimed balance otherwise. Being a Cloud
+// Function running under the Admin SDK is what makes the increase
+// possible at all; it bypasses those rules the same way the webhook does.
+//
+// Handles both cases the admin asked for:
+//  - The email already has a Firebase Auth account (they've signed into
+//    index.html/admin.html/producer.html at least once, whether or not
+//    they've since spent any of their starting credits) - looked up via
+//    getUserByEmail, then its /users/{uid} doc is incremented (or created,
+//    for the rare case where that never happened) directly.
+//  - The email has never signed in at all - there's no uid and so no
+//    /users/{uid} doc to credit yet. The grant is queued instead, in a new
+//    pendingCreditGrants/{email} doc, and index.html's own
+//    ensureUserCreditsDoc() folds it into that account's very first
+//    balance (on top of the usual 3, or 50 if the email's also on the
+//    bonusEmails list) the moment they do sign in - see the matching
+//    change to firestore.rules' /users/{uid} create rule and to
+//    ensureUserCreditsDoc itself.
+exports.grantCredits = onCall(async (request) => {
+  const auth = request.auth;
+  if (!auth || auth.token.email !== ADMIN_EMAIL || !auth.token.email_verified) {
+    throw new HttpsError('permission-denied', 'Only the admin account can grant credits.');
+  }
+
+  const email = String(request.data?.email || '').trim().toLowerCase();
+  const amount = Number(request.data?.amount);
+  if (!email || !email.includes('@')) {
+    throw new HttpsError('invalid-argument', 'Enter a valid email address.');
+  }
+  if (!Number.isInteger(amount) || amount < 1 || amount > 1000) {
+    throw new HttpsError('invalid-argument', 'Amount must be a whole number between 1 and 1000.');
+  }
+
+  let uid = null;
+  try {
+    uid = (await getAuth().getUserByEmail(email)).uid;
+  } catch (err) {
+    if (err.code !== 'auth/user-not-found') throw err;
+  }
+
+  if (uid) {
+    await db.collection('users').doc(uid).set(
+      { email, credits: FieldValue.increment(amount) },
+      { merge: true }
+    );
+    logger.info(`Granted ${amount} credits to existing account ${email} (uid ${uid})`);
+    return { status: 'credited', amount };
+  }
+
+  // merge + increment also handles this being the first grant queued for
+  // this email (increment on a field that doesn't exist yet starts from 0).
+  await db.collection('pendingCreditGrants').doc(email).set(
+    { email, amount: FieldValue.increment(amount) },
+    { merge: true }
+  );
+  logger.info(`Queued ${amount} pending credits for ${email} (no account yet)`);
+  return { status: 'pending', amount };
 });

@@ -337,10 +337,14 @@ line. Only this page has the logo/title/footer treatment so far -
    failing silently. Client-side, the enforcement against someone just
    editing their own balance in devtools lives entirely in
    `firestore.rules`' `/users/{uid}` rules: a new balance can only ever
-   be *created* at exactly 3 (or exactly 50, only if that email's in the
-   bonus list), and can only ever be *updated* to exactly one less than
-   whatever it already was - nothing client-side is ever allowed to
-   *increase* it. The admin account is fully exempt - no credits doc, no
+   be *created* at exactly 3 (or 50 if that email's in the bonus list),
+   plus whatever's sitting in a `pendingCreditGrants` doc for that email
+   from `admin.html`'s "Grant download credits" action (see that page's
+   own section below) - and can only ever be *updated* to something
+   lower than whatever it already was (not just exactly one less, since
+   Titan Game Producer can spend several credits in one multi-stage
+   compile) - nothing client-side is ever allowed to *increase* it. The
+   admin account is fully exempt - no credits doc, no
    check, no limit at all, checked the same way every other admin-only
    action in this project is (`request.auth.token.email` against the one
    hardcoded admin address, not a client-side flag).
@@ -922,6 +926,29 @@ with - it's read once, when that account's own credits doc is first
 created, not re-checked afterward, so adding or removing an email here
 doesn't retroactively change a balance someone already has.
 
+Right below that, **Grant download credits** adds credits to one
+*specific* account on top of whatever it already has - unlike the bonus
+list above, this isn't limited to a brand-new account's starting balance.
+Enter an email and an amount and click Grant. Since `firestore.rules`
+only ever lets a `/users/{uid}` balance go *down* (there's no backend
+otherwise to stop a client just inventing itself more), actually raising
+one has to run under the Admin SDK, which bypasses that rule - a new
+callable Cloud Function, `grantCredits` (`functions/index.js`), admin-
+gated the same way as every other admin-only action here (checked off
+the caller's own verified ID token, not a client-side flag). It handles
+both cases:
+- **The email has signed in before** (a real Firebase Auth account
+  exists, whether or not it's since spent any of its starting credits) -
+  looked up via `getUserByEmail`, then its `/users/{uid}` doc is
+  incremented directly.
+- **The email has never signed in at all** - there's no uid yet to
+  credit. The grant is queued instead, in a new `pendingCreditGrants/
+  {email}` doc, and folded into that account's very first balance (on
+  top of the usual 3, or 50 if it's also on the bonus list above) by
+  `index.html`'s `ensureUserCreditsDoc()` the moment that email actually
+  does sign in for the first time, then deleted so it's never applied
+  twice.
+
 Categories are hierarchical: **Maps** (sub-picker: **Tiny**, **Small**,
 **Medium**, **Large** - `maps/<size>`, so background art actually gets
 filed under the map size it was meant for instead of one flat bucket;
@@ -1084,12 +1111,16 @@ whole, a 20-stage compiled game can end up **very large** (tens of MB) -
 fine to play locally in a browser, but worth keeping in mind before
 trying to host or email it anywhere with its own size limit.
 
-## `functions/` — the Stripe webhook
+## `functions/` — the Stripe webhook and admin credit grants
 
 The only backend code in this project (everything else is static
-HTML/JS/Firebase rules) - a single Cloud Function, `stripeWebhook`, that
-grants 10 download credits after a real $5 Stripe payment. Deployed via
-`firebase deploy --only functions`; live at
+HTML/JS/Firebase rules) - two Cloud Functions, both allowed to *increase*
+a `/users/{uid}` credits balance specifically because they run under the
+Admin SDK, which is the only thing that can bypass `firestore.rules`' own
+"a client can only ever decrease its own balance" rule.
+
+`stripeWebhook` grants 10 download credits after a real $5 Stripe
+payment. Deployed via `firebase deploy --only functions`; live at
 `https://us-central1-game-maker-ed014.cloudfunctions.net/stripeWebhook`
 (2nd-gen functions also get a `*.run.app` URL - both resolve to the same
 function; the `cloudfunctions.net` one is what's registered in Stripe),
@@ -1121,10 +1152,26 @@ checks a `processedStripeSessions/{sessionId}` doc inside a transaction
 before granting anything, so a Stripe retry of the same event (which
 does happen) can't double-grant credits for one payment; (5) increments
 `users/{uid}.credits` by exactly 10 using the Admin SDK (`FieldValue.increment`,
-inside the same transaction) - this is the one piece of this whole
-project that's allowed to *increase* a credits balance, because
-`firestore.rules` can't (and shouldn't) trust a client to report its own
-payment, and the Admin SDK bypasses those rules entirely by design.
+inside the same transaction) - `firestore.rules` can't (and shouldn't)
+trust a client to report its own payment, so this has to bypass those
+rules entirely by design.
+
+`grantCredits` backs `admin.html`'s "Grant download credits" action - a
+callable function (`onCall`, not an HTTP endpoint like the webhook above,
+so it's invoked directly from admin.html via `httpsCallable` rather than
+receiving a webhook POST), gated to the one admin email off the caller's
+own verified ID token (`request.auth.token.email`), same as every other
+admin-only check in this project. Given an email and an amount: if
+`getAuth().getUserByEmail(email)` finds a real account (they've signed in
+at least once, whether or not they've since spent any starting credits),
+its `/users/{uid}.credits` is incremented directly with the Admin SDK. If
+it doesn't (`auth/user-not-found` - the email has never signed in), the
+amount is queued instead in a new `pendingCreditGrants/{email}` doc
+(`FieldValue.increment`, so several grants queued before that first
+sign-in just add up) - `index.html`'s `ensureUserCreditsDoc()` reads and
+folds this into the account's very first balance the moment it's
+actually created, then deletes the pending doc so it's never counted
+twice; see `firestore.rules`' matching `/users/{uid}` create rule change.
 
 `firebase-admin` v14 dropped the old `admin.firestore()`/`admin.initializeApp()`
 namespaced API in favor of modular imports
@@ -1164,7 +1211,13 @@ Project: `game-maker-ed014`.
   is enforced in the rules themselves, not trusted from the client, since
   this project has no backend to enforce it any other way; the update
   rule allows decreasing by *any* amount now, not just exactly 1, since
-  `producer.html` can spend several credits in one compile).
+  `producer.html` can spend several credits in one compile). A third,
+  `pendingCreditGrants/{email}`, backs `admin.html`'s "Grant download
+  credits" action for an email that hasn't signed in yet (public-read,
+  since the `users/{uid}` create rule has to read its `amount` field the
+  same way it already reads `bonusEmails`; no client write path at all -
+  only the `grantCredits` Cloud Function, running under the Admin SDK,
+  is ever allowed to create or increase one).
 - **Storage** — `maps/{uid}/{mapId}/...` for map-specific uploads,
   `library/{category}/...` for the shared library,
   `producer/{uid}/{draftId}/...` for Titan Game Producer's saved drafts

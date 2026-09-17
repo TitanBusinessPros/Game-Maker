@@ -914,21 +914,41 @@ onAuthStateChanged(auth, (user) => {
 // no check, unlimited downloads (see downloadStandaloneGame below). The
 // real enforcement is in firestore.rules (a client here could send any
 // number it wants - what actually stops a fake/inflated balance is the
-// rule only ever allowing a create at exactly 3 or 50, or an update
-// that's exactly current-minus-one); this code just has to agree with
-// those rules, not invent the security itself - the rules' own literal
-// 3 has to change right alongside this one, or new signups get rejected
-// outright (the rule would refuse to let a client create itself a
-// balance this code no longer matches).
+// rule only ever allowing a create at exactly 3-or-50-plus-any-pending-
+// grant, or an update that's strictly lower); this code just has to
+// agree with those rules, not invent the security itself - the rules'
+// own literal 3 has to change right alongside this one, or new signups
+// get rejected outright (the rule would refuse to let a client create
+// itself a balance this code no longer matches).
+//
+// A third source of starting balance, alongside the base 3 and the
+// bonusEmails 50: admin.html's "Grant download credits" action, when
+// used on an email that hasn't signed in yet, queues the amount in
+// pendingCreditGrants/{email} instead of writing straight to a /users/{uid}
+// doc (there's no uid to write to yet). Folded in here, once, the moment
+// that email's very first credits doc gets created, then deleted so it's
+// never applied twice. Doesn't need any bonusEmails-style admin-only
+// write rule of its own - only the grantCredits Cloud Function (Admin
+// SDK) is ever allowed to create/increase one.
 // ---------------------------------------------------------------------
 async function ensureUserCreditsDoc(user) {
   const userRef = doc(db, 'users', user.uid);
   const existing = await getDoc(userRef);
   if (existing.exists()) return;
   const bonusSnap = await getDoc(doc(db, 'bonusEmails', user.email.toLowerCase()));
-  const credits = bonusSnap.exists() ? 50 : 3;
+  const pendingRef = doc(db, 'pendingCreditGrants', user.email.toLowerCase());
+  const pendingSnap = await getDoc(pendingRef);
+  const pendingAmount = pendingSnap.exists() ? (pendingSnap.data().amount || 0) : 0;
+  const credits = (bonusSnap.exists() ? 50 : 3) + pendingAmount;
   try {
     await setDoc(userRef, { email: user.email, credits, createdAt: serverTimestamp() });
+    if (pendingSnap.exists()) {
+      // Best-effort: the balance is already correctly set above either
+      // way, this just stops a re-grant from ever being counted twice -
+      // rules let the account that owns this email delete its own
+      // now-consumed pending doc (see firestore.rules).
+      deleteDoc(pendingRef).catch(() => {});
+    }
   } catch (err) {
     console.error('Could not set up download credits for this account:', err);
   }
