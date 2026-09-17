@@ -1841,11 +1841,22 @@ async function main() {
       // Turn-Based hot-seat has no single privileged "you" - everyone
       // takes a turn as everyone - so always name the winner(s) instead
       // of personalizing it to whoever created the map.
-      document.getElementById('bannerText').textContent = (!turnMode && winningTeam === player.team)
+      const playerWon = !turnMode && winningTeam === player.team;
+      document.getElementById('bannerText').textContent = playerWon
         ? `Your team wins! (${winners})`
         : `${winners} win${winnerCountPlural}!`;
       document.getElementById('banner').classList.add('show');
       playSfx(sounds.endgame);
+      // Lets a page embedding this stage in an iframe (The Game Producer's
+      // compiled multi-stage output - see producer.html) know the match
+      // just ended, so it can surface its own "Continue to next stage"
+      // prompt instead of the player being stuck on this screen with only
+      // "Play Again" to click. Harmless no-op when played standalone
+      // (top-level tab, no parent listening) - '*' targetOrigin is fine
+      // here since this carries no sensitive data, just a completion ping.
+      if (window.parent !== window) {
+        try { window.parent.postMessage({ type: 'gm-stage-complete', outcome: playerWon ? 'win' : 'other' }, '*'); } catch (e) {}
+      }
     }
   }
 

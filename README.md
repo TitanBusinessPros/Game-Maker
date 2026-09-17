@@ -971,6 +971,75 @@ read-only) is left in for the same reason as `play.html`'s `__GM_DEBUG` -
 it lets the category grouping/labeling be verified against fabricated
 data without needing a real Google sign-in.
 
+## `producer.html` — "The Game Producer": combine stages into one game
+
+Turns up to 20 separate maps (each already made and downloaded from
+`index.html`'s own "⬇ Download My Game" button under My Maps - a
+standalone, self-contained copy of `play.html` with that one map's data
+baked in) into a single complete, playable game with its own cover art
+before every stage. Linked from a blurb near the top of `index.html`'s
+header, explaining the two-step workflow (make and download each stage
+separately here first, then combine them there). Entirely client-side -
+no sign-in, no Firebase reads/writes at all; every file involved (each
+stage's own downloaded game file, plus every cover image) is a local
+upload read straight off the user's disk with the File API, never
+touching the network.
+
+**Building side** (this page): three sections mirroring `index.html`'s
+numbered-checklist style - (1) an optional intro title/cover art for the
+very beginning of the game, (2) the stage list itself (a repeatable
+row per stage, same `.unit-row`-style remove button as `index.html`'s own
+unit rows, plus ↑/↓ buttons that physically move the row's DOM node
+instead of re-rendering from a separate array - this matters because a
+`<input type=file>`'s chosen file can't be restored programmatically
+after a re-render, only preserved by keeping the same element instance),
+each needing that stage's own downloaded `.html` game file (required) and
+an optional cover-art image, capped at 20 stages, and (3) an optional
+outro message/cover art for the very end. The one **"🎬 Take all my maps
+and make a complete game"** button at the bottom reads every stage's game
+file as raw text (`File.text()`), UTF-8-safe base64-encodes it
+(`btoa`/`atob` only handle Latin-1, so this goes through
+`TextEncoder`/`TextDecoder` and a raw byte string first - a stage's own
+map name or a unit name inside it can easily contain an emoji or accented
+character), reads every cover image as a data URI, and stitches all of it
+into one new self-contained HTML document that gets downloaded as
+`index.html` (so hosting the result anywhere that serves a folder's
+`index.html` by default just works) - the exact same "fetch this page's
+own HTML, splice in a `<script>window.GM_INLINE_CONFIG=...</script>` before
+the module script, download as a Blob" shape `index.html`/`play.html`'s own
+download buttons already use, just for a hand-authored runtime instead of
+`play.html` itself. Any literal `</script` sequence inside the embedded
+JSON (a stage name, an ending message) is escaped (`<\/script`) before
+being spliced in, or it would have prematurely closed the compiled file's
+own script tag - verified by feeding a stage named `Stage Two </script>`
+straight through in a real headless-browser test rather than trusting the
+escaping by eye.
+
+**The compiled/downloaded game itself** is its own small, freshly-written
+runtime (not reused code from `play.html`) that walks: intro screen (with
+a "▶ Start Game" button) → each stage's own cover-art screen in turn,
+showing a highlighted plaque-style badge in the middle reading "Stage N
+of M" (deliberately high-contrast/opaque so it stays legible over
+whatever cover art a map-maker picked, matching `play.html`'s own map-name
+plaque badge) plus a "▶ Start Stage" button → that stage's actual game,
+loaded into an `<iframe srcdoc="...">` (the decoded, embedded copy of that
+stage's downloaded HTML - fully offline, no separate file to host
+alongside it). Advancing past a stage doesn't require winning it or any
+specific outcome: a small persistent "Next Stage ▶" button is always
+available once a stage is playing, so a foreign (non-Game-Maker) `.html`
+upload never leaves the player stuck. `play.html`'s own game-over screen
+additionally `postMessage`s `{type:'gm-stage-complete'}` to its parent
+frame the moment a match ends (win or lose) - see its game-over handling
+in the `update()` loop - which the compiled game listens for to
+auto-surface a "Stage complete! Continue ▶" prompt on top of the
+always-available button, for any stage actually made with this project.
+After the final stage, an end screen shows the ending message/cover art
+and a "⟲ Play Again From Start" button. **Worth knowing:** since every
+stage's entire downloaded game (art, sound, and all) gets embedded
+whole, a 20-stage compiled game can end up **very large** (tens of MB) -
+fine to play locally in a browser, but worth keeping in mind before
+trying to host or email it anywhere with its own size limit.
+
 ## `functions/` — the Stripe webhook
 
 The only backend code in this project (everything else is static

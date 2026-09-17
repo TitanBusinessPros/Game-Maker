@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/png" href="data:image/png;base64,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">
+<title>The Game Producer &mdash; Compile Your Stages</title>
+<style>
+  :root {
+    --bg: #0b0e14;
+    --panel: #131926;
+    --panel-2: #1a2233;
+    --border: #2a3550;
+    --text: #e8ecf5;
+    --text-dim: #93a0bd;
+    --accent: #4fa8ff;
+    --good: #4fdc8f;
+    --bad: #ff5f6d;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    padding-bottom: 100px;
+  }
+  header { padding: 20px 16px 10px; max-width: 900px; margin: 0 auto; text-align: center; }
+  header h1 { margin: 8px 0 4px; font-size: 24px; }
+  header p { margin: 0; color: var(--text-dim); font-size: 14px; }
+  header .back-link { display: inline-block; margin-top: 10px; font-size: 12px; color: var(--accent); }
+  main { max-width: 900px; margin: 0 auto; padding: 0 16px; }
+  .section { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 18px; margin-bottom: 16px; }
+  .section h2 { margin: 0 0 4px; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+  .section h2 .num {
+    background: var(--accent); color: #06121f; width: 22px; height: 22px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex: none;
+  }
+  .section .hint { color: var(--text-dim); font-size: 12px; margin: 0 0 14px; }
+  .row { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
+  .field { flex: 1 1 220px; min-width: 0; }
+  label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 4px; }
+  input[type=text] {
+    width: 100%; background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+    border-radius: 6px; padding: 8px 10px; font-size: 14px;
+  }
+  input[type=file] { width: 100%; font-size: 12px; color: var(--text-dim); }
+  .upload-slot {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px;
+    background: var(--panel-2); border: 1px dashed var(--border); border-radius: 8px; padding: 8px;
+  }
+  .upload-slot .thumb {
+    width: 44px; height: 44px; border-radius: 6px; background: #0b0e14 center/cover no-repeat;
+    border: 1px solid var(--border); flex: none; display: flex; align-items: center; justify-content: center;
+    font-size: 18px; color: var(--text-dim);
+  }
+  .upload-slot .meta { flex: 1; min-width: 60px; }
+  .upload-slot .meta .name { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .upload-slot .meta .status { font-size: 11px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .upload-slot input[type=file] { margin-left: auto; flex: 1 1 200px; }
+
+  .stage-row {
+    border: 1px solid var(--border); background: var(--panel-2); border-radius: 8px;
+    padding: 12px; margin-bottom: 10px; position: relative;
+  }
+  .stage-row .stage-top { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
+  .stage-row .stage-num {
+    flex: none; width: 40px; height: 40px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--accent), #2a5db0); color: #06121f;
+    display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 15px;
+  }
+  .stage-row .stage-name-field { flex: 1; min-width: 0; }
+  .stage-row .stage-controls { flex: none; display: flex; gap: 4px; }
+  .stage-row .stage-controls button {
+    background: var(--panel); color: var(--text-dim); border: 1px solid var(--border);
+    padding: 6px 8px; font-size: 12px; border-radius: 6px; cursor: pointer;
+  }
+  .stage-row .stage-controls button:disabled { opacity: 0.35; cursor: not-allowed; }
+  .stage-row .remove-stage { color: var(--bad); border-color: var(--bad) !important; }
+  .stage-row .upload-slot + .upload-slot { margin-top: 8px; }
+
+  button { cursor: pointer; border: none; border-radius: 6px; padding: 9px 16px; font-size: 13px; font-weight: 600; }
+  .btn-primary { background: var(--accent); color: #06121f; }
+  .btn-secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
+  .btn-add { background: transparent; color: var(--accent); border: 1px dashed var(--accent); width: 100%; padding: 10px; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  #stageCount { font-size: 12px; color: var(--text-dim); margin-top: 6px; }
+
+  #compileBar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+    background: var(--panel); border-top: 1px solid var(--border);
+    padding: 12px 16px; display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap;
+  }
+  #compileBar #compileStatus { font-size: 12px; color: var(--text-dim); }
+  #compileBtn { padding: 12px 26px; font-size: 14px; }
+</style>
+</head>
+<body>
+
+<header>
+  <img src="data:image/png;base64,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" alt="Titan Business Pros logo" style="width:96px; height:96px; object-fit:contain; flex:none; border-radius:6px;">
+  <h1>&#127916; The Game Producer</h1>
+  <p>Turn up to 20 maps you made with the Game Maker into one complete, playable game &mdash; with your own cover art before every stage.</p>
+  <a class="back-link" href="index.html">&larr; Back to the Map Maker</a>
+</header>
+
+<main>
+
+  <section class="section" id="sec-intro">
+    <h2><span class="num">1</span> Beginning of the Game</h2>
+    <p class="hint">Shown first, before Stage 1 &mdash; your game's title screen. Cover art is optional; a plain title screen is used if you skip it.</p>
+    <div class="row">
+      <div class="field">
+        <label>Game title</label>
+        <input type="text" id="gameTitle" placeholder="e.g. Rise of the Titan Fleet">
+      </div>
+    </div>
+    <div class="upload-slot" data-role="intro">
+      <div class="thumb">&#127916;</div>
+      <div class="meta"><div class="name">No cover art chosen</div><div class="status">optional - shown behind the title on the opening screen</div></div>
+      <input type="file" accept="image/*" style="width:auto">
+    </div>
+  </section>
+
+  <section class="section" id="sec-stages">
+    <h2><span class="num">2</span> Stages</h2>
+    <p class="hint">
+      Each stage needs the standalone game file you downloaded from Play (the <strong>&#8681; Download My Game</strong>
+      button on a map's Play screen) - cover art per stage is optional. Stages play in the order listed here; use the
+      &uarr;/&darr; buttons to reorder.
+    </p>
+    <div id="stagesList"></div>
+    <button type="button" class="btn-add" id="addStageBtn">+ Add a stage (up to 20)</button>
+    <div id="stageCount">0 of 20 stages added.</div>
+  </section>
+
+  <section class="section" id="sec-outro">
+    <h2><span class="num">3</span> End of the Game</h2>
+    <p class="hint">Shown after the final stage. Cover art is optional; a plain "you finished!" screen is used if you skip it.</p>
+    <div class="row">
+      <div class="field">
+        <label>Ending message</label>
+        <input type="text" id="outroMessage" placeholder="e.g. You saved the fleet! 🎉">
+      </div>
+    </div>
+    <div class="upload-slot" data-role="outro">
+      <div class="thumb">&#127942;</div>
+      <div class="meta"><div class="name">No cover art chosen</div><div class="status">optional - shown behind your ending message</div></div>
+      <input type="file" accept="image/*" style="width:auto">
+    </div>
+  </section>
+
+</main>
+
+<footer style="max-width:900px; margin:24px auto 40px; padding:16px 16px 0; text-align:center; color:var(--text-dim); font-size:12px; line-height:1.7; border-top:1px solid var(--border);">
+  <p style="margin:12px 0 0;">Created by Titan Business Pros LLC</p>
+  <p style="margin:6px 0 0;">405-998-7979 &middot; <a href="https://www.titanbusinesspros.com" target="_blank" rel="noopener" style="color:var(--accent);">www.titanbusinesspros.com</a></p>
+  <p style="margin:6px 0 0;">Oklahoma City, OK &middot; &copy; 2026 Titan Business Pros LLC. All rights reserved.</p>
+  <p style="margin:6px 0 0;"><a href="terms.html" style="color:var(--accent);">Terms &amp; Conditions</a> &middot; <a href="privacy.html" style="color:var(--accent);">Privacy Policy</a></p>
+</footer>
+
+<div id="compileBar">
+  <div id="compileStatus">Add at least one stage to get started.</div>
+  <button type="button" class="btn-primary" id="compileBtn" disabled>&#127916; Take all my maps and make a complete game</button>
+</div>
+
+<script>
+const MAX_STAGES = 20;
+const stagesListEl = document.getElementById('stagesList');
+const addStageBtn = document.getElementById('addStageBtn');
+const stageCountEl = document.getElementById('stageCount');
+const compileBtn = document.getElementById('compileBtn');
+const compileStatusEl = document.getElementById('compileStatus');
+let stageSeq = 0;
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
+
+function formatBytes(n) {
+  if (n < 1024) return n + ' B';
+  if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+  return (n / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+// Reads a File as a UTF-8 text string - used for each stage's uploaded
+// standalone game .html file, which gets embedded whole (see
+// toBase64Unicode below) into the compiled output.
+function readAsText(file) {
+  return file.text ? file.text() : new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsText(file);
+  });
+}
+function readAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+// btoa() only handles Latin-1 - a stage's embedded game file (or a map
+// name/unit name inside it) can contain arbitrary UTF-8 (emoji, accented
+// names), so this goes through TextEncoder/a raw byte string first
+// instead of failing outright on the first non-Latin-1 character.
+function toBase64Unicode(str) {
+  const bytes = new TextEncoder().encode(str);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+
+function wireImageSlot(slot) {
+  const input = slot.querySelector('input[type=file]');
+  const thumb = slot.querySelector('.thumb');
+  const nameEl = slot.querySelector('.meta .name');
+  const statusEl = slot.querySelector('.meta .status');
+  const defaultStatus = statusEl.textContent;
+  input.addEventListener('change', () => {
+    const file = input.files[0];
+    if (!file) { slot._file = null; nameEl.textContent = 'No cover art chosen'; statusEl.textContent = defaultStatus; thumb.style.backgroundImage = ''; thumb.textContent = thumb.dataset.emoji || ''; return; }
+    slot._file = file;
+    nameEl.textContent = file.name;
+    statusEl.textContent = formatBytes(file.size);
+    thumb.textContent = '';
+    thumb.style.backgroundImage = `url(${URL.createObjectURL(file)})`;
+  });
+  thumb.dataset.emoji = thumb.textContent;
+}
+
+function renumberStages() {
+  const rows = [...stagesListEl.children];
+  rows.forEach((row, i) => {
+    row.querySelector('.stage-num').textContent = i + 1;
+    row.querySelector('.move-up').disabled = i === 0;
+    row.querySelector('.move-down').disabled = i === rows.length - 1;
+  });
+  stageCountEl.textContent = `${rows.length} of ${MAX_STAGES} stages added.`;
+  addStageBtn.disabled = rows.length >= MAX_STAGES;
+  addStageBtn.textContent = rows.length >= MAX_STAGES ? `Maximum of ${MAX_STAGES} stages reached` : '+ Add a stage (up to 20)';
+  updateCompileState();
+}
+
+function updateCompileState() {
+  const rows = [...stagesListEl.children];
+  const missingGame = rows.some((r) => !r._gameFile);
+  compileBtn.disabled = rows.length === 0 || missingGame;
+  if (rows.length === 0) compileStatusEl.textContent = 'Add at least one stage to get started.';
+  else if (missingGame) compileStatusEl.textContent = 'Every stage still needs its game file uploaded.';
+  else compileStatusEl.textContent = `Ready - ${rows.length} stage${rows.length === 1 ? '' : 's'} will be compiled in order.`;
+}
+
+function addStageRow(data = {}) {
+  const id = 'stage_' + (stageSeq++);
+  const row = document.createElement('div');
+  row.className = 'stage-row';
+  row.dataset.stageId = id;
+  row.innerHTML = `
+    <div class="stage-top">
+      <div class="stage-num">${stagesListEl.children.length + 1}</div>
+      <div class="stage-name-field">
+        <label>Stage name (optional)</label>
+        <input type="text" class="s-name" placeholder="e.g. The Frozen Outpost">
+      </div>
+      <div class="stage-controls">
+        <button type="button" class="move-up" title="Move earlier">&uarr;</button>
+        <button type="button" class="move-down" title="Move later">&darr;</button>
+        <button type="button" class="remove-stage" title="Remove stage">&times;</button>
+      </div>
+    </div>
+    <div class="upload-slot" data-role="game">
+      <div class="thumb">&#127918;</div>
+      <div class="meta"><div class="name">No game file chosen</div><div class="status">the standalone .html file from that map's own "&#8681; Download My Game" button</div></div>
+      <input type="file" accept=".html,.htm" style="width:auto">
+    </div>
+    <div class="upload-slot" data-role="cover">
+      <div class="thumb">&#128444;&#65039;</div>
+      <div class="meta"><div class="name">No cover art chosen</div><div class="status">optional - shown on this stage's "Start Stage" screen</div></div>
+      <input type="file" accept="image/*" style="width:auto">
+    </div>
+  `;
+
+  const gameSlot = row.querySelector('.upload-slot[data-role=game]');
+  const gameInput = gameSlot.querySelector('input[type=file]');
+  const gameNameEl = gameSlot.querySelector('.meta .name');
+  const gameStatusEl = gameSlot.querySelector('.meta .status');
+  const gameDefaultStatus = gameStatusEl.textContent;
+  gameInput.addEventListener('change', () => {
+    const file = gameInput.files[0];
+    if (!file) { row._gameFile = null; gameNameEl.textContent = 'No game file chosen'; gameStatusEl.textContent = gameDefaultStatus; updateCompileState(); return; }
+    row._gameFile = file;
+    gameNameEl.textContent = file.name;
+    gameStatusEl.textContent = formatBytes(file.size);
+    updateCompileState();
+  });
+
+  const coverSlot = row.querySelector('.upload-slot[data-role=cover]');
+  wireImageSlot(coverSlot);
+  const coverInput = coverSlot.querySelector('input[type=file]');
+  coverInput.addEventListener('change', () => { row._coverFile = coverSlot._file; });
+
+  row.querySelector('.remove-stage').addEventListener('click', () => { row.remove(); renumberStages(); });
+  row.querySelector('.move-up').addEventListener('click', () => {
+    if (row.previousElementSibling) row.parentNode.insertBefore(row, row.previousElementSibling);
+    renumberStages();
+  });
+  row.querySelector('.move-down').addEventListener('click', () => {
+    if (row.nextElementSibling) row.parentNode.insertBefore(row.nextElementSibling, row);
+    renumberStages();
+  });
+
+  stagesListEl.appendChild(row);
+  renumberStages();
+  return row;
+}
+
+addStageBtn.addEventListener('click', () => addStageRow());
+wireImageSlot(document.querySelector('.upload-slot[data-role=intro]'));
+wireImageSlot(document.querySelector('.upload-slot[data-role=outro]'));
+
+// Start with one empty stage so the page doesn't look broken/empty.
+addStageRow();
+
+// -----------------------------------------------------------------------
+// Compile: read every stage's game file + cover art (and the intro/outro
+// art) into the final single-file output, then trigger its download. Runs
+// entirely client-side - nothing here touches Firebase, this tool doesn't
+// need an account.
+// -----------------------------------------------------------------------
+function buildFinalHtml(DATA) {
+  const dataJson = JSON.stringify(DATA).replace(/<\/script/gi, '<\\/script');
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${escapeHtml(DATA.title || 'My Game')}</title>
+<style>
+  :root { --accent:#4fa8ff; --panel:#131926; --border:#2a3550; --text:#e8ecf5; --dim:#93a0bd; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; background:#06121f; color:var(--text); font-family:-apple-system, Segoe UI, Roboto, Arial, sans-serif; overflow:hidden; }
+  .screen {
+    position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center; gap:20px; padding:24px; background-size:cover; background-position:center; background-color:#06121f;
+  }
+  .screen.hidden { display:none; }
+  /* The "which stage" badge - a highlighted box in the middle of the
+     screen, deliberately opaque/high-contrast, so it always reads
+     clearly no matter what the map-maker's own cover art looks like
+     behind it. */
+  .badge {
+    display:inline-block; padding:10px 24px;
+    background:linear-gradient(135deg, var(--accent), #2a5db0); color:#06121f;
+    border:1px solid rgba(255,255,255,0.25); border-radius:10px;
+    font-size:20px; font-weight:800; letter-spacing:.02em;
+    box-shadow:0 4px 14px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.3);
+  }
+  .titleCard {
+    background:rgba(6,10,18,0.78); border:1px solid var(--border); border-radius:14px;
+    padding:24px 32px; max-width:560px;
+  }
+  .titleCard h1, .titleCard h2 { margin:0 0 8px; }
+  .titleCard p { margin:0; color:var(--dim); font-size:14px; }
+  button.big {
+    cursor:pointer; border:none; border-radius:8px; padding:14px 30px; font-size:16px; font-weight:700;
+    background:var(--accent); color:#06121f;
+  }
+  button.big:hover { filter:brightness(1.08); }
+  #stageFrame { position:fixed; inset:0; width:100%; height:100%; border:none; background:#06121f; }
+  #nextStageFloat {
+    position:fixed; bottom:16px; right:16px; z-index:50; background:var(--panel); border:1px solid var(--accent);
+    color:var(--accent); padding:10px 16px; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer;
+    box-shadow:0 4px 14px rgba(0,0,0,.5);
+  }
+  #nextStageFloat.hidden { display:none; }
+  #continuePrompt {
+    position:fixed; inset:0; background:rgba(0,0,0,.6); display:flex; align-items:center; justify-content:center; z-index:60;
+  }
+  #continuePrompt.hidden { display:none; }
+  #continuePrompt .box { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:26px 30px; text-align:center; max-width:360px; }
+</style>
+</head>
+<body>
+  <div id="introScreen" class="screen hidden"></div>
+  <div id="stageScreen" class="screen hidden"></div>
+  <div id="playScreen" class="screen hidden"><iframe id="stageFrame"></iframe></div>
+  <div id="outroScreen" class="screen hidden"></div>
+  <button id="nextStageFloat" class="hidden">Next Stage &#9654;</button>
+  <div id="continuePrompt" class="hidden">
+    <div class="box">
+      <h2 style="margin:0 0 10px;">Stage complete!</h2>
+      <p style="color:var(--dim); margin:0 0 18px;">Ready for the next one?</p>
+      <button class="big" id="continueBtn">Continue &#9654;</button>
+    </div>
+  </div>
+<script>
+// Produced by The Game Producer (producer.html) - this file is fully
+// self-contained (every stage's own game and every cover image is
+// embedded below as data), so it plays completely offline once
+// downloaded, same as any single map's own standalone download.
+const DATA = ${dataJson};
+let current = -1; // -1 = intro, 0..DATA.stages.length-1 = a stage, DATA.stages.length = outro
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
+function base64ToText(b64) {
+  const binary = atob(b64);
+  const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach((s) => s.classList.add('hidden'));
+  document.getElementById(id).classList.remove('hidden');
+}
+
+function renderIntro() {
+  const el = document.getElementById('introScreen');
+  el.style.backgroundImage = DATA.introArt ? \`url(\${DATA.introArt})\` : 'none';
+  el.innerHTML = \`<div class="titleCard"><h1>\${escapeHtml(DATA.title || 'My Game')}</h1><p>\${DATA.stages.length} stage\${DATA.stages.length === 1 ? '' : 's'}</p></div><button class="big" id="startGameBtn">&#9654; Start Game</button>\`;
+  document.getElementById('startGameBtn').onclick = () => goToStage(0);
+  document.getElementById('nextStageFloat').classList.add('hidden');
+  showScreen('introScreen');
+}
+function renderStageCover(i) {
+  const s = DATA.stages[i];
+  const el = document.getElementById('stageScreen');
+  el.style.backgroundImage = s.art ? \`url(\${s.art})\` : 'none';
+  el.innerHTML = \`<div class="badge">Stage \${i + 1} of \${DATA.stages.length}</div><div class="titleCard"><h2>\${escapeHtml(s.name)}</h2></div><button class="big" id="startStageBtn">&#9654; Start Stage</button>\`;
+  document.getElementById('startStageBtn').onclick = () => playStage(i);
+  document.getElementById('nextStageFloat').classList.add('hidden');
+  showScreen('stageScreen');
+}
+function playStage(i) {
+  current = i;
+  const iframe = document.getElementById('stageFrame');
+  iframe.srcdoc = base64ToText(DATA.stages[i].htmlB64);
+  showScreen('playScreen');
+  document.getElementById('nextStageFloat').classList.remove('hidden');
+}
+function goToStage(i) {
+  if (i >= DATA.stages.length) { renderOutro(); return; }
+  renderStageCover(i);
+}
+function renderOutro() {
+  const el = document.getElementById('outroScreen');
+  el.style.backgroundImage = DATA.outroArt ? \`url(\${DATA.outroArt})\` : 'none';
+  el.innerHTML = \`<div class="titleCard"><h1>\${escapeHtml(DATA.outroMessage || "🎉 You've completed the game!")}</h1></div><button class="big" id="restartAllBtn">&#8635; Play Again From Start</button>\`;
+  document.getElementById('restartAllBtn').onclick = () => { current = -1; renderIntro(); };
+  document.getElementById('nextStageFloat').classList.add('hidden');
+  showScreen('outroScreen');
+}
+
+document.getElementById('nextStageFloat').addEventListener('click', () => {
+  document.getElementById('nextStageFloat').classList.add('hidden');
+  goToStage(current + 1);
+});
+document.getElementById('continueBtn').addEventListener('click', () => {
+  document.getElementById('continuePrompt').classList.add('hidden');
+  goToStage(current + 1);
+});
+// A stage made with this project's own Play page (play.html) posts this
+// message the moment its match ends (win or lose) - see the
+// gm-stage-complete postMessage in play.html's game-over handling. Any
+// OTHER uploaded .html game simply never sends it, which is fine - the
+// always-available "Next Stage" button (above) still lets the player
+// move on whenever they're ready either way.
+window.addEventListener('message', (ev) => {
+  if (ev.data && ev.data.type === 'gm-stage-complete' && current >= 0) {
+    document.getElementById('continuePrompt').classList.remove('hidden');
+  }
+});
+
+renderIntro();
+<\/script>
+</body>
+</html>`;
+}
+
+compileBtn.addEventListener('click', async () => {
+  const rows = [...stagesListEl.children];
+  if (!rows.length || rows.some((r) => !r._gameFile)) return;
+  compileBtn.disabled = true;
+  addStageBtn.disabled = true;
+  try {
+    const stages = [];
+    for (let i = 0; i < rows.length; i++) {
+      compileStatusEl.textContent = `Reading stage ${i + 1} of ${rows.length}…`;
+      const row = rows[i];
+      const name = row.querySelector('.s-name').value.trim() || `Stage ${i + 1}`;
+      const gameText = await readAsText(row._gameFile);
+      const htmlB64 = toBase64Unicode(gameText);
+      const art = row._coverFile ? await readAsDataUrl(row._coverFile) : null;
+      stages.push({ name, htmlB64, art });
+    }
+    compileStatusEl.textContent = 'Reading cover art…';
+    const introSlot = document.querySelector('.upload-slot[data-role=intro]');
+    const outroSlot = document.querySelector('.upload-slot[data-role=outro]');
+    const introArt = introSlot._file ? await readAsDataUrl(introSlot._file) : null;
+    const outroArt = outroSlot._file ? await readAsDataUrl(outroSlot._file) : null;
+    const DATA = {
+      title: document.getElementById('gameTitle').value.trim(),
+      outroMessage: document.getElementById('outroMessage').value.trim(),
+      introArt, outroArt, stages,
+    };
+    compileStatusEl.textContent = 'Building the final file…';
+    const finalHtml = buildFinalHtml(DATA);
+    const blob = new Blob([finalHtml], { type: 'text/html' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'index.html';
+    a.click();
+    compileStatusEl.textContent = `Done - downloaded a complete ${stages.length}-stage game as index.html.`;
+  } catch (err) {
+    console.error(err);
+    compileStatusEl.textContent = 'Something went wrong reading one of your files - please try again.';
+  } finally {
+    addStageBtn.disabled = stagesListEl.children.length >= MAX_STAGES;
+    updateCompileState();
+  }
+});
+</script>
+</body>
+</html>
