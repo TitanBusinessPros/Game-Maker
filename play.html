@@ -430,23 +430,69 @@ function loadAudio(url) {
   return a;
 }
 
+// Every research topic now has exactly 3 levels, each a map-maker-set
+// PERCENTAGE bonus (index.html's new "Research Tree" section, cfg.research
+// = { <topicId>: [level1Pct, level2Pct, level3Pct], ... }) instead of a
+// fixed value hardcoded here - see researchLevel()/researchPercent()
+// below, which every stat that used to read a `techBonus(fac, 'someflag')`
+// string now goes through instead. `topic`/`level` on an entry (not
+// `effect` any more - techBonus/the old effect-string lookup is gone
+// entirely) is what ties a specific research id to a row in cfg.research;
+// cost/timeSeconds stay fixed here, only the percentage is map-maker-
+// editable. Mining Rate's Level 1 (mining_ops) is the one topic where
+// researching a level does something beyond a percentage - it's still
+// the Mining Ship's own unlock gate too, checked separately by its own id
+// everywhere that matters (unchanged). Extended Sensors and Rapid Repair
+// Crews are real, researchable, 3-level topics like the rest, but nothing
+// in this file actually reads researchPercent(fac, 'vision'/'regen') yet -
+// intentionally left for a follow-up, same as before this existed.
 const TECH_TREE = {
-  mining_ops: { name: 'Mining Operations', cost: 300, timeSeconds: 60, prereq: null, effect: 'unlock_mining' },
-  improved_extraction: { name: 'Improved Extraction', cost: 500, timeSeconds: 90, prereq: 'mining_ops', effect: 'mining_900' },
-  deep_mining: { name: 'Deep Mining', cost: 600, timeSeconds: 120, prereq: 'improved_extraction', effect: 'mining_1200' },
-  vessel_plating: { name: 'Vessel Plating', cost: 400, timeSeconds: 90, prereq: null, effect: 'hp_15' },
-  warp_drive: { name: 'Warp Drive Calibration', cost: 450, timeSeconds: 100, prereq: null, effect: 'speed_12' },
-  extended_sensors: { name: 'Extended Sensors', cost: 350, timeSeconds: 80, prereq: null, effect: 'vision_50' },
-  rapid_repair: { name: 'Rapid Repair Crews', cost: 500, timeSeconds: 100, prereq: null, effect: 'regen' },
-  // Missile Silo launchers start at range 500 with no research needed at
-  // all (same idea as Gold's own base 600/hr mining rate needing no
-  // unlock research, just Mining Operations to build the *unit* in the
-  // first place - here the Missile Silo building itself is that unlock),
-  // then these two chain exactly like Improved Extraction/Deep Mining do
-  // for mining rate - see missileRange() below.
-  missile_range_1000: { name: 'Extended Missile Range', cost: 500, timeSeconds: 90, prereq: null, effect: 'missile_range_1000' },
-  missile_range_2000: { name: 'Long-Range Missiles', cost: 700, timeSeconds: 120, prereq: 'missile_range_1000', effect: 'missile_range_2000' },
+  mining_ops: { name: 'Mining Operations', cost: 300, timeSeconds: 60, prereq: null, topic: 'mining', level: 1 },
+  improved_extraction: { name: 'Improved Extraction', cost: 500, timeSeconds: 90, prereq: 'mining_ops', topic: 'mining', level: 2 },
+  deep_mining: { name: 'Deep Mining', cost: 600, timeSeconds: 120, prereq: 'improved_extraction', topic: 'mining', level: 3 },
+  vessel_plating: { name: 'Vessel Plating', cost: 400, timeSeconds: 90, prereq: null, topic: 'hp', level: 1 },
+  vessel_plating_2: { name: 'Vessel Plating II', cost: 550, timeSeconds: 110, prereq: 'vessel_plating', topic: 'hp', level: 2 },
+  vessel_plating_3: { name: 'Vessel Plating III', cost: 700, timeSeconds: 130, prereq: 'vessel_plating_2', topic: 'hp', level: 3 },
+  warp_drive: { name: 'Warp Drive Calibration', cost: 450, timeSeconds: 100, prereq: null, topic: 'speed', level: 1 },
+  warp_drive_2: { name: 'Warp Drive Calibration II', cost: 600, timeSeconds: 120, prereq: 'warp_drive', topic: 'speed', level: 2 },
+  warp_drive_3: { name: 'Warp Drive Calibration III', cost: 750, timeSeconds: 140, prereq: 'warp_drive_2', topic: 'speed', level: 3 },
+  extended_sensors: { name: 'Extended Sensors', cost: 350, timeSeconds: 80, prereq: null, topic: 'vision', level: 1 },
+  extended_sensors_2: { name: 'Extended Sensors II', cost: 500, timeSeconds: 100, prereq: 'extended_sensors', topic: 'vision', level: 2 },
+  extended_sensors_3: { name: 'Extended Sensors III', cost: 650, timeSeconds: 120, prereq: 'extended_sensors_2', topic: 'vision', level: 3 },
+  rapid_repair: { name: 'Rapid Repair Crews', cost: 500, timeSeconds: 100, prereq: null, topic: 'regen', level: 1 },
+  rapid_repair_2: { name: 'Rapid Repair Crews II', cost: 650, timeSeconds: 120, prereq: 'rapid_repair', topic: 'regen', level: 2 },
+  rapid_repair_3: { name: 'Rapid Repair Crews III', cost: 800, timeSeconds: 140, prereq: 'rapid_repair_2', topic: 'regen', level: 3 },
+  // Missile Silo launchers still start at range 500 with no research
+  // needed at all (a fixed base, same as Gold's own 600/hr base mining
+  // rate) - these three are now purely additive percentage bonuses on
+  // top of that base, same shape as every other topic here, replacing
+  // the old two-node "500 free -> 1000 -> 2000" absolute-value chain.
+  missile_range_1: { name: 'Missile Range I', cost: 400, timeSeconds: 80, prereq: null, topic: 'missileRange', level: 1 },
+  missile_range_2: { name: 'Missile Range II', cost: 550, timeSeconds: 100, prereq: 'missile_range_1', topic: 'missileRange', level: 2 },
+  missile_range_3: { name: 'Missile Range III', cost: 700, timeSeconds: 120, prereq: 'missile_range_2', topic: 'missileRange', level: 3 },
 };
+// topicId -> [idAtLevel1, idAtLevel2, idAtLevel3], built once from the
+// `topic`/`level` metadata above rather than hand-maintained separately.
+const RESEARCH_TOPIC_LEVELS = {};
+Object.entries(TECH_TREE).forEach(([id, t]) => {
+  if (!t.topic) return;
+  if (!RESEARCH_TOPIC_LEVELS[t.topic]) RESEARCH_TOPIC_LEVELS[t.topic] = [];
+  RESEARCH_TOPIC_LEVELS[t.topic][t.level - 1] = id;
+});
+// How many levels of a topic this faction has researched so far (0-3) -
+// walks the chain in order and stops at the first gap, so a prereq chain
+// that somehow got out of sync (shouldn't happen - startResearch already
+// enforces prereqs) can't report a level higher than what's actually
+// unlocked.
+function researchLevel(fac, topicId) {
+  const ids = RESEARCH_TOPIC_LEVELS[topicId] || [];
+  let level = 0;
+  for (let i = 0; i < ids.length; i++) {
+    if (!fac.research.researched.has(ids[i])) break;
+    level = i + 1;
+  }
+  return level;
+}
 
 const HOMEWORLD_HP_DEFAULT = 2000; // used only as a fallback for a map saved before per-faction home base HP existed
 function clampHomeworldHp(v) { return Math.max(1000, Math.min(5000, Number(v) || HOMEWORLD_HP_DEFAULT)); }
@@ -805,26 +851,32 @@ async function main() {
   const units = [];
   let nextUnitId = 1;
   function factionOf(id) { return factions[id]; }
-  function techBonus(fac, effect) {
-    return fac.research.researched.has(Object.keys(TECH_TREE).find((k) => TECH_TREE[k].effect === effect));
+  // The percentage a faction's current level in a topic actually gives -
+  // index.html's new Research Tree section (cfg.research), map-maker-set
+  // per level, not a value baked into this file any more. researchLevel
+  // (module scope, above) only needs TECH_TREE; this needs cfg too, so it
+  // lives down here where cfg is in scope.
+  function researchPercent(fac, topicId) {
+    const level = researchLevel(fac, topicId);
+    if (!level) return 0;
+    const configured = (cfg.research && cfg.research[topicId]) || [];
+    return Number(configured[level - 1]) || 0;
   }
+  // Gold's (and every Additional Resource's) base mining rate - a flat
+  // percentage on top, same pattern every other topic below uses.
   function miningRate(fac) {
-    if (techBonus(fac, 'mining_1200')) return 1200;
-    if (techBonus(fac, 'mining_900')) return 900;
-    return 600;
+    return 600 * (1 + researchPercent(fac, 'mining') / 100);
   }
   // Missile Silo launchers' range isn't a map-maker-set field at all
-  // (unlike Gun Turrets' Range) - it's fully determined by research, same
-  // pattern as Gold's own mining rate above, just for a different stat.
+  // (unlike Gun Turrets' Range) - it's a fixed 500 base plus whatever
+  // percentage the map-maker configured for each researched level.
   function missileRange(fac) {
-    if (techBonus(fac, 'missile_range_2000')) return 2000;
-    if (techBonus(fac, 'missile_range_1000')) return 1000;
-    return 500;
+    return 500 * (1 + researchPercent(fac, 'missileRange') / 100);
   }
   function effectiveStat(fac, base, kind) {
     let v = base;
-    if (kind === 'hp' && techBonus(fac, 'hp_15')) v *= 1.15;
-    if (kind === 'speed' && techBonus(fac, 'speed_12')) v *= 1.12;
+    if (kind === 'hp') v *= (1 + researchPercent(fac, 'hp') / 100);
+    if (kind === 'speed') v *= (1 + researchPercent(fac, 'speed') / 100);
     return v;
   }
   function spawnUnit(factionId, defIndex, x, y) {
@@ -2674,7 +2726,12 @@ async function main() {
       const active = activeFaction.research.active && activeFaction.research.active.id === id;
       row.className = 'techRow' + (done ? ' done' : '') + (active ? ' active' : '');
       const lockedByPrereq = t.prereq && !activeFaction.research.researched.has(t.prereq);
-      row.innerHTML = `<div class="name">${t.name}</div><div class="desc">Cost ${t.cost} · ${t.timeSeconds}s${lockedByPrereq ? ' · requires ' + TECH_TREE[t.prereq].name : ''}${active ? ' · researching… ' + Math.ceil(activeFaction.research.active.remaining) + 's left' : ''}</div>`;
+      // Every topic's percentage is map-maker-set now (index.html's
+      // Research Tree section), not a fixed value baked into this file -
+      // show it right on the row so a player actually knows what
+      // researching this specific level does instead of a bare name.
+      const pctLabel = t.topic ? ` (+${((cfg.research && cfg.research[t.topic] && cfg.research[t.topic][t.level - 1]) || 0)}%)` : '';
+      row.innerHTML = `<div class="name">${t.name}${pctLabel}</div><div class="desc">Cost ${t.cost} · ${t.timeSeconds}s${lockedByPrereq ? ' · requires ' + TECH_TREE[t.prereq].name : ''}${active ? ' · researching… ' + Math.ceil(activeFaction.research.active.remaining) + 's left' : ''}</div>`;
       const btn = document.createElement('button');
       btn.textContent = !hasResearchFacility ? 'Locked' : (done ? 'Done' : (active ? 'In progress' : 'Research'));
       btn.disabled = !hasResearchFacility || done || !!activeFaction.research.active || lockedByPrereq || !canAffordGold(activeFaction, t.cost);

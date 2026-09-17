@@ -88,8 +88,9 @@ line. Only this page has the logo/title/footer treatment so far -
    also mines any Additional Resource: park one within range of that
    resource's own deposit (its near-base marker by default, or wherever
    it was placed on the map - see item 3a) and it earns that resource at
-   the same shared mining rate Gold uses (600 → 900 → 1200/hr via
-   research), same as parking one at Gold's own deposit does - it isn't
+   the same shared mining rate Gold uses (a 600/hr base, boosted by
+   whatever Mining Rate is set to under the new Research Tree section,
+   item 3b), same as parking one at Gold's own deposit does - it isn't
    a separate, weaker mechanic. **Free Resources Each Round** (item 5a,
    further down) still works independently on top of that, for any
    resource including Gold, as a flat bonus rather than the only way to
@@ -131,6 +132,20 @@ line. Only this page has the logo/title/footer treatment so far -
    Resource, which was already just a visual marker with no income or
    range of its own to manage, placing it on the map with several points
    just draws one shared marker per point instead of one per faction.
+3b. **Research Tree** — every research topic (`play.html`'s Research
+   tab) has exactly **3 levels**, and each level's actual effect is a
+   **percentage** the map-maker sets here, not a value fixed in the
+   engine - the same generic pattern for all 6 topics: **Mining Rate**
+   (Gold/Additional Resource mining income - Level 1 also unlocks the
+   Mining Ship itself, same gate as always), **Vessel Plating** (max HP),
+   **Warp Drive Calibration** (movement speed), **Extended Sensors**
+   (vision) and **Rapid Repair Crews** (HP regen) - both saved but not
+   yet tied to an actual effect in `play.html`, same status as before
+   this section existed - and **Missile Range** (Missile Silo launcher
+   range above its fixed 500 base). Leave a level at 0 to make it a
+   no-op. Defaults to 5% / 10% / 15% for Level 1/2/3 of every topic;
+   nothing here is required to Finish & Save. A map saved before this
+   section existed loads with every topic at those same defaults.
 4. **Air Base** (optional) — a building for planes/jets/spaceships/etc.
    Give it a name (defaults to "Air Base"), its own **art**, **HP**
    (1000-5000, same range/field as Home Base's), and a build cost, then
@@ -324,11 +339,11 @@ Not a rewrite of the original inspiration's mechanics - a fresh,
 self-contained implementation of the same *kind* of rules, driven
 entirely by one map's saved data:
 
-- Real-time mining economy (600 → 900 → 1200/hour via research tiers),
-  a 7-node research tree (economy chain + generic combat/utility
-  upgrades), a real build queue using every unit's actual stats. Income
-  and research keep running for every faction regardless of game style
-  or whose turn it is - never paused by anything except Pause itself.
+- Real-time mining economy (a 600/hr Gold base, boosted by research - see
+  the Research Tree bullet further down), a real build queue using every
+  unit's actual stats. Income and research keep running for every faction
+  regardless of game style or whose turn it is - never paused by anything
+  except Pause itself.
 - **Multiple resources**: every faction has its own wallet per resource
   that exists on the map (`fac.resources`, `{gold: N, ...}` - Gold plus
   whatever `index.html`'s "+ Add resource" defined), shown in the top
@@ -340,8 +355,9 @@ entirely by one map's saved data:
   research costs are all still plain Gold, unchanged. The Mining Ship
   itself isn't Gold-only: parked within range of ANY deposit - Gold's or
   an Additional Resource's - it earns that resource at the same shared
-  mining rate (600 → 900 → 1200/hr via research, unchanged by which
-  resource it's parked at), so several resources genuinely means several
+  mining rate (a 600/hr base, boosted by Mining Rate research, unchanged
+  by which resource it's parked at), so several resources genuinely means
+  several
   places for a fleet of miners to work, not one real economy and several
   decorative ones. `u.miningResourceIds` (set once per tick in the same
   income loop, read by the live "⛏ +900/hr" label) is which resource(s)

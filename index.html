@@ -162,6 +162,11 @@
   .placement-count { font-size: 12px; color: var(--text-dim); }
   .placement-clear { font-size: 11px; padding: 4px 10px; }
 
+  .research-topic { margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+  .research-topic:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+  .research-topic > label { font-size: 14px; }
+  .research-topic .hint { margin: 2px 0 10px; }
+
   #libraryModal {
     position: fixed; inset: 0; background: rgba(0,0,0,0.7);
     z-index: 100; display: flex; align-items: center; justify-content: center;
@@ -508,6 +513,13 @@
       <button type="button" class="btn-add" id="addResourceBtn">+ Add resource</button>
     </div>
     <p class="hint">Gold is always available - it's what the mining unit above produces, and every unit/turret can already cost it. Add more named resources (Oil, Wood, whatever fits your theme) if you want some units to also require them: each one gets its own deposit amount and its own deposit art shown near every home base, same shape as Gold's own deposit above. To actually hand any resource out over time, check it under "Free Resources Each Round" below instead of relying on automatic income. Every unit/turret below then gets a checkbox per resource here, with how much of it that one costs.</p>
+  </section>
+
+  <!-- 3b. Research Tree -->
+  <section class="section" id="sec-research">
+    <h2><span class="num">3b</span> Research Tree</h2>
+    <p class="hint">Every faction shares this same research tree once their Research Facility is built (item 4e below). Each item has 3 levels a faction can research in order, from Level 1 up - set what percentage bonus each level actually gives; leave one at 0 to make that level a no-op. Mining Rate's Level 1 also unlocks the Mining Ship itself, same as always. Extended Sensors and Rapid Repair Crews aren't tied to an in-game effect yet - their percentages are saved on the map either way, ready for whenever that gets wired up.</p>
+    <div id="researchTopicsList"></div>
   </section>
 
   <!-- Combat Units: replaced by Air Base / War Factory below as the way
@@ -2032,6 +2044,60 @@ function escapeAttr(s) {
 }
 
 // ---------------------------------------------------------------------
+// Research Tree: every topic has exactly 3 levels, each a percentage
+// bonus set here - play.html applies whichever level a faction has
+// actually researched (see researchPercent() there, which every stat
+// this drives now goes through instead of a value fixed in that file).
+// Mining Rate's Level 1 is also still the Mining Ship's own unlock gate,
+// unchanged. Extended Sensors/Rapid Repair Crews aren't wired to an
+// actual in-game effect in play.html yet - their percentages are still
+// collected/saved here regardless, so nothing about this UI needs
+// redoing once that happens.
+// ---------------------------------------------------------------------
+const RESEARCH_TOPICS = [
+  { id: 'mining', label: 'Mining Rate', hint: "Boosts Gold (and any Additional Resource) mining income above the Mining Ship's base rate. Level 1 also unlocks the Mining Ship itself." },
+  { id: 'hp', label: 'Vessel Plating (Max HP)', hint: "Boosts every unit's max HP once researched." },
+  { id: 'speed', label: 'Warp Drive Calibration (Speed)', hint: "Boosts every unit's movement speed once researched." },
+  { id: 'vision', label: 'Extended Sensors (Vision)', hint: 'Not tied to an in-game effect yet - see this section’s own hint above.' },
+  { id: 'regen', label: 'Rapid Repair Crews (HP Regen)', hint: 'Not tied to an in-game effect yet - see this section’s own hint above.' },
+  { id: 'missileRange', label: 'Missile Range (Missile Silo)', hint: "Boosts a Missile Silo launcher's range above its fixed 500 base." },
+];
+const RESEARCH_DEFAULT_PERCENTS = [5, 10, 15];
+
+// Fully rebuilds the list from whatever's passed (a saved map's
+// cfg.research, or nothing for a fresh map) - there's always exactly 6
+// topics x 3 levels, no add/remove lifecycle like the unit/resource rows
+// elsewhere in this file, so a full rebuild on load is simplest.
+function renderResearchTopics(existingResearch) {
+  const el = document.getElementById('researchTopicsList');
+  el.innerHTML = RESEARCH_TOPICS.map((topic) => {
+    const saved = (existingResearch && existingResearch[topic.id]) || [];
+    const rows = [1, 2, 3].map((lvl) => {
+      const val = saved[lvl - 1] ?? RESEARCH_DEFAULT_PERCENTS[lvl - 1];
+      return `<div class="field narrow"><label>Level ${lvl} %</label><input type="number" class="research-pct" data-topic="${topic.id}" data-level="${lvl}" value="${val}" min="0" step="1"></div>`;
+    }).join('');
+    return `
+      <div class="research-topic">
+        <label>${escapeAttr(topic.label)}</label>
+        <p class="hint">${topic.hint}</p>
+        <div class="row">${rows}</div>
+      </div>`;
+  }).join('');
+}
+renderResearchTopics();
+
+function collectResearch() {
+  const out = {};
+  RESEARCH_TOPICS.forEach((topic) => {
+    out[topic.id] = [1, 2, 3].map((lvl) => {
+      const input = document.querySelector(`.research-pct[data-topic="${topic.id}"][data-level="${lvl}"]`);
+      return Number(input.value) || 0;
+    });
+  });
+  return out;
+}
+
+// ---------------------------------------------------------------------
 // Save (draft or finished) + reload
 // ---------------------------------------------------------------------
 const saveStatus = document.getElementById('saveStatus');
@@ -2186,6 +2252,10 @@ async function buildMapDoc(status) {
     // generalized).
     resources: collectExtraResources(uploadResults),
     resourceGrants: currentGrantsFromDOM(),
+    // Research Tree (item 3b) - percentage per level, per topic. See
+    // play.html's TECH_TREE/researchPercent() for how a level's percent
+    // actually gets applied once a faction researches it.
+    research: collectResearch(),
     backgroundImage: uploadResults.backgroundImage,
     player: {
       name: document.getElementById('goodName').value.trim() || 'Allied Forces',
@@ -2554,6 +2624,11 @@ async function loadExistingMap() {
   // for a map saved before this was generalized to multiple resources
   // (it only ever meant a flat Gold amount).
   renderResourceGrants(m.resourceGrants || (m.goldPerRound ? { gold: m.goldPerRound } : {}));
+  // A map saved before the Research Tree section existed has no
+  // m.research at all - renderResearchTopics falls back to
+  // RESEARCH_DEFAULT_PERCENTS for every topic/level in that case, same
+  // as a brand-new map.
+  renderResearchTopics(m.research);
   if (m.backgroundImage) showExistingAsset('backgroundImage', m.backgroundImage);
 
   if (m.player) {
