@@ -823,6 +823,21 @@ async function main() {
   const worldMinY = Math.min(...factions.map((f) => f.y)) - 400;
   const worldMaxY = Math.max(...factions.map((f) => f.y)) + 400;
   const worldW = worldMaxX - worldMinX, worldH = worldMaxY - worldMinY;
+  // Same bounding box clampCamera() already confines the camera to (see
+  // its own comment further down) - nothing ever stopped a moving UNIT
+  // from walking past it though, only the camera. A unit chasing a
+  // move/attack/heal order in a straight line past the map's own edge
+  // just kept going forever into raw canvas past where the cover-fit
+  // background art actually ends (the same "solid black you can wander
+  // off into" as the camera issue, just for units instead of the view).
+  // Called right after every place a unit's x/y actually changes from
+  // movement (runMoveOrder, combatTick's and healTick's own chase-into-
+  // range step) - not from spawn position math, which already places
+  // everything sensibly within bounds on its own.
+  function clampToWorld(u) {
+    u.x = Math.min(worldMaxX, Math.max(worldMinX, u.x));
+    u.y = Math.min(worldMaxY, Math.max(worldMinY, u.y));
+  }
 
   // index.html's Resource & Mining placement widget: 'base' (default,
   // unset on any map saved before this existed) keeps the original
@@ -1316,6 +1331,7 @@ async function main() {
     else {
       u.facingAngle = facingToward(u, u.moveTarget.x, u.moveTarget.y);
       const sp = u.speed * MOVE_PX_PER_SPEED; u.x += dx / dist * sp * dt; u.y += dy / dist * sp * dt;
+      clampToWorld(u);
     }
   }
 
@@ -1405,6 +1421,7 @@ async function main() {
       if (u.isMissileLauncher || u.isTurret) { u.target = null; return; }
       const sp = u.speed * MOVE_PX_PER_SPEED;
       u.x += (t.x - u.x) / dist * sp * dt; u.y += (t.y - u.y) / dist * sp * dt;
+      clampToWorld(u);
     } else if (u.isMissileLauncher) {
       spawnMissile(u, t);
       lockUnit(u);
@@ -1430,6 +1447,7 @@ async function main() {
     if (dist > u.range) {
       const sp = u.speed * MOVE_PX_PER_SPEED;
       u.x += (t.x - u.x) / dist * sp * dt; u.y += (t.y - u.y) / dist * sp * dt;
+      clampToWorld(u);
     } else {
       t.hp = Math.min(t.maxHp, t.hp + u.healAmount);
       // A distinct green pulse (reusing the same `effects` array every

@@ -686,7 +686,16 @@ entirely by one map's saved data:
   showed nothing but the render loop's own solid fallback color forever -
   reported as "the map is surrounded by black and I can scroll off into
   it" on maps whose background art was already sized correctly, since the
-  black had nothing to do with the image itself.
+  black had nothing to do with the image itself. A moving unit itself
+  wasn't clamped the same way, though - a move order, or a combat unit
+  chasing an attack/heal target, planted far enough past the map's own
+  edge just kept walking into that same black area forever, since nothing
+  ever stopped a unit's own x/y from crossing the world bounding box the
+  way the camera now is (`clampToWorld()`, called from `runMoveOrder`,
+  `combatTick`, and `healTick` - everywhere a unit's position actually
+  changes from movement). Reported as "units can travel off the map into
+  the black part" - same underlying bounding box, same fix shape, just
+  for units instead of the camera.
 - Background art is a **single image, cover-fit once** over the whole
   world's bounding box (scale = the larger of width/height ratio,
   uncapped, so it always fully covers with no gaps) - not tiled. A tiled
