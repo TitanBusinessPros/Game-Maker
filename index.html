@@ -2137,7 +2137,15 @@ function addComputerRow(data = {}) {
   });
   wireUploadSlot(row.querySelector('.upload-slot'));
   computerList.appendChild(row);
-  if (data.imageUrl) showExistingAsset(id, data.imageUrl);
+  // Saved as .baseImage (see collectComputers/buildMapDoc, and the
+  // player's own goodBaseImage - same field name there too), not
+  // .imageUrl (that's what unit rows elsewhere in this file use). This
+  // mismatch meant a computer player's home base art thumbnail never
+  // restored on reload even though it was genuinely saved - reported as
+  // "computer/human player bases disappear when I refresh the build
+  // page" while name/color/HP/difficulty (all read from their own
+  // fields correctly above) stayed put.
+  if (data.baseImage) showExistingAsset(id, data.baseImage);
   if (computerList.querySelectorAll('.computer-row').length >= MAX_COMPUTER_PLAYERS) addComputerBtn.disabled = true;
   return row;
 }
