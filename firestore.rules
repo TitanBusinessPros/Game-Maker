@@ -40,25 +40,29 @@ service cloud.firestore {
     }
 
     // One doc per signed-in user, tracking download credits for the "⬇
-    // Download My Game" button in index.html. There's no backend here -
-    // this app is 100% client + these rules - so every anti-cheat
-    // guarantee has to live in the rules themselves, not in trusting
-    // whatever the client sends:
+    // Download My Game" button in index.html AND The Game Producer's own
+    // per-stage compile cost (producer.html - N stages spent in one
+    // transaction, N >= 1, not just the single-credit download). There's
+    // no backend here - this app is 100% client + these rules - so every
+    // anti-cheat guarantee has to live in the rules themselves, not in
+    // trusting whatever the client sends:
     //  - create: the STARTING balance must be exactly 3, or exactly 50
     //    if (and only if) this email is in bonusEmails - a client can't
     //    just create itself a doc with credits: 9999.
-    //  - update: the new balance must be exactly one less than the
-    //    current balance, and the current balance must already be at
-    //    least 1 - a client can't increase its own balance, skip
-    //    straight to 0 from some higher number, or spend from 0.
+    //  - update: the new balance must be LOWER than the current balance
+    //    and non-negative - not required to be exactly one less any
+    //    more (producer.html can spend several at once for a multi-stage
+    //    compile) - a client still can't increase its own balance, skip
+    //    to a negative number, or spend from a balance of 0.
     //  - email is pinned to the signer's own verified token email on
     //    both create and update (can't write into someone else's uid's
     //    doc, and can't change which email a doc claims to belong to
     //    after creation).
-    // The admin account never has a doc here at all - index.html skips
-    // every credit check/decrement for that one email entirely, so
-    // downloads are unlimited and untracked for it, same as the "does
-    // not affect the admin" instruction that created this whole system.
+    // The admin account never has a doc here at all - index.html and
+    // producer.html both skip every credit check/decrement for that one
+    // email entirely, so downloads/compiles are unlimited and untracked
+    // for it, same as the "does not affect the admin" instruction that
+    // created this whole system.
     match /users/{uid} {
       allow read: if request.auth != null && request.auth.uid == uid;
       allow create: if request.auth != null
@@ -75,8 +79,25 @@ service cloud.firestore {
                     && request.auth.token.email_verified == true
                     && request.resource.data.email == resource.data.email
                     && request.resource.data.keys().hasOnly(['email', 'credits', 'createdAt'])
-                    && resource.data.credits >= 1
-                    && request.resource.data.credits == resource.data.credits - 1;
+                    && request.resource.data.credits >= 0
+                    && request.resource.data.credits < resource.data.credits;
+    }
+
+    // The Game Producer's own saved-in-progress projects (producer.html's
+    // "💾 Save Draft" / "My Producer Drafts" list) - private to their
+    // owner, unlike /maps above, since there's no "play a draft" public-
+    // facing use case here, only "come back and keep building it" for
+    // whoever made it. ownerId is pinned to the signer's own uid on
+    // create and can never change on update (a client can't hand a draft
+    // to a different account, or steal one by overwriting its ownerId).
+    match /producerDrafts/{draftId} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.ownerId;
+      allow create: if request.auth != null
+                    && request.resource.data.ownerId == request.auth.uid;
+      allow update: if request.auth != null
+                    && request.auth.uid == resource.data.ownerId
+                    && request.resource.data.ownerId == resource.data.ownerId;
+      allow delete: if request.auth != null && request.auth.uid == resource.data.ownerId;
     }
   }
 }

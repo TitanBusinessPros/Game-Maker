@@ -979,11 +979,45 @@ standalone, self-contained copy of `play.html` with that one map's data
 baked in) into a single complete, playable game with its own cover art
 before every stage. Linked from a blurb near the top of `index.html`'s
 header, explaining the two-step workflow (make and download each stage
-separately here first, then combine them there). Entirely client-side -
-no sign-in, no Firebase reads/writes at all; every file involved (each
-stage's own downloaded game file, plus every cover image) is a local
-upload read straight off the user's disk with the File API, never
-touching the network.
+separately here first, then combine them there).
+
+Google-sign-in-gated exactly like `index.html` (same Firebase project,
+same accounts, same Google Identity Services flow/`authGate` pattern) -
+needed because compiling now **costs 1 download credit per stage** (a
+10-stage game costs 10 credits), spent from the exact same `/users/{uid}`
+credits balance `index.html`'s own "⬇ Download My Game" button already
+uses, admin account exempt from the charge entirely (unlimited, same
+"does not affect the admin" carve-out). Since a compile can now spend
+more than 1 credit at once, `firestore.rules`' `/users/{uid}` update rule
+changed from "the new balance must be exactly one less" to "the new
+balance must be lower, and non-negative" - still can't be increased,
+skipped to negative, or spent past 0, just no longer locked to exactly
+minus one. Saving a draft (below) is always free - only an actual
+compile spends anything, and only once the file is fully built (a
+network hiccup while checking credits shouldn't cost anything for
+nothing).
+
+**💾 Save Draft / My Producer Drafts:** a whole in-progress project
+(title, ending message, every stage's name/order, and every uploaded
+game file + cover image) can be saved and resumed later, mirroring
+`index.html`'s own Save Draft/My Maps pattern almost exactly, down to
+reusing a client-generated id in the URL (`?draft=...`) instead of
+Firestore's own auto-id. Firestore collection `producerDrafts` (new -
+owner-only read/write, unlike public-read `maps`, since there's no
+"play a draft" use case here) stores just the metadata and Storage
+download URLs, never the files themselves (a single stage's own game
+file can easily be several MB, way past Firestore's 1MB-per-document
+cap) - the actual files live in Storage under `producer/<uid>/<draftId>/`
+(new `storage.rules` block, owner-only, 50MB/file cap - higher than
+`maps`' own 15MB, since what's uploaded here is a whole already-inlined
+`play.html` copy, not a single sprite). Uploads run through the same "at
+most 5 in flight at once" worker-pool pattern as `index.html`'s own map
+save, and only changed files are re-uploaded on a later save (an
+untouched stage keeps its existing URL). Loading a draft repopulates
+every field and shows each stage's game file/cover art as "already
+uploaded ✓" (no local `File` object exists for it - the compile step
+below fetches it back down from its Storage URL instead, exactly like a
+freshly-picked one).
 
 **Building side** (this page): three sections mirroring `index.html`'s
 numbered-checklist style - (1) an optional intro title/cover art for the
@@ -993,16 +1027,22 @@ unit rows, plus ↑/↓ buttons that physically move the row's DOM node
 instead of re-rendering from a separate array - this matters because a
 `<input type=file>`'s chosen file can't be restored programmatically
 after a re-render, only preserved by keeping the same element instance),
-each needing that stage's own downloaded `.html` game file (required) and
-an optional cover-art image, capped at 20 stages, and (3) an optional
-outro message/cover art for the very end. The one **"🎬 Take all my maps
-and make a complete game"** button at the bottom reads every stage's game
-file as raw text (`File.text()`), UTF-8-safe base64-encodes it
-(`btoa`/`atob` only handle Latin-1, so this goes through
+each needing that stage's own downloaded `.html` game file (required,
+either a fresh local upload or an already-saved Storage URL from a loaded
+draft) and an optional cover-art image, capped at 20 stages, and (3) an
+optional outro message/cover art for the very end. The one **"🎬 Take all
+my maps and make a complete game"** button at the bottom reads every
+stage's game file as raw text (a fresh upload via `File.text()`, an
+already-saved one via `fetch(url).then(r => r.text())`), UTF-8-safe
+base64-encodes it (`btoa`/`atob` only handle Latin-1, so this goes through
 `TextEncoder`/`TextDecoder` and a raw byte string first - a stage's own
 map name or a unit name inside it can easily contain an emoji or accented
-character), reads every cover image as a data URI, and stitches all of it
-into one new self-contained HTML document that gets downloaded as
+character), reads every cover image as a data URI (again from either
+source - an already-saved one is fetched back down and re-embedded, so
+the compiled game stays fully offline regardless of where its art came
+from), spends the credits (aborting with nothing charged if the balance
+is short, same "buy 10 more" popup `index.html` already has), and stitches
+all of it into one new self-contained HTML document that gets downloaded as
 `index.html` (so hosting the result anywhere that serves a folder's
 `index.html` by default just works) - the exact same "fetch this page's
 own HTML, splice in a `<script>window.GM_INLINE_CONFIG=...</script>` before
@@ -1093,9 +1133,9 @@ time, which is exactly what broke the first deploy attempt.
 
 Project: `game-maker-ed014`.
 
-- **Authentication** — Google sign-in is *required* on both `index.html`
-  and `admin.html` (no more anonymous default). Implemented via **Google
-  Identity Services** (`accounts.google.com/gsi/client`), not
+- **Authentication** — Google sign-in is *required* on `index.html`,
+  `admin.html`, and `producer.html` (no more anonymous default).
+  Implemented via **Google Identity Services** (`accounts.google.com/gsi/client`), not
   `signInWithPopup`/`signInWithRedirect` - both of those route through
   `game-maker-ed014.firebaseapp.com` as a middleman before returning to
   the real site (`titanbusinesspros.github.io`), which is a known
@@ -1110,17 +1150,24 @@ Project: `game-maker-ed014`.
   sign-in fails with `Error 400: origin_mismatch`.
 - **Firestore** — `maps/{mapId}` (one doc per map) and `libraryItems/{id}`
   (the shared asset library), both public-read; writes locked to the
-  owning `uid` (maps) or the admin email (library) via rules. Two more
-  collections back the download-credit system: `bonusEmails/{email}`
+  owning `uid` (maps) or the admin email (library) via rules.
+  `producerDrafts/{draftId}` (The Game Producer's own saved projects) is
+  owner-read/write only - no public-read case here, unlike `maps`. Two
+  more collections back the download-credit system: `bonusEmails/{email}`
   (public-read, admin-only write - the 50-credit list) and `users/{uid}`
   (a signed-in user can only read/write their own doc; the actual credit
-  math - correct starting value, only ever decrementing by exactly 1,
-  never below 0 - is enforced in the rules themselves, not trusted from
-  the client, since this project has no backend to enforce it any other
-  way).
+  math - correct starting value, only ever decreasing and never below 0 -
+  is enforced in the rules themselves, not trusted from the client, since
+  this project has no backend to enforce it any other way; the update
+  rule allows decreasing by *any* amount now, not just exactly 1, since
+  `producer.html` can spend several credits in one compile).
 - **Storage** — `maps/{uid}/{mapId}/...` for map-specific uploads,
-  `library/{category}/...` for the shared library. Same read-public/
-  write-locked pattern. Its bucket also has a **CORS policy**
+  `library/{category}/...` for the shared library,
+  `producer/{uid}/{draftId}/...` for The Game Producer's saved drafts
+  (owner-read/write only, 50MB/file cap - higher than the other two,
+  since a single stage's own game file can be several MB). Same general
+  read-public(-or-owner)/write-locked pattern. Its bucket also has a
+  **CORS policy**
   (`cors.json` in this repo, applied via `gcloud storage buckets update
   gs://game-maker-ed014.firebasestorage.app --cors-file=cors.json` -
   Storage rules/`firebase deploy` don't cover this, it's a bucket-level
