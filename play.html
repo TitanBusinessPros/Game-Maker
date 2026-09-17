@@ -552,7 +552,16 @@ async function main() {
   const GATED_BUILDINGS = [
     { key: 'airBase', cfg: cfg.airBase || { name: 'Air Base', cost: 150, hp: 2000 }, unitCfgs: cfg.airUnits || [], icon: '✈️', img: airBaseImg, offsetX: 110, offsetY: 60 },
     { key: 'warFactory', cfg: cfg.warFactory || { name: 'War Factory', cost: 150, hp: 2000 }, unitCfgs: cfg.warUnits || [], icon: '🛡️', img: warFactoryImg, offsetX: -110, offsetY: 60 },
-    { key: 'infantryPost', cfg: cfg.infantryPost || { name: 'Infantry Post', cost: 150, hp: 2000 }, unitCfgs: cfg.infantryUnits || [], icon: '🪖', img: infantryPostImg, offsetX: 110, offsetY: -60 },
+    // 🪖 (Military Helmet) used to be here - a 2019-era emoji, ~9 years
+    // newer than every other building's icon (✈️🛡️🚁🔬🚀 are all
+    // 2010-2014), which several fonts - Windows especially - have no
+    // glyph for, so it rendered as a blank box in both the Infantry Post
+    // build-panel row AND every unit under it (unitDefs.forEach appends
+    // this same building.icon next to a unit's own name too). Reported
+    // as "no icon" for both. 💂 (Guard) reads the same and is one of the
+    // original 2010-era emoji, same fix as the Whip weapon-effect icon
+    // (🪢 -> 〰️) elsewhere in this project.
+    { key: 'infantryPost', cfg: cfg.infantryPost || { name: 'Infantry Post', cost: 150, hp: 2000 }, unitCfgs: cfg.infantryUnits || [], icon: '💂', img: infantryPostImg, offsetX: 110, offsetY: -60 },
     { key: 'helicopterFacility', cfg: cfg.heliFacility || { name: 'Helicopter Facility', cost: 150, hp: 2000 }, unitCfgs: cfg.heliUnits || [], icon: '🚁', img: heliFacilityImg, offsetX: -110, offsetY: -60 },
     { key: 'researchFacility', cfg: cfg.researchFacility || { name: 'Research Facility', cost: 150, hp: 2000 }, unitCfgs: [], icon: '🔬', img: researchFacilityImg, offsetX: 0, offsetY: 140, alwaysShow: true, gatesResearch: true },
     // unitCfgs here (cfg.missileUnits) is read ONLY for the generic "does
