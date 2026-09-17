@@ -1213,6 +1213,61 @@ const libraryList = document.getElementById('libraryList');
 const libraryCategoryTabs = document.getElementById('libraryCategoryTabs');
 let libraryActiveSlotKey = null;
 
+// Which library category a given upload slot should land on when opened,
+// instead of always defaulting to whatever category happens to sort
+// first (categories[0] below) - e.g. clicking 📚 Library on the Infantry
+// Post unit's own art slot used to land on Maps (or whatever else came
+// first) just as often as on Infantry, forcing a click through tabs
+// every single time. Exact-key hints for the fixed, one-per-map slots;
+// prefix/suffix patterns for the repeatable row types (unit_0, turret_3,
+// missile_2 vs. missile_2_missile, etc. - see makeUnitRow/addTurretRow/
+// addMissileUnitRow/addComputerRow for where these ids come from).
+// Deliberately not exhaustive - a slot with no clean matching admin.html
+// category (e.g. Mining Ship art) just falls through to the old
+// first-available behavior below, same as before this existed.
+const SLOT_CATEGORY_HINTS = {
+  goodBaseImage: 'bases',
+  resourceImage: 'resources',
+  airBaseImage: 'structures/airport',
+  warFactoryImage: 'structures/war_factory',
+  infantryPostImage: 'structures/infantry_post',
+  heliFacilityImage: 'structures/helicopter_facility',
+  researchFacilityImage: 'structures/research_facility',
+  missileSiloImage: 'structures/missile_silo',
+  soundMusic: 'sounds/music',
+  soundIntro: 'sounds/intro',
+  soundAttack: 'sounds/attack',
+  soundBuildingDestroyed: 'sounds/building_destroyed',
+  soundHomeUnderAttack: 'sounds/home_under_attack',
+  soundEndgame: 'sounds/endgame',
+};
+const SLOT_PREFIX_CATEGORY_HINTS = [
+  [/^resource_/, 'resources'],
+  [/^computer_/, 'bases'],
+  [/^airunit_/, 'characters/jets'],
+  [/^warunit_/, 'characters/tanks'],
+  [/^infunit_/, 'characters/infantry'],
+  [/^heliunit_/, 'characters/helicopters'],
+  [/^turret_/, 'structures/gun_turret'],
+  // Missile Silo rows have two upload slots each - the launcher's own
+  // sprite (missile_N) and a second, separate one for the projectile
+  // itself (missile_N_missile) - each wants a different category, so the
+  // more specific pattern has to be checked first.
+  [/^missile_\d+_missile$/, 'characters/missiles'],
+  [/^missile_\d+$/, 'structures/missile_silo'],
+];
+function defaultCategoryForSlot(slotKey) {
+  // Map background art has its own per-size sub-categories in admin.html
+  // (maps/tiny, maps/small, ...) - land on whichever matches the size
+  // already picked in Map Basics, not just "maps" generically.
+  if (slotKey === 'backgroundImage') {
+    return `maps/${document.getElementById('mapSize').value || 'medium'}`;
+  }
+  if (SLOT_CATEGORY_HINTS[slotKey]) return SLOT_CATEGORY_HINTS[slotKey];
+  const hit = SLOT_PREFIX_CATEGORY_HINTS.find(([re]) => re.test(slotKey));
+  return hit ? hit[1] : null;
+}
+
 function openLibraryPicker(slotKey, mediaType) {
   libraryActiveSlotKey = slotKey;
   const items = libraryManifest.filter((it) => it.type === mediaType);
@@ -1232,7 +1287,11 @@ function openLibraryPicker(slotKey, mediaType) {
       if (ib === -1) return -1;
       return ia - ib;
     });
-  let activeCategory = categories[0];
+  // Land on whatever category this specific slot is for, if the library
+  // actually has anything in it yet - otherwise fall back to the first
+  // available category, same as before this existed.
+  const hintedCategory = defaultCategoryForSlot(slotKey);
+  let activeCategory = (hintedCategory && categories.includes(hintedCategory)) ? hintedCategory : categories[0];
   function renderCategory(cat) {
     activeCategory = cat;
     libraryCategoryTabs.querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.cat === cat));

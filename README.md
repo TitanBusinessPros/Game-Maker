@@ -288,6 +288,20 @@ upload are compressed client-side first (resized to at most 768px,
 re-encoded as WebP) - a multi-MB photo commonly comes back under 300KB,
 which is most of what makes Save fast.
 
+Opening the picker **lands on the category that slot is actually for**
+instead of always the same first-available tab - Map background art
+opens straight to that size's own Maps sub-category (Tiny/Small/Medium/
+Large, matching whatever's picked under Map Basics), a home base art
+slot opens to Bases, an Infantry Post unit's art opens to Infantry, a
+Missile Silo launcher's own sprite opens to the Missile Silo structure
+category while that *same row's* separate missile-projectile art slot
+opens to the dedicated Missiles category, and so on
+(`defaultCategoryForSlot()`/`SLOT_CATEGORY_HINTS`/
+`SLOT_PREFIX_CATEGORY_HINTS` in `index.html`). Falls back to the old
+first-available-category behavior for the handful of slots with no clean
+matching admin.html category (Mining Ship art) or if the hinted category
+has nothing uploaded to it yet.
+
 **Save Draft** works with anything filled in; **Finish & Save** requires
 the checklist items above and marks the map playable.
 
