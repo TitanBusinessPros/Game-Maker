@@ -350,7 +350,7 @@
 <div id="buyCreditsModal" hidden>
   <div style="background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:24px; max-width:360px; text-align:center;">
     <h3 style="margin:0 0 8px;">Out of download credits</h3>
-    <p style="color:var(--text-dim); font-size:13px; margin:0 0 18px;">Every account starts with 5 free download credits, and they don't refill. Get 10 more for $5.</p>
+    <p style="color:var(--text-dim); font-size:13px; margin:0 0 18px;">Every account starts with 3 free download credits, and they don't refill. Get 10 more for $5.</p>
     <a id="buyCreditsLink" href="#" target="_blank" rel="noopener" class="btn-primary" style="display:inline-block; text-decoration:none; padding:10px 22px; border-radius:6px; font-weight:600;">Get 10 credits for $5</a>
     <button type="button" id="closeBuyCreditsModal" class="btn-secondary" style="display:block; margin:14px auto 0; padding:8px 16px;">Not now</button>
   </div>
@@ -518,7 +518,7 @@
   <!-- 3b. Research Tree -->
   <section class="section" id="sec-research">
     <h2><span class="num">3b</span> Research Tree</h2>
-    <p class="hint">Every faction shares this same research tree once their Research Facility is built (item 4e below). Each item has 3 levels a faction can research in order, from Level 1 up - set what percentage bonus each level actually gives; leave one at 0 to make that level a no-op. Mining Rate's Level 1 also unlocks the Mining Ship itself, same as always. Extended Sensors and Rapid Repair Crews aren't tied to an in-game effect yet - their percentages are saved on the map either way, ready for whenever that gets wired up.</p>
+    <p class="hint">Every faction shares this same research tree once their Research Facility is built (item 4g below). Each item has 3 levels a faction can research in order, from Level 1 up - set what percentage bonus each level actually gives; leave one at 0 to make that level a no-op. Mining Rate's Level 1 also unlocks the Mining Ship itself, same as always; Rapid Repair Crews boosts a Field Hospital medic's heal amount (item 4e below); Extended Range boosts every unit's and Gun Turret's own attack/heal range.</p>
     <div id="researchTopicsList"></div>
   </section>
 
@@ -904,23 +904,26 @@ onAuthStateChanged(auth, (user) => {
 });
 
 // ---------------------------------------------------------------------
-// Download credits - every account starts with 5 (50 for an email the
-// admin has added to the bonusEmails list in admin.html), spent one per
-// "⬇ Download My Game" click, never replenished or reset. The admin
-// account is exempt entirely - no doc, no check, unlimited downloads
-// (see downloadStandaloneGame below). The real enforcement is in
-// firestore.rules (a client here could send any number it wants -
-// what actually stops a fake/inflated balance is the rule only ever
-// allowing a create at exactly 5 or 50, or an update that's exactly
-// current-minus-one); this code just has to agree with those rules, not
-// invent the security itself.
+// Download credits - every account starts with 3 (50 for an email the
+// admin has added to the bonusEmails list in admin.html - unaffected by
+// this, still 50), spent one per "⬇ Download My Game" click, never
+// replenished or reset. The admin account is exempt entirely - no doc,
+// no check, unlimited downloads (see downloadStandaloneGame below). The
+// real enforcement is in firestore.rules (a client here could send any
+// number it wants - what actually stops a fake/inflated balance is the
+// rule only ever allowing a create at exactly 3 or 50, or an update
+// that's exactly current-minus-one); this code just has to agree with
+// those rules, not invent the security itself - the rules' own literal
+// 3 has to change right alongside this one, or new signups get rejected
+// outright (the rule would refuse to let a client create itself a
+// balance this code no longer matches).
 // ---------------------------------------------------------------------
 async function ensureUserCreditsDoc(user) {
   const userRef = doc(db, 'users', user.uid);
   const existing = await getDoc(userRef);
   if (existing.exists()) return;
   const bonusSnap = await getDoc(doc(db, 'bonusEmails', user.email.toLowerCase()));
-  const credits = bonusSnap.exists() ? 50 : 5;
+  const credits = bonusSnap.exists() ? 50 : 3;
   try {
     await setDoc(userRef, { email: user.email, credits, createdAt: serverTimestamp() });
   } catch (err) {
@@ -2172,7 +2175,7 @@ const RESEARCH_TOPICS = [
   { id: 'mining', defaultName: 'Mining Rate', hint: "Boosts Gold (and any Additional Resource) mining income above the Mining Ship's base rate. Level 1 also unlocks the Mining Ship itself." },
   { id: 'hp', defaultName: 'Vessel Plating', hint: "Boosts every unit's max HP once researched." },
   { id: 'speed', defaultName: 'Warp Drive Calibration', hint: "Boosts every unit's movement speed once researched." },
-  { id: 'vision', defaultName: 'Extended Sensors', hint: 'Not tied to an in-game effect yet - see this section’s own hint above.' },
+  { id: 'vision', defaultName: 'Extended Range', hint: "Boosts every unit's and Gun Turret's own attack/heal range once researched (formerly Extended Sensors/Vision, which had no in-game effect - internal id stayed 'vision', only what it does changed)." },
   { id: 'regen', defaultName: 'Rapid Repair Crews', hint: "Boosts how much HP a Field Hospital medic heals per turn (see item 4e below) once researched." },
   { id: 'missileRange', defaultName: 'Missile Range', hint: "Boosts a Missile Silo launcher's range above its fixed 500 base." },
 ];

@@ -442,10 +442,10 @@ function loadAudio(url) {
 // editable. Mining Rate's Level 1 (mining_ops) is the one topic where
 // researching a level does something beyond a percentage - it's still
 // the Mining Ship's own unlock gate too, checked separately by its own id
-// everywhere that matters (unchanged). Extended Sensors and Rapid Repair
-// Crews are real, researchable, 3-level topics like the rest, but nothing
-// in this file actually reads researchPercent(fac, 'vision'/'regen') yet -
-// intentionally left for a follow-up, same as before this existed.
+// everywhere that matters (unchanged). All 6 topics are wired to a real
+// effect now - 'vision' (displayed as "Extended Range") boosts unit/
+// turret range via effectiveStat's own 'range' kind, and 'regen'
+// (Rapid Repair Crews) boosts a Field Hospital medic's heal amount.
 const TECH_TREE = {
   mining_ops: { name: 'Mining Operations', cost: 300, timeSeconds: 60, prereq: null, topic: 'mining', level: 1 },
   improved_extraction: { name: 'Improved Extraction', cost: 500, timeSeconds: 90, prereq: 'mining_ops', topic: 'mining', level: 2 },
@@ -905,7 +905,11 @@ async function main() {
   // renderResearchPanel below.
   const RESEARCH_TOPIC_DEFAULT_NAMES = {
     mining: 'Mining Rate', hp: 'Vessel Plating', speed: 'Warp Drive Calibration',
-    vision: 'Extended Sensors', regen: 'Rapid Repair Crews', missileRange: 'Missile Range',
+    // Still keyed 'vision' internally (renaming the key would orphan any
+    // map already saved under it, for zero benefit - it's an internal
+    // identifier a map-maker never sees) - only what it actually DOES
+    // changed, from a vestigial no-op to boosting unit/turret range.
+    vision: 'Extended Range', regen: 'Rapid Repair Crews', missileRange: 'Missile Range',
   };
   function researchTopicName(topicId) {
     const topicCfg = cfg.research && cfg.research[topicId];
@@ -936,6 +940,15 @@ async function main() {
     let v = base;
     if (kind === 'hp') v *= (1 + researchPercent(fac, 'hp') / 100);
     if (kind === 'speed') v *= (1 + researchPercent(fac, 'speed') / 100);
+    // 'vision' internally (see RESEARCH_TOPIC_DEFAULT_NAMES above) -
+    // Extended Range boosts a combat unit's/Gun Turret's/Field Hospital
+    // medic's own range (attack range, or heal range for a medic - both
+    // just u.range) the same way Vessel Plating/Warp Drive boost HP/
+    // speed. Not applied to Missile Silo launchers (missileRange() is its
+    // own separate, dynamically-computed stat - see that function) or
+    // the Mining Ship (MINING_RANGE is a fixed engine constant, not a
+    // per-map field at all).
+    if (kind === 'range') v *= (1 + researchPercent(fac, 'vision') / 100);
     return v;
   }
   function spawnUnit(factionId, defIndex, x, y) {
@@ -944,7 +957,7 @@ async function main() {
     const u = {
       id: nextUnitId++, factionId, defIndex, isMiner: false,
       hp: Math.round(effectiveStat(fac, def.hp, 'hp')), maxHp: Math.round(effectiveStat(fac, def.hp, 'hp')),
-      attack: def.attack, range: def.range, speed: effectiveStat(fac, def.speed, 'speed'),
+      attack: def.attack, range: effectiveStat(fac, def.range, 'range'), speed: effectiveStat(fac, def.speed, 'speed'),
       img: unitImages[defIndex], x, y, alive: true, selected: false,
       orderType: null, moveTarget: null, target: null,
       lockedUntilTurn: 0, facingAngle: 0, weapon: def.weapon || 'laser',
@@ -975,7 +988,7 @@ async function main() {
     const u = {
       id: nextUnitId++, factionId, defIndex, isMiner: false, isTurret: true,
       hp: Math.round(effectiveStat(fac, def.hp, 'hp')), maxHp: Math.round(effectiveStat(fac, def.hp, 'hp')),
-      attack: def.attack, range: def.range, speed: 0,
+      attack: def.attack, range: effectiveStat(fac, def.range, 'range'), speed: 0,
       img: turretImages[defIndex], x, y, alive: true, selected: false,
       orderType: null, moveTarget: null, target: null,
       lockedUntilTurn: 0, facingAngle: 0, weapon: def.weapon || 'laser',

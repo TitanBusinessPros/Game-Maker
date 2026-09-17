@@ -138,12 +138,17 @@ line. Only this page has the logo/title/footer treatment so far -
    engine - the same generic pattern for all 6 topics: **Mining Rate**
    (Gold/Additional Resource mining income - Level 1 also unlocks the
    Mining Ship itself, same gate as always), **Vessel Plating** (max HP),
-   **Warp Drive Calibration** (movement speed), **Extended Sensors**
-   (vision - still saved but not yet tied to an actual effect in
-   `play.html`), **Rapid Repair Crews** (HP regen - now tied to a real
-   effect: how much HP a Field Hospital medic heals per turn, item 4e
-   below) and **Missile Range** (Missile Silo launcher range above its
-   fixed 500 base). Leave a level at 0 to make it a no-op. Defaults to 5%
+   **Warp Drive Calibration** (movement speed), **Extended Range**
+   (formerly "Extended Sensors (Vision)," which had no in-game effect at
+   all - now boosts every unit's and Gun Turret's own attack/heal range;
+   internal id stayed `vision`, only its default name/what it does
+   changed, so a map that already had percentages saved under it keeps
+   them, just applied to range from now on), **Rapid Repair Crews** (HP
+   regen - boosts how much HP a Field Hospital medic heals per turn, item
+   4e below) and **Missile Range** (Missile Silo launcher range above its
+   fixed 500 base). All 6 topics now drive a real effect - none are
+   inert placeholders any more. Leave a level at 0 to make it a no-op.
+   Defaults to 5%
    / 10% / 15% for Level 1/2/3 of every topic; nothing here is required
    to Finish & Save. Each topic also has its own **Research name** field,
    pre-filled with its plain default name (e.g. "Warp Drive Calibration")
@@ -316,14 +321,15 @@ line. Only this page has the logo/title/footer treatment so far -
    the result via `window.GM_INLINE_CONFIG`) someone else can play with
    zero further Firebase cost, however many times, however many people.
    Clicking it spends one **download credit** - every account
-   starts with 5, never refilled or reset (an admin-listed email starts
-   with 50 instead - see `admin.html`'s own section below), shown next
-   to your email at the top of the page ("N download credits left").
+   starts with 3, never refilled or reset (an admin-listed email starts
+   with 50 instead, unaffected by this - see `admin.html`'s own section
+   below), shown next to your email at the top of the page ("N download
+   credits left").
    Hitting 0 blocks further downloads with a clear message instead of
    failing silently. Client-side, the enforcement against someone just
    editing their own balance in devtools lives entirely in
    `firestore.rules`' `/users/{uid}` rules: a new balance can only ever
-   be *created* at exactly 5 (or exactly 50, only if that email's in the
+   be *created* at exactly 3 (or exactly 50, only if that email's in the
    bonus list), and can only ever be *updated* to exactly one less than
    whatever it already was - nothing client-side is ever allowed to
    *increase* it. The admin account is fully exempt - no credits doc, no
