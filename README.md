@@ -247,12 +247,13 @@ line. Only this page has the logo/title/footer treatment so far -
    checkbox (on by default - the launcher itself never rotates at all,
    regardless of this checkbox or of what it's firing at; this only
    controls whether the *projectile's* own sprite turns to face the
-   direction it's flying), an **Auto Attack** checkbox (on by default,
-   same meaning as Gun Turrets' own - see 4h below - though it only ever
-   actually changes anything for an AI-controlled faction's launcher,
-   since a human player's launcher was already always manual-only either
-   way; unchecking it just means an AI faction's launcher never fires on
-   its own either), and **costs** (the usual
+   direction it's flying), an **Auto Attack** checkbox (**off** by
+   default, unlike Gun Turrets' own - see 4h below - since a launcher has
+   always been manual-only for a human player: leave it unchecked and
+   nothing changes, a player still has to click the launcher then click
+   an enemy. Check it and the launcher fires on its own at whatever comes
+   into range instead, exactly like a Gun Turret, for a human or
+   AI-controlled faction alike), and **costs** (the usual
    per-resource checkboxes). No Range or Weapon field on this row at all
    - unlike every other
    unit/turret type, a launcher's range isn't set here; see `play.html`'s
@@ -853,16 +854,21 @@ entirely by one map's saved data:
 - **Missile Silo** (optional, gated building - index.html's item 4f):
   placed exactly like a Gun Turret (same ring, same arm-then-click flow,
   same speed-0/never-moves shape) but additionally requires the Missile
-  Silo building itself to be built first. A human player always has to
-  click the launcher, then click an enemy, same as giving any other owned
-  unit a normal attack order, regardless of Auto Attack (no special-cased
-  order-issuing code needed for this at all). An AI-controlled launcher
-  auto-acquires `nearestEnemy()` like any other AI unit UNLESS
-  index.html's Auto Attack checkbox was turned off for that launcher type
-  (on by default), in which case an AI faction's launcher just never
-  fires it at all - there's no AI equivalent of a player's click, so
-  turning this off only ever makes sense as a deliberate "AI factions
-  never use this" map design choice. Its range
+  Silo building itself to be built first. index.html's own Auto Attack
+  checkbox is **off by default** here (unlike a Gun Turret's, which
+  defaults on) - a player has to click the launcher, then click an enemy,
+  same as giving any other owned unit a normal attack order, exactly like
+  every launcher already worked before this checkbox existed. Checking
+  it applies identically to a human or an AI-controlled faction alike -
+  it starts self-acquiring `nearestEnemy()` and firing on its own the
+  instant something wanders into range, exactly like a Gun Turret with
+  Auto Attack on (an earlier version of this feature only ever let it
+  affect an AI-controlled launcher, always requiring a human to click
+  first regardless of the checkbox - reported back and fixed, since the
+  whole point was a single on/off switch that behaves the same no matter
+  who owns it). A manual click-to-order still works and overrides
+  whatever it's currently doing either way, same as commanding any other
+  unit. Its range
   isn't a field set on the map at all: it starts at 500 and researches up
   to 1000 then 2000 through two new Research-tab entries (Extended
   Missile Range, Long-Range Missiles), the same "tiered value driven

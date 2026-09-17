@@ -1042,14 +1042,14 @@ async function main() {
       // (spawnMissile's own facingAngle) shows travel direction, so the
       // static structure stays put (map-maker request: "it tilts sideways
       // and aims at the target, we need it to stay still").
-      // index.html's "Auto Attack" checkbox (defaults on) - only affects
-      // an AI-controlled faction's own launcher, which otherwise
-      // auto-acquires a target the same way any other AI unit does (see
-      // the per-unit update() loop's generic !fac.isHuman branch); a
-      // human player's launcher was already always manual-only regardless
-      // of this field, unchanged.
+      // index.html's "Auto Attack" checkbox - defaults OFF here (unlike a
+      // Gun Turret's, which defaults on), since a launcher has always
+      // been manual-only for a human player; checking it applies
+      // identically to a human or AI-owned launcher alike (see the
+      // per-unit update() loop's own isMissileLauncher branch), the same
+      // shape as a Gun Turret's Auto Attack.
       lockedUntilTurn: 0, facingAngle: 0, rotateToFace: false,
-      autoAttack: def.autoAttack !== false,
+      autoAttack: def.autoAttack === true,
     };
     units.push(u);
     return u;
@@ -1830,6 +1830,23 @@ async function main() {
         if (u.target) combatTick(u, dt);
         continue;
       }
+      // Missile Silo launcher: same Auto Attack shape as a Gun Turret
+      // above, applying identically to a human or an AI-controlled
+      // faction alike - NOT the generic isHuman-branches every ordinary
+      // unit goes through further down, which would only ever let an AI
+      // auto-acquire and always require a human to click first regardless
+      // of this checkbox (an earlier version of this feature did exactly
+      // that, reported back as "the option only works for AI and a user
+      // still has to click the launcher and the target"). With Auto
+      // Attack on, a human's launcher now fires on its own too, exactly
+      // like a turret; a manual click-to-order still works and overrides
+      // it either way, same click-to-order flow every other selected unit
+      // already uses in handleClick.
+      if (u.isMissileLauncher) {
+        if (u.autoAttack === true && (!u.target || u.target.hp <= 0 || u.target.alive === false)) u.target = nearestEnemy(u);
+        if (u.target) combatTick(u, dt);
+        continue;
+      }
       // Field Hospital medic: an AI-controlled one auto-targets the
       // nearest damaged ally on its own (same idea as isTurret's own
       // nearestEnemy() above, just healing instead of attacking) whenever
@@ -1856,16 +1873,7 @@ async function main() {
         // player-commanded unit.
         if (u.orderType === 'move' && u.moveTarget) runMoveOrder(u, dt);
       } else if (!fac.isHuman) {
-        // A Missile Silo launcher's own "Auto Attack" checkbox only ever
-        // matters here - an AI faction's launcher otherwise auto-acquires
-        // exactly like any other AI-controlled unit; turning it off makes
-        // an AI-owned launcher never fire on its own (there's no AI
-        // equivalent of a player's manual click, so it just sits idle - a
-        // deliberate map-maker choice, same as leaving it unchecked for a
-        // Gun Turret above). Regular combat units have no .autoAttack
-        // field at all, so `undefined !== false` keeps this a no-op for
-        // every unit type except missile launchers.
-        if (u.autoAttack !== false && !u.target) u.target = nearestEnemy(u);
+        if (!u.target) u.target = nearestEnemy(u);
         combatTick(u, dt);
       } else {
         if (u.orderType === 'attack' && u.target) combatTick(u, dt);

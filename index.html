@@ -1858,8 +1858,8 @@ function addMissileUnitRow(data = {}) {
       <div class="field narrow"><label>Missile speed</label><input type="number" class="u-missile-speed" value="${data.missileSpeed ?? 4}" min="0.1" step="0.1"></div>
     </div>
     <label style="display:flex; align-items:center; gap:6px; font-weight:normal; margin:8px 0 0;">
-      <input type="checkbox" class="u-auto-attack" ${data.autoAttack !== false ? 'checked' : ''} style="width:auto;">
-      Auto Attack (an AI-controlled faction's launcher fires on its own at whatever comes into range - a human player always has to click the launcher, then click an enemy, either way; uncheck to stop AI factions from auto-firing it too)
+      <input type="checkbox" class="u-auto-attack" ${data.autoAttack === true ? 'checked' : ''} style="width:auto;">
+      Auto Attack (off by default - a player has to click the launcher, then click an enemy, same as any other unit. Check this and it fires on its own at whatever comes into range instead, exactly like a Gun Turret, for a human or AI-controlled faction alike)
     </label>
     <div class="field" style="margin-top:10px;">
       <label>Missile art (the projectile itself, shown traveling to its target)</label>
