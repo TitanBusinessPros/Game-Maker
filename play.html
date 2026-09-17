@@ -837,10 +837,28 @@ async function main() {
     });
   }
 
-  const worldMinX = Math.min(...factions.map((f) => f.x)) - 400;
-  const worldMaxX = Math.max(...factions.map((f) => f.x)) + 400;
-  const worldMinY = Math.min(...factions.map((f) => f.y)) - 400;
-  const worldMaxY = Math.max(...factions.map((f) => f.y)) + 400;
+  // A square centered on worldCenter, sized directly from the map's own
+  // homeRadius (2*homeRadius+800 - exactly the "world" size
+  // admin.html's own MAP_SIZE_INFO hint already documents per map size:
+  // 1640/3320/5840/10880 for Tiny/Small/Medium/Large) - NOT derived from
+  // wherever the factions themselves happen to land, which used to be
+  // this box's actual definition (min/max of faction x/y, plus 400
+  // padding). That only produced a proper square when factions were
+  // spread symmetrically in both axes (e.g. 4 of them 90 degrees apart);
+  // with exactly 2 factions - the single most common case - they sit
+  // directly opposite each other along ONE axis only, collapsing the
+  // OTHER axis down to a fixed 800px band regardless of map size, no
+  // matter how big "Large" was supposed to be. Camera panning and
+  // (once clampToWorld existed) unit movement were both clamped to that
+  // same too-small box, reported as "the border prevents users from
+  // going to the edge of the map" - the visible cover-fit background art
+  // implied a much bigger square than the box anything could actually
+  // reach.
+  const worldHalf = homeRadius + 400;
+  const worldMinX = worldCenter.x - worldHalf;
+  const worldMaxX = worldCenter.x + worldHalf;
+  const worldMinY = worldCenter.y - worldHalf;
+  const worldMaxY = worldCenter.y + worldHalf;
   const worldW = worldMaxX - worldMinX, worldH = worldMaxY - worldMinY;
   // Same bounding box clampCamera() already confines the camera to (see
   // its own comment further down) - nothing ever stopped a moving UNIT

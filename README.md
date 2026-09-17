@@ -695,7 +695,22 @@ entirely by one map's saved data:
   `combatTick`, and `healTick` - everywhere a unit's position actually
   changes from movement). Reported as "units can travel off the map into
   the black part" - same underlying bounding box, same fix shape, just
-  for units instead of the camera.
+  for units instead of the camera. That bounding box itself had its own
+  bug, exposed once units actually started respecting it: it was computed
+  from the min/max of wherever the factions themselves happened to land,
+  not from the map's own actual size - which only produced a proper
+  square when factions were spread symmetrically in every direction (4 of
+  them 90 degrees apart, say). With exactly 2 factions - the single most
+  common case - they sit directly opposite each other along ONE axis
+  only, collapsing the OTHER axis down to a fixed 800px band no matter
+  how big the chosen map size was supposed to be, so units (and the
+  camera) hit an invisible wall long before reaching the edge of the
+  visibly-covered background art. Reported as "the border prevents users
+  from going to the edge of the map." Fixed by computing the world's
+  bounding box directly from the map's own `homeRadius` (a real square,
+  `2*homeRadius+800` per side - exactly the size admin.html's own
+  MAP_SIZE_INFO hint already documents: 1640/3320/5840/10880 for
+  Tiny/Small/Medium/Large) instead of from faction positions at all.
 - A small **▲ / ▼ tab centered under the topbar** collapses the entire
   topbar (resource/turn HUD, map name, Skip Turn, Pause/Sound/Save/Load/
   Download) down to just that tab, so only the map itself shows -
