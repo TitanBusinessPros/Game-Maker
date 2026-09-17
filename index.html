@@ -198,7 +198,38 @@
   #libraryCategoryTabs button.active { background: var(--accent); color: #06121f; border-color: var(--accent); }
   #libraryGrid {
     display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    grid-auto-rows: minmax(110px, auto);
     gap: 10px; padding: 16px; overflow-y: auto;
+    /* Three separate fixes for what reads as one bug ("can't see the
+       full image," "each section needs a scroll") - confirmed with a
+       headless-Chrome measurement harness, not just reasoning about the
+       CSS (see game-maker-workflow memory), because the actual failure
+       was surprising: it wasn't only that content got cut off - the
+       thumbnails themselves were being squashed to ~14px tall instead of
+       their real ~100px (80px image + label), so most of the image was
+       invisible even for rows that WERE on screen.
+       1) flex:1 + min-height:0 - a flex child (this is one, inside
+          #libraryModalPanel's flex-direction:column) defaults to
+          min-height:auto, so without these it grows to fit EVERY row no
+          matter how many, instead of stopping at the space actually left
+          inside the panel - overflow-y:auto above then has nothing to
+          do, since the grid's own content never exceeds the grid's own
+          (unbounded) height, only the PANEL's max-height (85vh) does,
+          which the panel clips instead of scrolling.
+       2) grid-auto-rows: minmax(110px, auto) - the real fix for the
+          squashing. .library-item below has overflow:hidden (originally
+          just to clip square thumbnails to its own rounded corners) -
+          per the CSS box-sizing spec, a grid item with overflow other
+          than visible gets an automatic minimum size of ZERO instead of
+          one based on its content, so once the grid container above had
+          a bounded height (fix 1), Grid was free to shrink EVERY
+          implicit row far below its natural content size to cram all of
+          them into whatever space was left, with nothing left to stop
+          it. An explicit minmax(110px, auto) row-track floor isn't
+          "automatic," so that zeroing rule doesn't touch it - rows now
+          hold their real size and the ones that don't fit correctly
+          overflow (and therefore scroll) instead of being crushed. */
+    flex: 1 1 auto; min-height: 0;
   }
   /* Without these, setting .hidden = true on either element via JS
      (openLibraryPicker/renderCategory, when switching between an image
@@ -213,7 +244,7 @@
      at the bottom" - they weren't broken, the leftover image grid above
      them just was never really hidden. */
   #libraryGrid[hidden], #libraryList[hidden] { display: none; }
-  #libraryList { padding: 8px 16px 16px; overflow-y: auto; }
+  #libraryList { padding: 8px 16px 16px; overflow-y: auto; flex: 1 1 auto; min-height: 0; }
   .library-item {
     background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
     cursor: pointer; overflow: hidden; text-align: center; padding-bottom: 6px;
