@@ -998,7 +998,15 @@ async function main() {
       attack: def.attack, range: effectiveStat(fac, def.range, 'range'), speed: 0,
       img: turretImages[defIndex], x, y, alive: true, selected: false,
       orderType: null, moveTarget: null, target: null,
-      lockedUntilTurn: 0, facingAngle: 0, weapon: def.weapon || 'laser',
+      // A turret's single static image doesn't hold up rotated to face an
+      // arbitrary enemy direction - confirmed by screenshotting an
+      // isolated test sprite rotating 180 degrees to face straight down,
+      // which is exactly correct math but reads as the whole turret
+      // flipping "upside down" (map-maker report: "when it attacks it
+      // turns upside down and looks like shit"). Same fix already applied
+      // to the Missile Silo launcher for the same reason - the body just
+      // stays in its placed pose regardless of what it's firing at.
+      lockedUntilTurn: 0, facingAngle: 0, weapon: def.weapon || 'laser', rotateToFace: false,
     };
     units.push(u);
     return u;
@@ -1358,16 +1366,11 @@ async function main() {
     // baked in at spawn time.
     const range = u.isMissileLauncher ? missileRange(factionOf(u.factionId)) : u.range;
     const dist = Math.hypot(t.x - u.x, t.y - u.y);
-    // A turret auto-acquires nearestEnemy() with no range check of its own
-    // (see nearestEnemy above) - it's stationary, so `dist > range` below
-    // means it can NEVER close the distance, and would otherwise sit
-    // rotated to face that permanently-unreachable target forever. Only
-    // actually rotate once something is truly in range to fire at -
-    // until then it stays in whatever pose it was last in (its neutral
-    // placed orientation, the instant it's placed), instead of snapping
-    // to face some enemy clear across the map the moment it spawns
-    // (reported as "turrets are upside down when you place them").
-    if (!u.isTurret || dist <= range) u.facingAngle = facingToward(u, t.x, t.y);
+    // Turrets and Missile Silo launchers both have rotateToFace:false (see
+    // their spawn functions), so this facingAngle update is a harmless
+    // no-op for them - only a moving unit chasing a target actually gets
+    // drawn rotated by it.
+    u.facingAngle = facingToward(u, t.x, t.y);
     if (dist > range) {
       // Stationary and can't close the distance - rather than sit here
       // recomputing the same too-far distance every frame forever, drop
@@ -2716,6 +2719,45 @@ async function main() {
     if (clickedBase) showHomeBaseInfo(clickedBase);
   }
 
+  // Two units count as "the same exact unit" for double-click selection
+  // below: same defIndex within whichever def list they actually come
+  // from (turretDefs/missileDefs/unitDefs are separate index spaces, so
+  // this checks category first) - a gated building only matches another
+  // of the exact same building (buildingKey), and the Mining Ship has no
+  // defIndex at all (there's only ever one kind), so any two miners match.
+  function sameUnitType(a, b) {
+    if (a.isMiner || b.isMiner) return a.isMiner && b.isMiner;
+    if (a.isTurret || b.isTurret) return a.isTurret && b.isTurret && a.defIndex === b.defIndex;
+    if (a.isMissileLauncher || b.isMissileLauncher) return a.isMissileLauncher && b.isMissileLauncher && a.defIndex === b.defIndex;
+    if (a.isGatedBuilding || b.isGatedBuilding) return a.isGatedBuilding && b.isGatedBuilding && a.buildingKey === b.buildingKey;
+    return a.defIndex === b.defIndex;
+  }
+  // "On screen" - the same screen rectangle drawUnit's own culling check
+  // uses (minus its small off-screen margin), so this always matches
+  // exactly what's currently visible, not the whole map.
+  function isOnScreen(u) {
+    const p = toScreen(u.x, u.y);
+    return p.x >= 0 && p.x <= canvas.width && p.y >= 0 && p.y <= canvas.height;
+  }
+  // Double-click one unit to select every unit of that exact same type
+  // that's both yours and currently on screen - e.g. double-clicking one
+  // Tank inside a mixed 20-unit group selects just the Tanks, the
+  // classic RTS double-click convention. The browser fires two ordinary
+  // 'click' events before 'dblclick' (each already selecting just the
+  // clicked unit via handleClick above), so this only needs to widen
+  // that selection afterward, not replace any click-handling logic.
+  canvas.addEventListener('dblclick', (evt) => {
+    if (gameOver || paused || !matchStarted || placingTurret || placingMissile) return;
+    const r = canvas.getBoundingClientRect();
+    const p = toWorld(evt.clientX - r.left, evt.clientY - r.top);
+    const own = livingUnits(activeFaction.id).find((u) => Math.hypot(u.x - p.x, u.y - p.y) < (u.isGatedBuilding ? GATED_BUILDING_SIZE : UNIT_SIZE) / 2 + 8);
+    if (!own) return;
+    const matches = livingUnits(activeFaction.id).filter((u) => sameUnitType(u, own) && isOnScreen(u));
+    livingUnits(activeFaction.id).forEach((u) => u.selected = false);
+    matches.forEach((u) => u.selected = true);
+    showUnitInfo(matches.length === 1 ? matches[0] : null, matches.length);
+  });
+
   function showUnitInfo(u, count) {
     const box = document.getElementById('unitInfoBox');
     const textEl = document.getElementById('unitInfoText');
@@ -2750,11 +2792,36 @@ async function main() {
     hideUnitInfo();
   }
   document.getElementById('deselectBtn').addEventListener('click', deselectAll);
+  // Control groups ("divisions"): Ctrl/Cmd+1-9 saves whatever's currently
+  // selected as that number, by unit id; pressing the bare digit later
+  // re-selects exactly those (whichever are still alive and still belong
+  // to whoever's turn it currently is - a group made on your turn simply
+  // matches nothing if recalled during another faction's turn, same as
+  // any other selection being restricted to activeFaction.id elsewhere in
+  // this file). Session-only, like any other live selection state - not
+  // part of Save/Load's serialized state, so a reloaded match starts with
+  // every group empty again.
+  const controlGroups = {};
   window.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape') return;
-    if (placingTurret) { setPlacingTurret(null); renderBuildPanel(); return; }
-    if (placingMissile) { setPlacingMissile(null); renderBuildPanel(); return; }
-    deselectAll();
+    if (e.key === 'Escape') {
+      if (placingTurret) { setPlacingTurret(null); renderBuildPanel(); return; }
+      if (placingMissile) { setPlacingMissile(null); renderBuildPanel(); return; }
+      deselectAll();
+      return;
+    }
+    if (/^[1-9]$/.test(e.key) && !e.altKey) {
+      if (gameOver || paused || !matchStarted) return;
+      e.preventDefault();
+      if (e.ctrlKey || e.metaKey) {
+        controlGroups[e.key] = selectedUnits().map((u) => u.id);
+      } else {
+        const ids = controlGroups[e.key] || [];
+        const matches = livingUnits(activeFaction.id).filter((u) => ids.includes(u.id));
+        livingUnits(activeFaction.id).forEach((u) => u.selected = false);
+        matches.forEach((u) => u.selected = true);
+        showUnitInfo(matches.length === 1 ? matches[0] : null, matches.length);
+      }
+    }
   });
 
   // ---------------------------------------------------------------------

@@ -517,7 +517,22 @@ entirely by one map's saved data:
   click to move or attack. Issuing an order deselects automatically -
   a unit doesn't stay glued to your next click the way it used to. A
   **✕ Deselect** button (also the Escape key) clears the current
-  selection too.
+  selection too. **Double-click** one of your own units to select every
+  unit of that *exact same type* that's both yours and currently visible
+  on screen (not the whole map) - e.g. double-clicking one Tank inside a
+  mixed 20-unit group selects just the Tanks, the classic RTS double-
+  click convention. "Same type" means the same unit definition (a Tank
+  only matches other Tanks, not Infantry), a Gun Turret/Missile Silo only
+  matches its own exact def, and the Mining Ship (only ever one kind)
+  always matches any other miner.
+- **Control groups ("divisions")**: select any units, then **Ctrl+1**
+  through **Ctrl+9** saves that exact selection as that number; pressing
+  the bare digit any time afterward re-selects exactly those units (only
+  the ones still alive and still yours to command right now), letting a
+  player keep several divisions ready to recall with one keypress instead
+  of re-dragging a box every time. Session-only, like any other live
+  selection state - not part of Save/Load's serialized state, so a
+  reloaded match starts with every group empty again.
 - **Mining ships auto-travel**: built next to your own deposit, a miner
   immediately gets a move order there on its own - no manual command
   needed - and income only flows while it's actually parked within range
@@ -793,16 +808,15 @@ entirely by one map's saved data:
   who owns it or whether it's AI- or human-controlled, rather than
   waiting for a click the way a normal unit does - though clicking it
   and giving it an explicit target still overrides that, same as
-  commanding any other unit. It only visually rotates to face that
-  target once the target is actually within its own firing range -
-  auto-acquiring the globally-nearest enemy has no range check of its
-  own, so a turret that rotated to face it immediately (regardless of
-  distance) would spend most of a match visibly aimed at some enemy
-  clear across the map it could never actually reach, which read as the
-  turret rendering "upside down" the instant it was placed (whatever
-  direction that permanently-out-of-range enemy happened to be in).
-  Until something is truly in range it stays in its neutral placed
-  orientation instead. Follows the exact same rules every other
+  commanding any other unit. It never visually rotates at all, whether
+  idle or actively firing - confirmed by screenshotting an isolated test
+  sprite made to fire at a target directly below it: the math that turns
+  it to face that direction is completely correct, but rotating a single
+  static image 180 degrees to face straight down just reads as the whole
+  turret flipping upside-down, for any turret art, regardless of which
+  way it's aimed. Same fix already applied to the Missile Silo launcher
+  for the same reason - the body stays exactly in its placed pose no
+  matter what it's shooting at. Follows the exact same rules every other
   unit does now: frozen during another faction's turn in Turn-Based mode
   (its own faction's turn only), and one attack per turn (Turn-Based) or
   per 90s clock-turn (Real-Time), then locked until the next one, same
