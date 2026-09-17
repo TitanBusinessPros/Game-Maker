@@ -671,7 +671,10 @@ entirely by one map's saved data:
   production time, 10 seconds up to 120 minutes, set on the map) shown
   in TWO places, both updating live every frame, not just at the moment
   you click Queue or on some other unrelated re-render - the building's
-  own build-panel row ("Producing Tank… 24s left · 2 queued") AND, since
+  own build-panel row ("Producing Tank… 24s left · Queue: 2/10" - always
+  showing the structure's own total occupancy out of
+  `MAX_QUEUE_PER_BUILDING`, even "Queue: 0/10" while it's standing but
+  idle, not just while something's actively producing) AND, since
   that was reported as easy to miss ("no live countdown, queue level only
   shown once full"), the specific unit's own row right below it too
   ("Jet ✈️ · ... · producing… 24s left · 3 in production queue (2 more

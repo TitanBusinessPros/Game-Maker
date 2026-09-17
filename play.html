@@ -2739,15 +2739,26 @@ async function main() {
   function buildingStatsText(b) {
     const built = activeFaction.built[b.key];
     const queue = activeFaction.buildQueue[b.key];
-    if (built && queue.length) {
-      return `Producing ${unitDefs[queue[0].defIndex].name}… ${formatDuration(queue[0].remaining)} left${queue.length > 1 ? ` · ${queue.length - 1} queued` : ''}`;
+    if (built) {
+      // "2/10 units in the queue" - the structure's own total occupancy
+      // (every unit type combined, since it's one shared FIFO per
+      // building instance), always shown once the building exists, not
+      // just while something's actively producing - so an idle, empty
+      // Air Base plainly reads "Queue: 0/10" instead of falling through
+      // to its pre-built cost/HP blurb, which no longer applies once it's
+      // actually standing.
+      const queueLabel = `Queue: ${queue.length}/${MAX_QUEUE_PER_BUILDING}`;
+      if (queue.length) {
+        return `Producing ${unitDefs[queue[0].defIndex].name}… ${formatDuration(queue[0].remaining)} left · ${queueLabel}`;
+      }
+      return `${queueLabel} · idle, nothing queued`;
     }
     // Every other building requires Research Facility to already be
     // built first (see the hasResearchFacility gate in renderBuildPanel/
     // aiThink) - "can't build any buildings or units until you build a
     // research facility." Research Facility itself is exempt, or nothing
     // could ever get built at all.
-    if (!built && b.key !== 'researchFacility' && !activeFaction.built.researchFacility) {
+    if (b.key !== 'researchFacility' && !activeFaction.built.researchFacility) {
       return `Cost ${b.cfg.cost} · HP ${b.cfg.hp} · requires ${buildingCfgByKey.researchFacility.name} first`;
     }
     const requires = b.gatesResearch ? 'required before you can research anything (see the Research tab)' : 'required before any of its units below can be built';
