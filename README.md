@@ -445,10 +445,13 @@ entirely by one map's saved data:
     frozen until their own turn comes back around. A per-faction timer
     (10-60s, set on the map) counts down and then passes control to the
     next faction automatically - "no continued [global] timer," just
-    each faction's own window - or a **⏭ Skip Turn** button next to the
-    timer ends it early on purpose, same effect as the timer running out
-    on its own. The top bar shows whose turn it is and
-    the seconds left; the camera snaps to their home base when it
+    each faction's own window - or a **⏭ Skip Turn** button ends it early
+    on purpose, same effect as the timer running out on its own. That
+    button sits directly under the map name/plaque badge, next to the
+    Titan logo in the top-left corner (moved there from the center HUD
+    cluster, so it reads as "an action tied to this specific game" rather
+    than floating among the resource/turn readouts). The top bar shows
+    whose turn it is and the seconds left; the camera snaps to their home base when it
     becomes their turn. A unit that attacks here locks for the rest of
     that faction's turn (one attack per turn, not per 90s clock-turn -
     this mode has no such clock at all) and clears again the moment its
@@ -1064,16 +1067,17 @@ whatever cover art a map-maker picked, matching `play.html`'s own map-name
 plaque badge) plus a "▶ Start Stage" button → that stage's actual game,
 loaded into an `<iframe srcdoc="...">` (the decoded, embedded copy of that
 stage's downloaded HTML - fully offline, no separate file to host
-alongside it). Advancing past a stage doesn't require winning it or any
-specific outcome: a small persistent "Next Stage ▶" button is always
-available once a stage is playing, so a foreign (non-Game-Maker) `.html`
-upload never leaves the player stuck. `play.html`'s own game-over screen
-additionally `postMessage`s `{type:'gm-stage-complete'}` to its parent
-frame the moment a match ends (win or lose) - see its game-over handling
-in the `update()` loop - which the compiled game listens for to
-auto-surface a "Stage complete! Continue ▶" prompt on top of the
-always-available button, for any stage actually made with this project.
-After the final stage, an end screen shows the ending message/cover art
+alongside it). The only way to advance past a stage is `play.html`'s own
+game-over screen `postMessage`-ing `{type:'gm-stage-complete'}` to its
+parent frame the moment a match ends (win or lose) - see its game-over
+handling in the `update()` loop - which the compiled game listens for to
+surface a "Stage complete! Continue ▶" prompt (there is deliberately no
+persistent/manual "skip to next stage" button any more - an earlier
+version had one, removed at the map-maker's own request). **This means a
+stage has to actually be made with this project** to ever finish - an
+arbitrary foreign `.html` upload that never sends that message would
+leave the player stuck on it with no way to move on. After the final
+stage, an end screen shows the ending message/cover art
 and a "⟲ Play Again From Start" button. **Worth knowing:** since every
 stage's entire downloaded game (art, sound, and all) gets embedded
 whole, a 20-stage compiled game can end up **very large** (tens of MB) -
