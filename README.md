@@ -55,9 +55,11 @@ line. Only this page has the logo/title/footer treatment so far -
    `AI_DIFFICULTY` in `play.html`). It scales three things about that
    faction's AI, all independent of its actual decision logic (which is
    identical at every difficulty): how often it gets to act at all
-   (`tickSeconds`, 10s down to 2.5s), a flat bonus/penalty on its Gold +
-   extra-resource income (`incomeMult`, 0.65x-1.65x - the classic RTS
-   "cheating AI" lever), and how often it takes an affordable
+   (`tickSeconds`, 10s down to 2.5s), a flat bonus/penalty on its Gold
+   mining income (`incomeMult`, 0.65x-1.65x - the classic RTS "cheating
+   AI" lever; extra resources have no automatic income of their own to
+   apply this to - see item 3's own bullet), and how often it takes an
+   affordable
    building/turret/extra-miner opportunity instead of skipping it
    (`buildingChance`/`turretChance`/`minerChance`). Ignored for a
    Turn-Based hot-seat "Human"-controlled computer player.
@@ -78,12 +80,18 @@ line. Only this page has the logo/title/footer treatment so far -
    it) and the mining unit that drains it (name, income/hour, art).
    Below that, **Additional resources** (optional) — a **+ Add resource**
    button adds another named resource beyond Gold (e.g. Oil, Wood), each
-   with its own **income per hour** and its own **deposit art** (shown
+   with its own **deposit amount** and its own **deposit art** (shown
    near every home base in `play.html` - see the "Multiple resources"
-   bullet further down). Unlike Gold, an extra resource's income is
-   passive - it's earned automatically every hour, no mining unit or
-   deposit range to manage; the art is just a visual marker for where it
-   "comes from." Every unit/turret added below (see item 4) gets a
+   bullet further down), same shape as Gold's own deposit above.
+   Deposit amount is descriptive, same as Gold's own - it isn't drained
+   by anything, since an extra resource has no mining unit of its own.
+   An extra resource has no automatic income at all by itself; the only
+   way a faction actually earns one is checking it under **Free
+   Resources Each Round** (item 5a, further down) - previously each
+   extra resource also had its own separate "income per hour" that
+   accrued automatically regardless of that grant, which duplicated it
+   and was removed at the map-maker's own request. Every unit/turret
+   added below (see item 4) gets a
    checkbox per resource that currently exists here, with an amount for
    each one checked - a Tank could read "50 Gold, 100 Oil" if both boxes
    are checked with those amounts. Adding, removing, or renaming a
@@ -117,9 +125,9 @@ line. Only this page has the logo/title/footer treatment so far -
    them earns its full income share, so several Gold points genuinely
    means several places to work, not several copies of the same spot (see
    `play.html`'s own income bullet further down). For an Additional
-   Resource, which was already just a passive-income visual marker with
-   no range to manage, placing it on the map with several points just
-   draws one shared marker per point instead of one per faction.
+   Resource, which was already just a visual marker with no income or
+   range of its own to manage, placing it on the map with several points
+   just draws one shared marker per point instead of one per faction.
 4. **Air Base** (optional) — a building for planes/jets/spaceships/etc.
    Give it a name (defaults to "Air Base"), its own **art**, **HP**
    (1000-5000, same range/field as Home Base's), and a build cost, then
@@ -231,8 +239,10 @@ line. Only this page has the logo/title/footer treatment so far -
    plus anything added under item 3's Additional Resources). Checking
    one hands every faction (you and every alive computer player) that
    much of that resource automatically at the start of each round, on
-   top of Gold's normal mining income and any extra resource's own
-   passive income (not instead of either). "Round" means the same thing
+   top of Gold's normal mining income (not instead of it) - for an
+   extra resource, which has no income of its own otherwise, this is
+   the only way a map actually hands any of it out at all. "Round" means
+   the same thing
    the top bar's "Round N" already means in Turn-Based mode (once every
    faction has taken a turn); in Real-Time mode, which has no separate
    round concept, it fires on the existing 90s cosmetic turn-clock
@@ -326,10 +336,10 @@ entirely by one map's saved data:
   buildings' own one-time unlock cost, the Mining Ship's flat cost, and
   research costs are all still plain Gold, unchanged. Gold is the only
   resource an actual mining unit ever drains from a deposit (parked
-  within range, same as always); every other resource earns its
-  own income/hour automatically and continuously instead - no unit or
-  range to manage - plus whatever "Free resources each round" (item 5a)
-  adds on top. Each extra resource also gets its own deposit marker
+  within range, same as always); every other resource has no automatic
+  income of its own at all - the only way a faction earns one is
+  whatever "Free resources each round" (item 5a) hands out. Each extra
+  resource also gets its own deposit marker
   drawn near every home base (`index.html`'s per-resource art upload) -
   purely a visual "this is where it comes from," not an interactive
   object; a resource added with no art falls back to a plain circle + 💎,

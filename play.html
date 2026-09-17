@@ -462,9 +462,11 @@ const AI_TICK_SECONDS = 6; // medium's value - other difficulties scale it via A
 // "AI Difficulty" select on each Computer Player row). tickSeconds:
 // how often aiThink() below gets to act at all - lower means more
 // decisions per minute, not smarter ones. incomeMult: a flat bonus/
-// penalty on Gold+extra-resource income, the classic RTS "cheating AI"
-// lever - the decision logic in aiThink is identical at every
-// difficulty, only how often it fires and how much it has to spend
+// penalty on Gold mining income, the classic RTS "cheating AI" lever -
+// extra resources have no automatic income of their own to apply this
+// to (see EXTRA_RESOURCES' own comment further down) - the decision
+// logic in aiThink is identical at every difficulty, only how often it
+// fires and how much it has to spend
 // actually differ. buildingChance/turretChance/minerChance scale the
 // existing Math.random() thresholds aiThink already rolls against.
 const AI_DIFFICULTY = {
@@ -598,13 +600,13 @@ async function main() {
   // Resource & Mining) - Gold always exists (it's what the Mining Ship
   // produces, and every pre-existing map already assumes it), cfg.resources
   // adds any others a map-maker defined (e.g. Oil), each with its own
-  // income/hour and deposit art. Unlike Gold, an extra resource's income
-  // is passive - no Mining Ship or deposit range to manage, it just
-  // accrues every tick (see the income loop in update()); its deposit
-  // image is purely a visual marker near each faction's home (see
-  // extraDeposits below), not an interactive/mineable object. On top of
-  // that, any resource (Gold included) can also hand out a flat "free
-  // each round" grant (cfg.resourceGrants) - see applyResourceGrants().
+  // deposit amount (r.size) and deposit art. An extra resource has no
+  // automatic income of its own at all, same as Gold's own deposit "size"
+  // isn't actually drained by anything - its deposit image is purely a
+  // visual marker near each faction's home (see extraDeposits below), not
+  // an interactive/mineable object. The only way a faction actually earns
+  // one is a flat "free each round" grant (cfg.resourceGrants, which
+  // Gold can also use) - see applyResourceGrants().
   const EXTRA_RESOURCES = cfg.resources || [];
   const EXTRA_RESOURCE_IMAGES = await Promise.all(EXTRA_RESOURCES.map((r) => loadImage(r.image)));
   const ALL_RESOURCE_IDS = ['gold', ...EXTRA_RESOURCES.map((r) => r.id)];
@@ -1484,11 +1486,14 @@ async function main() {
       // slot - same !f.isHuman condition the aiThink gate below uses.
       const incomeMult = !f.isHuman ? (AI_DIFFICULTY[f.difficulty] || AI_DIFFICULTY.medium).incomeMult : 1;
       if (minersInRange > 0) f.resources.gold += (miningRate(f) / 3600) * dt * minersInRange * incomeMult;
-      // Extra resources are passive (see EXTRA_RESOURCES' own comment
-      // above) - no deposit range or unit to manage, every faction just
-      // earns its stated income/hour continuously, same conditions as
-      // Gold's own income line right above.
-      EXTRA_RESOURCES.forEach((r) => { f.resources[r.id] = (f.resources[r.id] || 0) + ((Number(r.incomePerHour) || 0) / 3600) * dt * incomeMult; });
+      // Extra resources have no automatic income of their own at all -
+      // same as Gold's own deposit "size," an extra resource's deposit
+      // amount (r.size) is descriptive, not something drained by a unit
+      // or ticked up over time. The only way a faction actually earns
+      // one is index.html's "Free Resources Each Round" grant
+      // (applyResourceGrants above) - removed a redundant, undocumented
+      // r.incomePerHour passive-income tick that duplicated what that
+      // grant already does, at the map-maker's own request.
       // AI factions only get to act (build/research decisions) during
       // their own turn in Turn-Based mode - frozen the rest of the time,
       // same as a human faction would be. In Real-Time mode this is

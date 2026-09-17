@@ -507,7 +507,7 @@
       <div id="extraResourcesList"></div>
       <button type="button" class="btn-add" id="addResourceBtn">+ Add resource</button>
     </div>
-    <p class="hint">Gold is always available - it's what the mining unit above produces, and every unit/turret can already cost it. Add more named resources (Oil, Wood, whatever fits your theme) if you want some units to also require them: each one gets its own income per hour (earned automatically, no mining unit needed) and its own deposit art shown near every home base. Every unit/turret below then gets a checkbox per resource here, with how much of it that one costs.</p>
+    <p class="hint">Gold is always available - it's what the mining unit above produces, and every unit/turret can already cost it. Add more named resources (Oil, Wood, whatever fits your theme) if you want some units to also require them: each one gets its own deposit amount and its own deposit art shown near every home base, same shape as Gold's own deposit above. To actually hand any resource out over time, check it under "Free Resources Each Round" below instead of relying on automatic income. Every unit/turret below then gets a checkbox per resource here, with how much of it that one costs.</p>
   </section>
 
   <!-- Combat Units: replaced by Air Base / War Factory below as the way
@@ -1811,7 +1811,7 @@ gameStyleSelect.addEventListener('change', updateGameStyleUI);
 // reasoning as admin.html's category ids - a saved unit's costs are
 // keyed by id, so renaming a resource later must not orphan them.
 // ---------------------------------------------------------------------
-let extraResources = []; // [{id, name}] - just enough to drive allResources()/checkbox labels; income/image live in the DOM, read at save time (see collectExtraResources)
+let extraResources = []; // [{id, name}] - just enough to drive allResources()/checkbox labels; deposit size/image live in the DOM, read at save time (see collectExtraResources)
 let resourceCounter = 0;
 function allResources() { return [{ id: 'gold', name: 'Gold', builtin: true }, ...extraResources]; }
 
@@ -1830,7 +1830,7 @@ function addExtraResourceRow(r) {
   row.innerHTML = `
     <div class="row" style="align-items:flex-end;">
       <div class="field"><label>Resource name</label><input type="text" class="resource-name" value="${escapeAttr(r.name || '')}" placeholder="e.g. Oil"></div>
-      <div class="field narrow"><label>Income per hour</label><input type="number" class="resource-rate" value="${r.incomePerHour ?? 300}" min="1" step="10"></div>
+      <div class="field narrow"><label>Deposit amount</label><input type="number" class="resource-size" value="${r.size ?? 5000}" min="100" step="100"></div>
       <button type="button" class="remove-unit resource-remove" title="Remove resource">&times;</button>
     </div>
     <div class="upload-slot" data-slot="${r.id}">
@@ -1876,7 +1876,7 @@ function collectExtraResources(uploadResults) {
     return {
       id,
       name: row.querySelector('.resource-name').value.trim() || 'Resource',
-      incomePerHour: Number(row.querySelector('.resource-rate').value) || 300,
+      size: Number(row.querySelector('.resource-size').value) || 5000,
       image: uploadResults[id] || null,
       placement: readPlacement(row.querySelector('.placement-widget')),
     };
