@@ -139,13 +139,20 @@ line. Only this page has the logo/title/footer treatment so far -
    (Gold/Additional Resource mining income - Level 1 also unlocks the
    Mining Ship itself, same gate as always), **Vessel Plating** (max HP),
    **Warp Drive Calibration** (movement speed), **Extended Sensors**
-   (vision) and **Rapid Repair Crews** (HP regen) - both saved but not
-   yet tied to an actual effect in `play.html`, same status as before
-   this section existed - and **Missile Range** (Missile Silo launcher
-   range above its fixed 500 base). Leave a level at 0 to make it a
-   no-op. Defaults to 5% / 10% / 15% for Level 1/2/3 of every topic;
-   nothing here is required to Finish & Save. A map saved before this
-   section existed loads with every topic at those same defaults.
+   (vision - still saved but not yet tied to an actual effect in
+   `play.html`), **Rapid Repair Crews** (HP regen - now tied to a real
+   effect: how much HP a Field Hospital medic heals per turn, item 4e
+   below) and **Missile Range** (Missile Silo launcher range above its
+   fixed 500 base). Leave a level at 0 to make it a no-op. Defaults to 5%
+   / 10% / 15% for Level 1/2/3 of every topic; nothing here is required
+   to Finish & Save. Each topic also has its own **Research name** field,
+   pre-filled with its plain default name (e.g. "Warp Drive Calibration")
+   as an example - rename it to whatever fits your game's theme and
+   `play.html`'s Research tab shows *that* name (plus " II"/" III" for
+   Levels 2/3 of the same topic - one rename covers all 3 levels, not
+   three separate name fields) instead. A map saved before either of
+   these fields existed loads with every topic at its default name and
+   percentages.
 4. **Air Base** (optional) — a building for planes/jets/spaceships/etc.
    Give it a name (defaults to "Air Base"), its own **art**, **HP**
    (1000-5000, same range/field as Home Base's), and a build cost, then
@@ -167,7 +174,7 @@ line. Only this page has the logo/title/footer treatment so far -
    "Producing Jet… 30s left", counting down to 0), formatted as
    hours/minutes once it's over a minute so a long timer doesn't read as
    an unreadable raw seconds count. Each building's own queue holds up to
-   10 units at once - see item 4d's own bullet above.
+   10 units at once - see item 4e's own bullet below.
    Leave its unit list empty and the whole feature is simply absent from
    the map, same as never adding it.
 4a. **War Factory** (optional) — a second building, identical in every
@@ -178,26 +185,38 @@ line. Only this page has the logo/title/footer treatment so far -
    every way again, for helicopters.
 4d. **Navy Harbor** (optional) — a fifth building, identical in every way
    again, for ships/submarines/etc.
-   All five of these (Air Base/War Factory/Infantry Post/Helicopter
-   Facility/Navy Harbor) share the exact same shape: own name (with its
-   own sensible default), own art, own HP, own build cost, and a unit
-   list with per-unit **production time** (now **10 seconds up to 120
-   minutes**, not capped at 100s any more - a build panel row showing a
-   raw seconds count at that scale would be unreadable, so `play.html`'s
-   own countdown and this stat line both show it as e.g. "1h 30m" instead
-   of "5400s", falling back to plain seconds under a minute, unchanged
-   from before) - fully independent of each other (a faction can have any
-   combination, including none; every building with units queued produces
-   in parallel, none of them compete for a shared timer, and each
-   building's own queue holds **up to 10 units** at once - once full, its
-   remaining unit rows show "Queue full" and can't be queued again until
-   the front item finishes and the queue shortens). Together they
-   replaced the old standalone "Combat Units" checklist item entirely - a
-   finished map now needs at least one unit under one of these five
-   instead (that old section still exists in `index.html`'s code, hidden,
-   purely so a map made before this change keeps working). Each of the
-   five has a **🗑 Remove this building** button in its own header, for a
-   map-maker who only wants some of them (e.g. 2 of the 5) rather than
+4e. **Field Hospital** (optional) — a sixth building, same building-level
+   shape as the five above (own name, art, HP, build cost, produced with
+   the same queue/countdown system - see below), but a **different unit
+   shape**: no Attack or Weapon field at all, since a medic never fights.
+   Instead: **HP**, **heal range**, **speed**, a **heal amount** (how
+   much HP it restores, once per turn, to whichever allied unit you
+   click - the same one-action-per-turn rule combat already follows, not
+   a separate mechanic), and **costs**. Boosted by **Rapid Repair Crews**
+   research (item 3b above) - previously a real, researchable topic with
+   no in-game effect at all; this is what it was missing.
+   All six of these (Air Base/War Factory/Infantry Post/Helicopter
+   Facility/Navy Harbor/Field Hospital) share the exact same *building*
+   shape: own name (with its own sensible default), own art, own HP, own
+   build cost, and a unit list with per-unit **production time** (now
+   **10 seconds up to 120 minutes**, not capped at 100s any more - a
+   build panel row showing a raw seconds count at that scale would be
+   unreadable, so `play.html`'s own countdown and this stat line both
+   show it as e.g. "1h 30m" instead of "5400s", falling back to plain
+   seconds under a minute, unchanged from before) - fully independent of
+   each other (a faction can have any combination, including none; every
+   building with units queued produces in parallel, none of them compete
+   for a shared timer, and each building's own queue holds **up to 10
+   units** at once - once full, its remaining unit rows show "Queue full"
+   and can't be queued again until the front item finishes and the queue
+   shortens). Together they replaced the old standalone "Combat Units"
+   checklist item entirely - a finished map now needs at least one unit
+   under one of these instead (that old section still exists in
+   `index.html`'s code, hidden, purely so a map made before this change
+   keeps working; Field Hospital's own medics don't count toward this -
+   same treatment as Gun Turrets/Missile Silo, since a medic can't fight).
+   Each of the six has a **🗑 Remove this building** button in its own
+   header, for a map-maker who only wants some of them rather than
    filling in a section they don't plan to use - clicking it clears that
    building's unit list (the
    only thing that actually makes a building "absent" from the game at
@@ -205,30 +224,30 @@ line. Only this page has the logo/title/footer treatment so far -
    check, unchanged) and collapses the section to a one-line "removed -
    **+ Add it back**" note. Not persisted - it only hides the section for
    the rest of that editing session; reopening the map later shows all
-   four again (an unused one just has nothing in its unit list, same as
+   six again (an unused one just has nothing in its unit list, same as
    if it had never been touched, which was already indistinguishable
    from "removed" as far as `play.html` is concerned).
-4e. **Missile Silo** (optional) — a sixth gated building, same
+4f. **Missile Silo** (optional) — a seventh gated building, same
    name/art/HP/build-cost shape as Air Base/War Factory/Infantry Post/
-   Helicopter Facility/Navy Harbor above (including its own **🗑 Remove
-   this building** button), but its unit list below it is a **missile
-   launcher** type, not a normal combat unit: **name**, **launcher art**,
-   **HP**, **Missile HP damage**, **Missile speed**, **missile art** (a
-   *second*, separate upload - the projectile itself, drawn actually
-   traveling to its target, not the stationary launcher's own sprite),
-   and **costs** (the usual per-resource checkboxes). No Range or Weapon
-   field on this row at all - unlike every other unit/turret type, a
-   launcher's range isn't set here; see `play.html`'s own bullet on this
-   further down for why. In `play.html`, a launcher is placed the same
-   way a Gun Turret is (see 4g below) - click **Place**, then click
-   anywhere between 50 and 300 range of your Home Base - rather than
-   produced with a timer (and so not subject to the 10-unit queue cap
-   either, it isn't a queue at all) like Air Base's own units, but still
-   requires the Missile Silo building itself to already be standing
-   first, unlike Gun Turrets (which have no gating building at all).
-   Leave its launcher list empty and the whole feature is absent from the
-   map, same as the five buildings above.
-4f. **Research Facility** — NOT optional, unlike the buildings
+   Helicopter Facility/Navy Harbor/Field Hospital above (including its
+   own **🗑 Remove this building** button), but its unit list below it is
+   a **missile launcher** type, not a normal combat unit: **name**,
+   **launcher art**, **HP**, **Missile HP damage**, **Missile speed**,
+   **missile art** (a *second*, separate upload - the projectile itself,
+   drawn actually traveling to its target, not the stationary launcher's
+   own sprite), and **costs** (the usual per-resource checkboxes). No
+   Range or Weapon field on this row at all - unlike every other
+   unit/turret type, a launcher's range isn't set here; see `play.html`'s
+   own bullet on this further down for why. In `play.html`, a launcher is
+   placed the same way a Gun Turret is (see 4h below) - click **Place**,
+   then click anywhere between 50 and 300 range of your Home Base -
+   rather than produced with a timer (and so not subject to the 10-unit
+   queue cap either, it isn't a queue at all) like Air Base's own units,
+   but still requires the Missile Silo building itself to already be
+   standing first, unlike Gun Turrets (which have no gating building at
+   all). Leave its launcher list empty and the whole feature is absent
+   from the map, same as the six buildings above.
+4g. **Research Facility** — NOT optional, unlike the buildings
    above: every map has the same built-in research tree (the Research
    tab in `play.html`), so this is the one building every player has to
    construct before they can research anything there at all. Same
@@ -238,16 +257,16 @@ line. Only this page has the logo/title/footer treatment so far -
    also the one thing every faction can always afford to build with
    nothing else built first - in `play.html`, it gates everything else on
    this list: Air Base/War Factory/Infantry Post/Helicopter Facility/
-   Navy Harbor/Missile Silo, every unit under them, Gun Turrets, and the
-   Mining Ship are all locked (Build/Place buttons disabled, a "requires
-   Research Facility first" note in their stats line) until a faction's
-   own Research Facility is standing - not just research itself like
-   before. AI factions follow the same rule (an unbuilt Research Facility
-   is the only thing an AI will spend on until it's built), and
-   destroying a faction's Research Facility re-locks everything else
-   again, same as destroying any other gated building re-locks its own
-   units.
-4g. **Gun Turrets** (optional) — shaped differently from the buildings
+   Navy Harbor/Field Hospital/Missile Silo, every unit under them, Gun
+   Turrets, and the Mining Ship are all locked (Build/Place buttons
+   disabled, a "requires Research Facility first" note in their stats
+   line) until a faction's own Research Facility is standing - not just
+   research itself like before. AI factions follow the same rule (an
+   unbuilt Research Facility is the only thing an AI will spend on until
+   it's built), and destroying a faction's Research Facility re-locks
+   everything else again, same as destroying any other gated building
+   re-locks its own units.
+4h. **Gun Turrets** (optional) — shaped differently from the buildings
    above: no gating building of its own, no production timer, and no
    Speed field (they're stationary by design - the field doesn't exist
    for these rows at all). Add as many turret types as you want, each
@@ -624,8 +643,9 @@ entirely by one map's saved data:
   through, so this never worked before; the click still issues an attack
   order too if you have units selected and it's an enemy's.
 - **Air Base, War Factory, Infantry Post, Helicopter Facility, Navy
-  Harbor** (all optional, set on the map): a faction-owned buildable
-  structure that has to be built before any of its own units can be,
+  Harbor, Field Hospital** (all optional, set on the map): a
+  faction-owned buildable structure that has to be built before any of
+  its own units can be,
   exactly like the Mining Ship's "requires Mining Operations research"
   pattern. In the Build panel each shows as a one-time purchase ("Build"
   → "Already built"); its units show as 🔒 Locked with a "requires
@@ -671,6 +691,25 @@ entirely by one map's saved data:
   something else happened to redraw the panel, so it looked frozen -
   reported as "no timer for troop production" even though production
   itself was always progressing correctly in the background).
+- **Field Hospital's medics** - the one unit type in the whole game with
+  no attack at all. Select one (or several) and click one of your own
+  units to order it to heal that unit instead of issuing a move/attack
+  order - walks into its own heal range first if it isn't already close
+  enough, then restores its set **heal amount** to the target (capped at
+  that unit's own max HP), same one-action-per-turn lock every other
+  attack goes through, so "heal one unit each turn" is the exact same
+  rule as "attack once per turn," not a separate cooldown system. Shows
+  as a distinct green pulse (not one of the 26 combat weapon effects -
+  healing shouldn't read as an attack). An AI-controlled medic picks its
+  own target automatically instead of waiting for a click - whichever
+  living ally is both nearest and actually still missing HP - the same
+  idea as a Gun Turret auto-acquiring the nearest enemy. Heal amount
+  itself is boosted by **Rapid Repair Crews** research (baked in once
+  when the medic is built, same as Vessel Plating/Warp Drive's own
+  HP/speed bonuses - an already-built medic doesn't retroactively get
+  stronger if that research finishes later, only ones built afterward
+  do) - the one research topic that used to have no in-game effect at
+  all now does.
 - **Research Facility** (mandatory, set on the map): same one-time-
   purchase build-panel row, same real attackable/destroyable entity, as
   the buildings above, but it gates the Research tab itself rather than
@@ -682,8 +721,8 @@ entirely by one map's saved data:
   nothing that would make it optional the way an empty unit list does
   for the other buildings. Beyond gating research, it's now also the
   prerequisite for everything else buildable in the game: Air Base/War
-  Factory/Infantry Post/Helicopter Facility and their units, Gun
-  Turrets, and the Mining Ship are all disabled with a "requires
+  Factory/Infantry Post/Helicopter Facility/Navy Harbor/Field Hospital
+  and their units, Gun Turrets, and the Mining Ship are all disabled with a "requires
   Research Facility first" note until a faction's own Research Facility
   is standing - previously any of those could be built with nothing
   else in place. It's exempt from its own rule (always buildable
@@ -720,7 +759,7 @@ entirely by one map's saved data:
   it can be selected, destroyed, and targeted by enemies like anything
   else. AI factions place them too, picking a random valid spot in the
   same ring instead of needing a click.
-- **Missile Silo** (optional, gated building - index.html's item 4e):
+- **Missile Silo** (optional, gated building - index.html's item 4f):
   placed exactly like a Gun Turret (same ring, same arm-then-click flow,
   same speed-0/never-moves shape) but additionally requires the Missile
   Silo building itself to be built first, and never auto-targets on its
@@ -861,7 +900,7 @@ they were never tagged with one), **Characters** (sub-picker:
 with Infantry; anything already uploaded under the old
 `characters/army_men` id still shows up, just under "Other" now instead
 of a named sub-category), giving the Missile Silo's own launcher/missile
-art uploads (index.html item 4e) a dedicated place in the shared library
+art uploads (index.html item 4f) a dedicated place in the shared library
 alongside every other character-art type
 Picking a Maps sub-category also shows a hint line with that size's
 recommended-art note (same "capped at 768px, stretched ~N× to cover the
@@ -872,7 +911,7 @@ map creator sets the size.
 **Worlds**, **Bases**, **Resources** (flat, no sub-picker), **Structures**
 (sub-picker: **War Factory**, **Airport**, **Infantry Post**,
 **Helicopter Facility**, **Research Facility**, **Gun Turret**,
-**Missile Silo**, **Navy Harbor** - `structures/<type>`), **Sounds** (sub-picker: **Background
+**Missile Silo**, **Navy Harbor**, **Field Hospital** - `structures/<type>`), **Sounds** (sub-picker: **Background
 Music**, **Intro Music**, **Attack**, **Building Destroyed**, **Home Base
 Under Attack**, **Game Over** - `sounds/<type>`). Any top-level category
 with `children` in `CATEGORY_TREE` gets this same sub-picker UI - it used
