@@ -462,12 +462,11 @@ const AI_TICK_SECONDS = 6; // medium's value - other difficulties scale it via A
 // "AI Difficulty" select on each Computer Player row). tickSeconds:
 // how often aiThink() below gets to act at all - lower means more
 // decisions per minute, not smarter ones. incomeMult: a flat bonus/
-// penalty on Gold mining income, the classic RTS "cheating AI" lever -
-// extra resources have no automatic income of their own to apply this
-// to (see EXTRA_RESOURCES' own comment further down) - the decision
-// logic in aiThink is identical at every difficulty, only how often it
-// fires and how much it has to spend
-// actually differ. buildingChance/turretChance/minerChance scale the
+// penalty on all mining income, Gold or an extra resource alike (see
+// EXTRA_RESOURCES' own comment further down) - the classic RTS
+// "cheating AI" lever - the decision logic in aiThink is identical at
+// every difficulty, only how often it fires and how much it has to
+// spend actually differ. buildingChance/turretChance/minerChance scale the
 // existing Math.random() thresholds aiThink already rolls against.
 const AI_DIFFICULTY = {
   easy:      { tickSeconds: 10,  incomeMult: 0.65, buildingChance: 0.30, turretChance: 0.08, minerChance: 0.05 },
@@ -1466,7 +1465,18 @@ async function main() {
       // not just one - a miner parked at any of the placed points earns,
       // since it could have been sent to whichever is closest at the time.
       const deposit = sharedGoldPoints ? null : deposits.find((d) => d.factionId === f.id);
-      let minersInRange = 0;
+      // A Mining Ship isn't Gold-only - parked within range of ANY
+      // deposit it earns that resource, at the same shared mining rate
+      // (miningRate(f), the 600/900/1200 research-tiered value) Gold
+      // itself uses. There's no separate per-resource rate any more - an
+      // extra resource's own "deposit amount" (index.html) is
+      // descriptive, same as Gold's own deposit "size" always was, not a
+      // rate. This was reported as "mining ships only mine Gold - moving
+      // one to a new resource says en route and never collects it,"
+      // which was literally true: extraDeposits before this had no range
+      // check on them at all, purely decorative markers.
+      let goldMinersInRange = 0;
+      const extraMinersInRange = {}; // resourceId -> count of this faction's own miners currently in range of it
       units.forEach((u) => {
         if (!u.alive || u.factionId !== f.id || !u.isMiner) return;
         // NOT named "mining" - nearestEnemy() below has a stray
@@ -1475,25 +1485,40 @@ async function main() {
         // miner from being attacked at all if this used that same name.
         // Resource ships are meant to stay a real, killable target the
         // whole time.
-        const inRange = sharedGoldPoints
+        const inGoldRange = sharedGoldPoints
           ? deposits.some((d) => Math.hypot(u.x - d.x, u.y - d.y) < MINING_RANGE)
           : (!!deposit && Math.hypot(u.x - deposit.x, u.y - deposit.y) < MINING_RANGE);
-        u.activelyMining = inRange; // read by drawUnit for the live income label
-        if (inRange) minersInRange++;
+        if (inGoldRange) goldMinersInRange++;
+        // read by drawUnit for the live income label - which resource(s),
+        // if any, this specific miner is actually parked in range of
+        // right now (almost always 0 or 1, but nothing stops a map-maker
+        // placing two deposits close enough together to overlap).
+        const inRangeIds = inGoldRange ? ['gold'] : [];
+        EXTRA_RESOURCES.forEach((r) => {
+          // Its own faction's near-base marker (placement:'base', the
+          // default) plus any shared point placed on the map
+          // (placement:'map', factionId null there - see extraDeposits
+          // above) are both minable; another faction's own near-base
+          // marker is not.
+          const inR = extraDeposits.some((d) => d.resourceId === r.id && (d.factionId === null || d.factionId === f.id)
+            && Math.hypot(u.x - d.x, u.y - d.y) < MINING_RANGE);
+          if (inR) { extraMinersInRange[r.id] = (extraMinersInRange[r.id] || 0) + 1; inRangeIds.push(r.id); }
+        });
+        u.miningResourceIds = inRangeIds;
       });
       // incomeMult (AI_DIFFICULTY) only applies to actual AI factions,
       // not the human player or a hot-seat "Human"-controlled computer
       // slot - same !f.isHuman condition the aiThink gate below uses.
       const incomeMult = !f.isHuman ? (AI_DIFFICULTY[f.difficulty] || AI_DIFFICULTY.medium).incomeMult : 1;
-      if (minersInRange > 0) f.resources.gold += (miningRate(f) / 3600) * dt * minersInRange * incomeMult;
-      // Extra resources have no automatic income of their own at all -
-      // same as Gold's own deposit "size," an extra resource's deposit
-      // amount (r.size) is descriptive, not something drained by a unit
-      // or ticked up over time. The only way a faction actually earns
-      // one is index.html's "Free Resources Each Round" grant
-      // (applyResourceGrants above) - removed a redundant, undocumented
-      // r.incomePerHour passive-income tick that duplicated what that
-      // grant already does, at the map-maker's own request.
+      if (goldMinersInRange > 0) f.resources.gold += (miningRate(f) / 3600) * dt * goldMinersInRange * incomeMult;
+      EXTRA_RESOURCES.forEach((r) => {
+        const n = extraMinersInRange[r.id] || 0;
+        if (n > 0) f.resources[r.id] = (f.resources[r.id] || 0) + (miningRate(f) / 3600) * dt * n * incomeMult;
+      });
+      // Free Resources Each Round (index.html item 5a, applyResourceGrants
+      // above) still works exactly as before, independently of mining -
+      // a flat bonus on top for whichever resources it's checked for,
+      // Gold included.
       // AI factions only get to act (build/research decisions) during
       // their own turn in Turn-Based mode - frozen the rest of the time,
       // same as a human faction would be. In Real-Time mode this is
@@ -1756,7 +1781,15 @@ async function main() {
       // vertically on the text) doesn't leak into any other text drawn
       // later this frame.
       ctx.save();
-      const label = u.activelyMining ? `⛏ +${miningRate(factionOf(u.factionId))}/hr` : '⛏ en route…';
+      // u.miningResourceIds (set in update()'s income loop) is whichever
+      // resource(s) this specific miner is currently parked in range of
+      // - almost always 0 or 1, but shows every name if a map-maker
+      // placed two deposits close enough to overlap. Same shared rate
+      // for all of them (miningRate(f)), so it's only shown once.
+      const ids = u.miningResourceIds || [];
+      const label = ids.length
+        ? `⛏ +${miningRate(factionOf(u.factionId))}/hr ${ids.map((id) => RESOURCE_NAMES[id] || id).join(', ')}`
+        : '⛏ en route…';
       const labelY = p.y - size / 2 - 16;
       ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       const w = ctx.measureText(label).width;

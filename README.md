@@ -55,11 +55,11 @@ line. Only this page has the logo/title/footer treatment so far -
    `AI_DIFFICULTY` in `play.html`). It scales three things about that
    faction's AI, all independent of its actual decision logic (which is
    identical at every difficulty): how often it gets to act at all
-   (`tickSeconds`, 10s down to 2.5s), a flat bonus/penalty on its Gold
+   (`tickSeconds`, 10s down to 2.5s), a flat bonus/penalty on all of its
    mining income (`incomeMult`, 0.65x-1.65x - the classic RTS "cheating
-   AI" lever; extra resources have no automatic income of their own to
-   apply this to - see item 3's own bullet), and how often it takes an
-   affordable
+   AI" lever; applies to any resource a miner is parked at, Gold or an
+   Additional Resource alike - see item 3's own bullet), and how often it
+   takes an affordable
    building/turret/extra-miner opportunity instead of skipping it
    (`buildingChance`/`turretChance`/`minerChance`). Ignored for a
    Turn-Based hot-seat "Human"-controlled computer player.
@@ -82,16 +82,19 @@ line. Only this page has the logo/title/footer treatment so far -
    button adds another named resource beyond Gold (e.g. Oil, Wood), each
    with its own **deposit amount** and its own **deposit art** (shown
    near every home base in `play.html` - see the "Multiple resources"
-   bullet further down), same shape as Gold's own deposit above.
-   Deposit amount is descriptive, same as Gold's own - it isn't drained
-   by anything, since an extra resource has no mining unit of its own.
-   An extra resource has no automatic income at all by itself; the only
-   way a faction actually earns one is checking it under **Free
-   Resources Each Round** (item 5a, further down) - previously each
-   extra resource also had its own separate "income per hour" that
-   accrued automatically regardless of that grant, which duplicated it
-   and was removed at the map-maker's own request. Every unit/turret
-   added below (see item 4) gets a
+   bullet further down), same shape as Gold's own deposit above. Deposit
+   amount is descriptive, same as Gold's own - neither is actually
+   drained down as a finite pool. The same Mining Ship that drains Gold
+   also mines any Additional Resource: park one within range of that
+   resource's own deposit (its near-base marker by default, or wherever
+   it was placed on the map - see item 3a) and it earns that resource at
+   the same shared mining rate Gold uses (600 → 900 → 1200/hr via
+   research), same as parking one at Gold's own deposit does - it isn't
+   a separate, weaker mechanic. **Free Resources Each Round** (item 5a,
+   further down) still works independently on top of that, for any
+   resource including Gold, as a flat bonus rather than the only way to
+   earn an Additional Resource. Every unit/turret added below (see item
+   4) gets a
    checkbox per resource that currently exists here, with an amount for
    each one checked - a Tank could read "50 Gold, 100 Oil" if both boxes
    are checked with those amounts. Adding, removing, or renaming a
@@ -334,16 +337,26 @@ entirely by one map's saved data:
   that unit/turret ("Cost 50 Gold, 100 Oil" in the Build panel). Only
   combat units and Gun Turrets use this multi-resource system - Gated
   buildings' own one-time unlock cost, the Mining Ship's flat cost, and
-  research costs are all still plain Gold, unchanged. Gold is the only
-  resource an actual mining unit ever drains from a deposit (parked
-  within range, same as always); every other resource has no automatic
-  income of its own at all - the only way a faction earns one is
-  whatever "Free resources each round" (item 5a) hands out. Each extra
+  research costs are all still plain Gold, unchanged. The Mining Ship
+  itself isn't Gold-only: parked within range of ANY deposit - Gold's or
+  an Additional Resource's - it earns that resource at the same shared
+  mining rate (600 → 900 → 1200/hr via research, unchanged by which
+  resource it's parked at), so several resources genuinely means several
+  places for a fleet of miners to work, not one real economy and several
+  decorative ones. `u.miningResourceIds` (set once per tick in the same
+  income loop, read by the live "⛏ +900/hr" label) is which resource(s)
+  a specific miner is currently in range of - almost always 0 ("⛏ en
+  route…") or 1, but nothing stops two deposits placed close enough to
+  overlap. "Free resources each round" (item 5a) still works
+  independently on top of mining, for any resource including Gold, as a
+  flat bonus rather than a second income mechanism. Each extra
   resource also gets its own deposit marker
   drawn near every home base (`index.html`'s per-resource art upload) -
-  purely a visual "this is where it comes from," not an interactive
-  object; a resource added with no art falls back to a plain circle + 💎,
-  same graceful-fallback treatment every other optional image gets
+  visually just "this is where it comes from" the same as Gold's own
+  deposit art is, but a real, minable object underneath, not purely
+  decorative; a resource added with no art falls back to a plain
+  circle + 💎, same graceful-fallback treatment every other optional
+  image gets
   elsewhere in this file. A map saved before multiple resources existed
   still loads and plays identically (its one flat `cost` number is read
   as a Gold cost, and its old single `goldPerRound` value becomes a
@@ -425,7 +438,11 @@ entirely by one map's saved data:
 - **Mining ships auto-travel**: built next to your own deposit, a miner
   immediately gets a move order there on its own - no manual command
   needed - and income only flows while it's actually parked within range
-  of the deposit, not just for existing somewhere on the map. Its HP is
+  of a deposit, not just for existing somewhere on the map. That auto-
+  order always targets Gold's own deposit specifically - manually
+  redirecting a miner to an Additional Resource's deposit instead (see
+  the "Multiple resources" bullet above) is a deliberate action a player
+  takes, not something it does on its own. Its HP is
   a real per-map setting now (index.html's "Mining unit HP" field,
   defaults to 40, gets the same HP-research bonus every other unit
   does) shown right in the Build panel row, not a number only baked
