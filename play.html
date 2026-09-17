@@ -21,6 +21,24 @@
     background:var(--panel2); color:var(--text); border:1px solid var(--border); border-radius:6px;
     padding:6px 9px; font-size:11px; cursor:pointer; text-decoration:none; white-space:nowrap;
   }
+  /* Collapses the whole topbar (resource/turn HUD, Save/Load, Pause,
+     etc.) so only the map itself shows - the canvas already fills the
+     full screen underneath the topbar's translucent overlay, so hiding
+     it needs no resize of its own, just #topbar going away. This button
+     is a separate, always-visible element (not inside #topbar) so
+     there's still something to click to bring it back once the topbar
+     it would otherwise live inside is gone - a higher z-index than
+     #topbar keeps it clickable/visible either way, and it's centered so
+     it reads as a tab hanging off the topbar's own bottom edge rather
+     than a stray floating button. `top` is set in JS (see resize()),
+     right at #topbar's own actual bottom edge (0 once #topbar is
+     display:none) - a fixed top:0 here overlapped the centered resource/
+     turn HUD text underneath it instead. */
+  #hudToggleBtn {
+    position:absolute; top:0; left:50%; transform:translateX(-50%); z-index:21;
+    background:rgba(11,14,20,0.9); color:var(--text); border:1px solid var(--border); border-top:none;
+    border-radius:0 0 8px 8px; padding:2px 16px; font-size:11px; cursor:pointer; line-height:1.6;
+  }
   /* Left = map title, fixed. Middle = HUD + turn status, grows/wraps to
      fill whatever's left. Right = every action button (Pause through the
      panel toggle) as one cluster, pinned to the right edge via
@@ -282,6 +300,7 @@
       <button id="panelToggleBtn">☰</button>
     </div>
   </div>
+  <button id="hudToggleBtn" title="Hide map info">▲</button>
 
   <canvas id="canvas"></canvas>
   <div id="dragBox" class="selbox" style="display:none;"></div>
@@ -3667,13 +3686,37 @@ async function main() {
 
   const topbarEl = document.getElementById('topbar');
   const sidePanelEl = document.getElementById('sidePanel');
+  const hudToggleBtn = document.getElementById('hudToggleBtn');
   function resize() {
     resizeCanvasOnly();
     sidePanelEl.style.top = topbarEl.offsetHeight + 'px';
+    // Hangs the toggle button right off #topbar's own bottom edge when
+    // it's showing (0 when it's hidden, since a display:none element's
+    // offsetHeight is 0) - without this it sat at a fixed top:0 and
+    // visually overlapped the centered resource/turn HUD text underneath
+    // it instead of reading as a tab attached to the topbar.
+    hudToggleBtn.style.top = topbarEl.offsetHeight + 'px';
   }
   window.addEventListener('resize', resize);
   new ResizeObserver(resize).observe(topbarEl);
   resize();
+
+  // "▲ Hide map info" / "▼ Show map info" - collapses the resource/turn
+  // HUD, Save/Load, Pause, etc. entirely so only the map itself shows.
+  // The canvas is already full-screen underneath #topbar's translucent
+  // overlay, so there's nothing to resize here beyond re-running the
+  // existing resize() (the ResizeObserver above already does this on its
+  // own once #topbar's box collapses to 0, but calling it directly here
+  // keeps the button/side panel's own top offset from lagging a frame
+  // behind).
+  let hudHidden = false;
+  hudToggleBtn.addEventListener('click', () => {
+    hudHidden = !hudHidden;
+    topbarEl.style.display = hudHidden ? 'none' : 'flex';
+    hudToggleBtn.textContent = hudHidden ? '▼' : '▲';
+    hudToggleBtn.title = hudHidden ? 'Show map info' : 'Hide map info';
+    resize();
+  });
 
   let last = performance.now();
   function loop(now) {

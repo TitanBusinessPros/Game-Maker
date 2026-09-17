@@ -696,6 +696,20 @@ entirely by one map's saved data:
   changes from movement). Reported as "units can travel off the map into
   the black part" - same underlying bounding box, same fix shape, just
   for units instead of the camera.
+- A small **▲ / ▼ tab centered under the topbar** collapses the entire
+  topbar (resource/turn HUD, map name, Skip Turn, Pause/Sound/Save/Load/
+  Download) down to just that tab, so only the map itself shows -
+  clicking it again (▼ when collapsed) brings the topbar straight back.
+  The canvas already renders full-screen underneath the topbar's own
+  translucent overlay, so hiding it needs no resize of its own, just
+  `#topbar` itself going to `display:none` - the tab is a separate,
+  always-visible element (not inside the topbar) specifically so there's
+  still something to click once the topbar it would otherwise live
+  inside is gone, and its own vertical position is kept pinned to
+  whatever the topbar's actual current height is (0 once hidden) so it
+  never overlaps the centered HUD text while the topbar is showing. The
+  side panel (Build/Research/Controls) is untouched by this - only the
+  topbar collapses.
 - Background art is a **single image, cover-fit once** over the whole
   world's bounding box (scale = the larger of width/height ratio,
   uncapped, so it always fully covers with no gaps) - not tiled. A tiled
