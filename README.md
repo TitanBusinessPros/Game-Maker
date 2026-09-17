@@ -244,10 +244,10 @@ line. Only this page has the logo/title/footer treatment so far -
    **missile art** (a *second*, separate upload - the projectile itself,
    drawn actually traveling to its target, not the stationary launcher's
    own sprite), a **Rotate missile to face its travel direction**
-   checkbox (on by default - the launcher itself never moves and always
-   turns to face whatever it's targeting regardless of this, same as a
-   Gun Turret; this only controls whether the *projectile's* own sprite
-   turns to face the direction it's flying), and **costs** (the usual
+   checkbox (on by default - the launcher itself never rotates at all,
+   regardless of this checkbox or of what it's firing at; this only
+   controls whether the *projectile's* own sprite turns to face the
+   direction it's flying), and **costs** (the usual
    per-resource checkboxes). No Range or Weapon field on this row at all
    - unlike every other
    unit/turret type, a launcher's range isn't set here; see `play.html`'s
@@ -465,7 +465,17 @@ entirely by one map's saved data:
     it before anyone touched anything - reported as "the user's troops
     are still locked" every time their turn came back around). A move
     order is left alone across turns, since a unit can legitimately take
-    several turns to reach a far destination.
+    several turns to reach a far destination. An armed Gun Turret/Missile
+    Silo "Place" mode is cleared the instant control passes to the next
+    faction too, for the same reason - left armed, a click landing just
+    after the switch would place (and charge) it against the new active
+    faction's own base instead of the faction who actually clicked Place
+    (reported: a missile silo placed right as a turn changed ended up on
+    the next player's base, spending their resources). `tryPlaceTurret`/
+    `tryPlaceMissileLauncher` also independently refuse a click whose
+    recorded faction no longer matches whoever's turn it now is, as a
+    backstop for a click already in flight the instant the switch
+    happens.
 - **Team select** - shown before every match, for every player. You're
   always Team A; every other faction gets a real team-letter picker (one
   letter per faction that exists, up to 11 with 10 computer players -
@@ -783,7 +793,16 @@ entirely by one map's saved data:
   who owns it or whether it's AI- or human-controlled, rather than
   waiting for a click the way a normal unit does - though clicking it
   and giving it an explicit target still overrides that, same as
-  commanding any other unit. Follows the exact same rules every other
+  commanding any other unit. It only visually rotates to face that
+  target once the target is actually within its own firing range -
+  auto-acquiring the globally-nearest enemy has no range check of its
+  own, so a turret that rotated to face it immediately (regardless of
+  distance) would spend most of a match visibly aimed at some enemy
+  clear across the map it could never actually reach, which read as the
+  turret rendering "upside down" the instant it was placed (whatever
+  direction that permanently-out-of-range enemy happened to be in).
+  Until something is truly in range it stays in its neutral placed
+  orientation instead. Follows the exact same rules every other
   unit does now: frozen during another faction's turn in Turn-Based mode
   (its own faction's turn only), and one attack per turn (Turn-Based) or
   per 90s clock-turn (Real-Time), then locked until the next one, same
@@ -819,7 +838,11 @@ entirely by one map's saved data:
   speed until it's close enough to hit - at which point it applies the
   launcher's damage and vanishes. If the target dies before the missile
   arrives, the missile is simply removed with no damage dealt and no
-  retargeting - "it disappears from the screen." A missile belonging to a
+  retargeting - "it disappears from the screen." Unlike a Gun Turret, the
+  launcher itself never visually rotates at all - not while idle, not
+  while firing - only the missile projectile itself turns to show its
+  own travel direction (map-maker request: the launcher should "stay
+  still"). A missile belonging to a
   faction that isn't currently active in Turn-Based mode just holds its
   current mid-flight position, same freeze every other unit's own
   movement already gets, and continues from exactly where it left off

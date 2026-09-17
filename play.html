@@ -1021,7 +1021,12 @@ async function main() {
       hp, maxHp: hp, attack: def.attack, speed: 0,
       img: missileLauncherImages[defIndex], x, y, alive: true, selected: false,
       orderType: null, moveTarget: null, target: null,
-      lockedUntilTurn: 0, facingAngle: 0,
+      // Unlike a Gun Turret, the launcher itself never visually turns to
+      // face what it's firing at - only its separate missile projectile
+      // (spawnMissile's own facingAngle) shows travel direction, so the
+      // static structure stays put (map-maker request: "it tilts sideways
+      // and aims at the target, we need it to stay still").
+      lockedUntilTurn: 0, facingAngle: 0, rotateToFace: false,
     };
     units.push(u);
     return u;
@@ -1353,7 +1358,16 @@ async function main() {
     // baked in at spawn time.
     const range = u.isMissileLauncher ? missileRange(factionOf(u.factionId)) : u.range;
     const dist = Math.hypot(t.x - u.x, t.y - u.y);
-    u.facingAngle = facingToward(u, t.x, t.y);
+    // A turret auto-acquires nearestEnemy() with no range check of its own
+    // (see nearestEnemy above) - it's stationary, so `dist > range` below
+    // means it can NEVER close the distance, and would otherwise sit
+    // rotated to face that permanently-unreachable target forever. Only
+    // actually rotate once something is truly in range to fire at -
+    // until then it stays in whatever pose it was last in (its neutral
+    // placed orientation, the instant it's placed), instead of snapping
+    // to face some enemy clear across the map the moment it spawns
+    // (reported as "turrets are upside down when you place them").
+    if (!u.isTurret || dist <= range) u.facingAngle = facingToward(u, t.x, t.y);
     if (dist > range) {
       // Stationary and can't close the distance - rather than sit here
       // recomputing the same too-far distance every frame forever, drop
@@ -1453,6 +1467,17 @@ async function main() {
   function advanceTurn() {
     const alive = factions.filter((f) => f.hp > 0);
     if (!alive.length) return;
+    // The outgoing faction's own armed Gun Turret/Missile Silo "Place"
+    // mode belongs to THEM, not whoever's turn is about to start - left
+    // armed, a click that lands after control has already passed would
+    // place (and charge) it against the new active faction's base
+    // instead (reported: a missile silo placed mid-switch ended up on
+    // "the next user's" base, spending their resources). tryPlaceTurret/
+    // tryPlaceMissileLauncher also double-check this themselves for a
+    // click already in flight the instant the switch happens, but
+    // clearing it here means the button/cursor don't stay stuck showing
+    // "Click the map…" for a placement that's no longer this faction's.
+    setPlacingTurret(null); setPlacingMissile(null);
     deselectAll(); // clear the outgoing faction's selection ring before switching - else it stays visible, stale, during the next faction's turn
     do {
       activeIdx = (activeIdx + 1) % factions.length;
@@ -2590,6 +2615,15 @@ async function main() {
   // placement mode, no cost taken) rather than erroring - lets someone
   // click around to find the right spot without being kicked out.
   function tryPlaceTurret(p) {
+    // In Turn-Based mode, the per-faction turn timer can run out while a
+    // click is already mid-flight (armed placement mode doesn't get
+    // cleared by itself) - without this check the click still lands, but
+    // against whichever faction has since become active, placing (and
+    // charging) it on the NEW active faction's base instead of the one
+    // who actually clicked Place. advanceTurn() also clears placement
+    // mode outright as a first line of defense; this is the backstop for
+    // a click that's already in flight the instant it happens.
+    if (placingTurret.factionId !== activeFaction.id) { setPlacingTurret(null); renderBuildPanel(); return; }
     const def = turretDefs[placingTurret.defIndex];
     const dist = Math.hypot(p.x - activeFaction.x, p.y - activeFaction.y);
     if (dist < TURRET_MIN_RANGE || dist > TURRET_MAX_RANGE) return;
@@ -2601,6 +2635,10 @@ async function main() {
     renderBuildPanel();
   }
   function tryPlaceMissileLauncher(p) {
+    // Same guard as tryPlaceTurret above, same reason - a turn switch
+    // mid-placement must never let the click land against the new active
+    // faction's base instead of the one who actually armed it.
+    if (placingMissile.factionId !== activeFaction.id) { setPlacingMissile(null); renderBuildPanel(); return; }
     const def = missileDefs[placingMissile.defIndex];
     const dist = Math.hypot(p.x - activeFaction.x, p.y - activeFaction.y);
     if (dist < TURRET_MIN_RANGE || dist > TURRET_MAX_RANGE) return;
@@ -2947,7 +2985,7 @@ async function main() {
       const btn = document.createElement('button');
       btn.textContent = isPlacingThis ? 'Click the map… (or Esc)' : 'Place';
       btn.disabled = !hasRF || (!isPlacingThis && !canAffordCosts(activeFaction, turretCosts));
-      btn.onclick = () => { setPlacingTurret(isPlacingThis ? null : { defIndex: i }); renderBuildPanel(); };
+      btn.onclick = () => { setPlacingTurret(isPlacingThis ? null : { defIndex: i, factionId: activeFaction.id }); renderBuildPanel(); };
       row.appendChild(btn);
       el.appendChild(row);
     });
@@ -2971,7 +3009,7 @@ async function main() {
       const btn = document.createElement('button');
       btn.textContent = isPlacingThis ? 'Click the map… (or Esc)' : 'Place';
       btn.disabled = locked || (!isPlacingThis && !canAffordCosts(activeFaction, missileCosts));
-      btn.onclick = () => { setPlacingMissile(isPlacingThis ? null : { defIndex: i }); renderBuildPanel(); };
+      btn.onclick = () => { setPlacingMissile(isPlacingThis ? null : { defIndex: i, factionId: activeFaction.id }); renderBuildPanel(); };
       row.appendChild(btn);
       el.appendChild(row);
     });
