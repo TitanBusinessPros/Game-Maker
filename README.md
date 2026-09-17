@@ -818,8 +818,20 @@ entirely by one map's saved data:
   placement mode), and Esc or clicking the button again cancels for
   free before you've spent anything. A placed turret has speed 0 (so
   combatTick's own chase-toward-target math always computes zero
-  movement - it just can't fire until something wanders into range) and,
-  with index.html's own Auto Attack checkbox left on (the default),
+  movement - it just can't fire until something wanders into range) and
+  drops a target the instant it's out of range instead of clinging to it
+  (the same treatment a Missile Silo launcher already had) - without
+  this, a turret that auto-acquired an enemy's distant HOME BASE the
+  moment it spawned (often the only thing anywhere on the map yet, before
+  real enemy troops ever got close) would keep that permanently-
+  unreachable target forever, since it's neither null nor dead, and so
+  would never re-scan and notice real enemies later walking right into
+  its own range - reported as "the gun turret does not auto fire on
+  enemy targets within range" (confirmed by replaying the actual reported
+  map's saved turret data in a real match: it silently locked onto the
+  enemy base at spawn and stayed silent for the rest of the game even
+  with enemies standing right next to it). With index.html's own Auto
+  Attack checkbox left on (the default),
   auto-acquires the nearest enemy on its own every frame regardless of
   who owns it or whether it's AI- or human-controlled, rather than
   waiting for a click the way a normal unit does - though clicking it

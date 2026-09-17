@@ -1389,10 +1389,20 @@ async function main() {
     if (dist > range) {
       // Stationary and can't close the distance - rather than sit here
       // recomputing the same too-far distance every frame forever, drop
-      // the order so the normal targeting path (human click, or AI's
-      // nearestEnemy() for an AI-controlled silo) gets a fresh shot at
-      // picking something actually in range next time.
-      if (u.isMissileLauncher) { u.target = null; return; }
+      // the order so the normal targeting path (human click, or the
+      // per-unit loop's own auto-acquire for an AI-controlled unit or an
+      // Auto-Attack-enabled turret/silo) gets a fresh shot at picking
+      // something actually in range next time. Turrets need this exactly
+      // as much as launchers do - without it, a turret that auto-acquired
+      // an enemy's distant HOME BASE the instant it spawned (the only
+      // thing visible on the map yet, before any real enemy unit ever
+      // wandered close) would cling to that permanently-unreachable
+      // target forever, since it's neither null nor dead - and so never
+      // re-scan and notice real enemy troops later walking right into
+      // range. Reported as "the gun turret does not auto fire on enemy
+      // targets within range" - the missile launcher never had this
+      // problem since it already dropped its target here.
+      if (u.isMissileLauncher || u.isTurret) { u.target = null; return; }
       const sp = u.speed * MOVE_PX_PER_SPEED;
       u.x += (t.x - u.x) / dist * sp * dt; u.y += (t.y - u.y) / dist * sp * dt;
     } else if (u.isMissileLauncher) {
