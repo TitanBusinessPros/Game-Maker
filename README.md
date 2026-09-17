@@ -674,11 +674,15 @@ entirely by one map's saved data:
   own build-panel row ("Producing Tank… 24s left · 2 queued") AND, since
   that was reported as easy to miss ("no live countdown, queue level only
   shown once full"), the specific unit's own row right below it too
-  ("Jet ✈️ · ... · producing… 24s left", or "queued (position 2 of 3)"
-  if something else is being produced first - found by that unit's own
-  `defIndex` actually appearing in the queue, not just "this building
-  happens to be busy," so an unrelated unit under the same building never
-  falsely claims to be queued). A long timer shows as "1h 30m left" -
+  ("Jet ✈️ · ... · producing… 24s left · 3 in production queue (2 more
+  waiting)" if several of that exact unit are queued back to back, or
+  "2 in production queue (next at position 3 of 4)" if something else
+  is being produced first - found by that unit's own `defIndex` actually
+  appearing in the queue, not just "this building happens to be busy,"
+  so an unrelated unit under the same building never falsely claims to
+  be queued, and the count shown is specifically how many of THAT unit
+  are active in the queue, not the building's total). A long timer shows
+  as "1h 30m left" -
   `formatDuration()` switches to h/m once it's a minute or more so this
   never reads as a raw, unreadable seconds count - and the unit only
   actually appears once that timer runs out. Each building's own queue

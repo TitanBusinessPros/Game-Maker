@@ -2784,12 +2784,24 @@ async function main() {
     // anything in it at all" - a Tank sitting idle while a Jet is being
     // produced under the same Air Base must not claim to be "queued"
     // just because its building happens to be busy with something else.
+    // myIndexes holds EVERY slot this unit type occupies in the queue
+    // (someone can queue 3 Jets back to back) so the row can show the
+    // actual active count - "how many of each unit is being produced" -
+    // not just whether at least one copy exists somewhere in line.
     let progressText = '';
     if (building) {
       const queue = activeFaction.buildQueue[building.key];
-      const pos = queue.findIndex((item) => item.defIndex === i);
-      if (pos === 0) progressText = ` · producing… ${formatDuration(queue[0].remaining)} left`;
-      else if (pos > 0) progressText = ` · queued (position ${pos + 1} of ${queue.length})`;
+      const myIndexes = [];
+      queue.forEach((item, idx) => { if (item.defIndex === i) myIndexes.push(idx); });
+      const count = myIndexes.length;
+      if (count > 0) {
+        if (myIndexes[0] === 0) {
+          progressText = ` · producing… ${formatDuration(queue[0].remaining)} left`;
+          if (count > 1) progressText += ` · ${count} in production queue (${count - 1} more waiting)`;
+        } else {
+          progressText = ` · ${count} in production queue (next at position ${myIndexes[0] + 1} of ${queue.length})`;
+        }
+      }
     }
     const statsText = `${combatStats} · Cost ${costsText(unitCosts)}${building ? ` · builds in ${formatDuration(def.prodTime)}` : ''}${progressText}${locked ? ` · requires ${lockReason}` : (queueFull ? ` · queue full (${MAX_QUEUE_PER_BUILDING}/${MAX_QUEUE_PER_BUILDING})` : '')}`;
     const btnText = locked ? 'Locked' : (queueFull ? 'Queue full' : (building ? 'Queue' : 'Build'));
