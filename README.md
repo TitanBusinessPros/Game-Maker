@@ -197,7 +197,10 @@ line. Only this page has the logo/title/footer treatment so far -
    Instead: **HP**, **heal range**, **speed**, a **heal amount** (how
    much HP it restores, once per turn, to whichever allied unit you
    click - the same one-action-per-turn rule combat already follows, not
-   a separate mechanic), and **costs**. Boosted by **Rapid Repair Crews**
+   a separate mechanic), a **Rotate to face movement direction**
+   checkbox (same field/default as every other combat unit type - a
+   medic does walk to reach whoever it's healing), and **costs**.
+   Boosted by **Rapid Repair Crews**
    research (item 3b above) - previously a real, researchable topic with
    no in-game effect at all; this is what it was missing.
    All six of these (Air Base/War Factory/Infantry Post/Helicopter
@@ -240,8 +243,13 @@ line. Only this page has the logo/title/footer treatment so far -
    **launcher art**, **HP**, **Missile HP damage**, **Missile speed**,
    **missile art** (a *second*, separate upload - the projectile itself,
    drawn actually traveling to its target, not the stationary launcher's
-   own sprite), and **costs** (the usual per-resource checkboxes). No
-   Range or Weapon field on this row at all - unlike every other
+   own sprite), a **Rotate missile to face its travel direction**
+   checkbox (on by default - the launcher itself never moves and always
+   turns to face whatever it's targeting regardless of this, same as a
+   Gun Turret; this only controls whether the *projectile's* own sprite
+   turns to face the direction it's flying), and **costs** (the usual
+   per-resource checkboxes). No Range or Weapon field on this row at all
+   - unlike every other
    unit/turret type, a launcher's range isn't set here; see `play.html`'s
    own bullet on this further down for why. In `play.html`, a launcher is
    placed the same way a Gun Turret is (see 4h below) - click **Place**,
@@ -661,16 +669,26 @@ entirely by one map's saved data:
   unit. Once built, its units queue for production instead of spawning
   instantly: clicking one starts a real countdown (its own per-unit
   production time, 10 seconds up to 120 minutes, set on the map) shown
-  right on the building's own build-panel row ("Producing Tank… 24s left
-  · 2 queued", or "Producing Battleship… 1h 30m left" for a long timer -
+  in TWO places, both updating live every frame, not just at the moment
+  you click Queue or on some other unrelated re-render - the building's
+  own build-panel row ("Producing Tank… 24s left · 2 queued") AND, since
+  that was reported as easy to miss ("no live countdown, queue level only
+  shown once full"), the specific unit's own row right below it too
+  ("Jet ✈️ · ... · producing… 24s left", or "queued (position 2 of 3)"
+  if something else is being produced first - found by that unit's own
+  `defIndex` actually appearing in the queue, not just "this building
+  happens to be busy," so an unrelated unit under the same building never
+  falsely claims to be queued). A long timer shows as "1h 30m left" -
   `formatDuration()` switches to h/m once it's a minute or more so this
-  never reads as a raw, unreadable seconds count), and the unit only
+  never reads as a raw, unreadable seconds count - and the unit only
   actually appears once that timer runs out. Each building's own queue
-  holds **up to `MAX_QUEUE_PER_BUILDING` (10) units at once** - Queue
-  disables itself (and every unit under that building shows "queue full
-  (10/10)") once it's at the cap, for the player and AI alike, until the
-  front item finishes and the queue shortens again. Only the front item
-  of each building's queue ticks - so a faction with several of these
+  holds **up to `MAX_QUEUE_PER_BUILDING` (10) units at once** - every
+  unit under that building live-shows "queue full (10/10)" and disables
+  its own Queue button once the cap is hit, for the player and AI alike,
+  until the front item finishes and the queue shortens again - this too
+  updates every frame now, not just whenever the panel happens to next
+  fully re-render. Only the front item of each building's queue ticks -
+  so a faction with several of these
   buildings produces one unit per building at the same time, none of
   them competing for a shared timer - and like research/mining income,
   queues keep progressing regardless of whose turn it is in Turn-Based

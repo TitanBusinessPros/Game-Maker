@@ -1837,6 +1837,10 @@ function addMissileUnitRow(data = {}) {
         <div class="meta"><div class="name">No file chosen</div><div class="status">missile sprite - transparent PNG works best</div></div>
         <input type="file" accept="image/*" style="width:auto">
       </div>
+      <label style="display:flex; align-items:center; gap:6px; font-weight:normal; margin:8px 0 0;">
+        <input type="checkbox" class="u-missile-rotate" ${data.missileRotateToFace !== false ? 'checked' : ''} style="width:auto;">
+        Rotate missile to face its travel direction
+      </label>
     </div>
     <div class="field" style="margin-top:6px;">
       <label>Cost</label>
@@ -1881,6 +1885,10 @@ function addFieldHospitalUnitRow(data = {}) {
       <div class="meta"><div class="name">No file chosen</div><div class="status">medic sprite - transparent PNG works best</div></div>
       <input type="file" accept="image/*" style="width:auto">
     </div>
+    <label style="display:flex; align-items:center; gap:6px; font-weight:normal; margin:8px 0 0;">
+      <input type="checkbox" class="u-rotate" ${data.rotateToFace !== false ? 'checked' : ''} style="width:auto;">
+      Rotate to face movement direction
+    </label>
     <div class="row" style="margin-top:10px;">
       <div class="field narrow"><label>HP</label><input type="number" class="u-hp" value="${data.hp ?? 150}" min="1"></div>
       <div class="field narrow"><label>Heal range</label><input type="number" class="u-range" value="${data.range ?? 80}" min="0"></div>
@@ -2346,6 +2354,7 @@ function collectMissileUnits(uploadResults) {
       attack: Number(row.querySelector('.u-attack').value) || 0,
       missileSpeed: Number(row.querySelector('.u-missile-speed').value) || 4,
       missileImageUrl: uploadResults[`${id}_missile`] || null,
+      missileRotateToFace: row.querySelector('.u-missile-rotate').checked,
       costs: currentCostsFromRow(row),
     };
   });
@@ -2373,7 +2382,7 @@ function collectFieldHospitalUnits(uploadResults) {
       costs: currentCostsFromRow(row),
       attack: 0,
       weapon: 'laser',
-      rotateToFace: true,
+      rotateToFace: row.querySelector('.u-rotate').checked,
       isMedic: true,
     };
   });

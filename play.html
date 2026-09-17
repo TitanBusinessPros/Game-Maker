@@ -1170,6 +1170,11 @@ async function main() {
       x: launcher.x, y: launcher.y, factionId: launcher.factionId, target,
       damage: launcher.attack, speed: (Number(def.missileSpeed) || 4) * MOVE_PX_PER_SPEED,
       img: missileProjectileImages[launcher.defIndex], facingAngle: 0,
+      // index.html's "Rotate missile to face its travel direction"
+      // checkbox on the launcher row - defaults true for a map saved
+      // before this field existed, same convention as a normal unit's
+      // own rotateToFace.
+      rotateToFace: def.missileRotateToFace !== false,
     });
   }
   function fireWeaponEffect(u, t) {
@@ -2075,7 +2080,7 @@ async function main() {
         const fit = fittedSize(m.img, size);
         ctx.save();
         ctx.translate(p.x, p.y);
-        ctx.rotate(m.facingAngle || 0);
+        if (m.rotateToFace !== false) ctx.rotate(m.facingAngle || 0);
         ctx.drawImage(m.img, -fit.w / 2, -fit.h / 2, fit.w, fit.h);
         ctx.restore();
       } else {
@@ -2748,10 +2753,61 @@ async function main() {
     const requires = b.gatesResearch ? 'required before you can research anything (see the Research tab)' : 'required before any of its units below can be built';
     return `Cost ${b.cfg.cost} · HP ${b.cfg.hp} · ${requires}`;
   }
+  // buildingStatsText above (the per-BUILDING summary row, "✈️ Air
+  // Base") was already live - this is the same treatment for each
+  // per-UNIT row below it ("Jet ✈️ · HP... · Cost..."), which wasn't:
+  // renderBuildPanel() only runs on discrete events, so a unit row's own
+  // "queue full"/locked/afford state and its production countdown were
+  // all computed once at click/turn-change time and then sat frozen -
+  // reported as "no live countdown of troops being produced, queue only
+  // shows once full" (technically true: it WAS live on the building's
+  // own summary line, just not on the specific unit's own row, which is
+  // what someone watching a specific unit actually looks at). Shared by
+  // both the initial render (renderBuildPanel) and the per-frame refresh
+  // (updateProductionStatus) so the two can't drift out of sync with
+  // each other.
+  function unitRowState(def, i) {
+    const hasRF = activeFaction.built.researchFacility;
+    const building = def.buildingKey && GATED_BUILDINGS.find((b) => b.key === def.buildingKey);
+    const locked = !hasRF || (building && !activeFaction.built[building.key]);
+    const lockReason = !hasRF ? buildingCfgByKey.researchFacility.name : (building ? building.cfg.name : '');
+    const queueFull = building && activeFaction.buildQueue[building.key].length >= MAX_QUEUE_PER_BUILDING;
+    const unitCosts = getCosts(def);
+    const combatStats = def.isMedic
+      ? `HP ${def.hp} · Heals ${Math.round((Number(def.healAmount) || 0) * (1 + researchPercent(activeFaction, 'regen') / 100))} HP/turn · RNG ${def.range} · SPD ${def.speed}`
+      : `HP ${def.hp} · ATK ${def.attack} · RNG ${def.range} · SPD ${def.speed}`;
+    // Live production progress for THIS specific unit type, not just the
+    // building's own separate summary line - "producing… 12s left" while
+    // it's at the front of that building's queue, or its own position if
+    // it's queued behind something else. Found by THIS unit's own
+    // defIndex actually appearing in the queue, not just "the queue has
+    // anything in it at all" - a Tank sitting idle while a Jet is being
+    // produced under the same Air Base must not claim to be "queued"
+    // just because its building happens to be busy with something else.
+    let progressText = '';
+    if (building) {
+      const queue = activeFaction.buildQueue[building.key];
+      const pos = queue.findIndex((item) => item.defIndex === i);
+      if (pos === 0) progressText = ` · producing… ${formatDuration(queue[0].remaining)} left`;
+      else if (pos > 0) progressText = ` · queued (position ${pos + 1} of ${queue.length})`;
+    }
+    const statsText = `${combatStats} · Cost ${costsText(unitCosts)}${building ? ` · builds in ${formatDuration(def.prodTime)}` : ''}${progressText}${locked ? ` · requires ${lockReason}` : (queueFull ? ` · queue full (${MAX_QUEUE_PER_BUILDING}/${MAX_QUEUE_PER_BUILDING})` : '')}`;
+    const btnText = locked ? 'Locked' : (queueFull ? 'Queue full' : (building ? 'Queue' : 'Build'));
+    const btnDisabled = locked || queueFull || !canAffordCosts(activeFaction, unitCosts);
+    return { statsText, btnText, btnDisabled };
+  }
   function updateProductionStatus() {
     GATED_BUILDINGS.forEach((b) => {
       const statsEl = document.getElementById(`buildStats-${b.key}`);
       if (statsEl) statsEl.textContent = buildingStatsText(b);
+    });
+    unitDefs.forEach((def, i) => {
+      const statsEl = document.getElementById(`unitStats-${i}`);
+      if (!statsEl) return; // Build tab hasn't been rendered this session yet, or this unit isn't in it
+      const { statsText, btnText, btnDisabled } = unitRowState(def, i);
+      statsEl.textContent = statsText;
+      const btnEl = document.getElementById(`unitBtn-${i}`);
+      if (btnEl) { btnEl.textContent = btnText; btnEl.disabled = btnDisabled; }
     });
   }
   function renderBuildPanel() {
@@ -2823,27 +2879,16 @@ async function main() {
     unitDefs.forEach((def, i) => {
       const row = document.createElement('div');
       row.className = 'buildRow';
+      // Just for the name line's icon - unitRowState below independently
+      // looks this up too for its own locked/queueFull computation.
       const building = def.buildingKey && GATED_BUILDINGS.find((b) => b.key === def.buildingKey);
-      // !hasRF locks every unit, including the old ungated `cfg.units`
-      // list (no buildingKey at all, `building` undefined) that plain
-      // "Build" units below used to skip this check entirely.
-      const locked = !hasRF || (building && !activeFaction.built[building.key]);
-      const lockReason = !hasRF ? buildingCfgByKey.researchFacility.name : (building ? building.cfg.name : '');
-      const queueFull = building && activeFaction.buildQueue[building.key].length >= MAX_QUEUE_PER_BUILDING;
-      const unitCosts = getCosts(def);
-      // A Field Hospital medic has no attack at all - showing "ATK 0"
-      // like every other unit would read as broken, not "this one
-      // heals." Heal amount shown here is the CURRENT researched value
-      // (base * Rapid Repair Crews bonus), not the flat def.healAmount -
-      // matches what a newly-built one will actually heal for right now.
-      const combatStats = def.isMedic
-        ? `HP ${def.hp} · Heals ${Math.round((Number(def.healAmount) || 0) * (1 + researchPercent(activeFaction, 'regen') / 100))} HP/turn · RNG ${def.range} · SPD ${def.speed}`
-        : `HP ${def.hp} · ATK ${def.attack} · RNG ${def.range} · SPD ${def.speed}`;
-      row.innerHTML = `<div class="name">${def.name}${building ? ' ' + building.icon : ''}</div><div class="stats">${combatStats} · Cost ${costsText(unitCosts)}${building ? ` · builds in ${formatDuration(def.prodTime)}` : ''}${locked ? ` · requires ${lockReason}` : (queueFull ? ` · queue full (${MAX_QUEUE_PER_BUILDING}/${MAX_QUEUE_PER_BUILDING})` : '')}</div>`;
+      const { statsText, btnText, btnDisabled } = unitRowState(def, i);
+      row.innerHTML = `<div class="name">${def.name}${building ? ' ' + building.icon : ''}</div><div class="stats" id="unitStats-${i}">${statsText}</div>`;
       const btn = document.createElement('button');
-      btn.textContent = locked ? 'Locked' : (queueFull ? 'Queue full' : (building ? 'Queue' : 'Build'));
-      btn.disabled = locked || queueFull || !canAffordCosts(activeFaction, unitCosts);
-      btn.onclick = () => { spendCosts(activeFaction, unitCosts); startProduction(activeFaction, i); renderBuildPanel(); };
+      btn.id = `unitBtn-${i}`;
+      btn.textContent = btnText;
+      btn.disabled = btnDisabled;
+      btn.onclick = () => { spendCosts(activeFaction, getCosts(def)); startProduction(activeFaction, i); renderBuildPanel(); };
       row.appendChild(btn);
       el.appendChild(row);
     });
