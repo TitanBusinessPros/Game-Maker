@@ -971,7 +971,7 @@ read-only) is left in for the same reason as `play.html`'s `__GM_DEBUG` -
 it lets the category grouping/labeling be verified against fabricated
 data without needing a real Google sign-in.
 
-## `producer.html` — "The Game Producer": combine stages into one game
+## `producer.html` — "Titan Game Producer": combine stages into one game
 
 Turns up to 20 separate maps (each already made and downloaded from
 `index.html`'s own "⬇ Download My Game" button under My Maps - a
@@ -1151,7 +1151,7 @@ Project: `game-maker-ed014`.
 - **Firestore** — `maps/{mapId}` (one doc per map) and `libraryItems/{id}`
   (the shared asset library), both public-read; writes locked to the
   owning `uid` (maps) or the admin email (library) via rules.
-  `producerDrafts/{draftId}` (The Game Producer's own saved projects) is
+  `producerDrafts/{draftId}` (Titan Game Producer's own saved projects) is
   owner-read/write only - no public-read case here, unlike `maps`. Two
   more collections back the download-credit system: `bonusEmails/{email}`
   (public-read, admin-only write - the 50-credit list) and `users/{uid}`
@@ -1163,7 +1163,7 @@ Project: `game-maker-ed014`.
   `producer.html` can spend several credits in one compile).
 - **Storage** — `maps/{uid}/{mapId}/...` for map-specific uploads,
   `library/{category}/...` for the shared library,
-  `producer/{uid}/{draftId}/...` for The Game Producer's saved drafts
+  `producer/{uid}/{draftId}/...` for Titan Game Producer's saved drafts
   (owner-read/write only, 50MB/file cap - higher than the other two,
   since a single stage's own game file can be several MB). Same general
   read-public(-or-owner)/write-locked pattern. Its bucket also has a
