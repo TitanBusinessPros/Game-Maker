@@ -655,10 +655,10 @@ async function main() {
   // 'warFactory') is read by the build panel below to gate them behind
   // that faction actually having built the matching building, and by
   // update()'s production-queue processing.
-  const [airBaseImg, warFactoryImg, infantryPostImg, heliFacilityImg, navyHarborImg, fieldHospitalImg, researchFacilityImg, missileSiloImg, missileBatteryImg] = await Promise.all([
+  const [airBaseImg, warFactoryImg, infantryPostImg, heliFacilityImg, navyHarborImg, fieldHospitalImg, researchFacilityImg, missileSiloImg, missileBatteryImg, religiousInstitutionImg] = await Promise.all([
     loadImage(cfg.airBase?.image), loadImage(cfg.warFactory?.image), loadImage(cfg.infantryPost?.image),
     loadImage(cfg.heliFacility?.image), loadImage(cfg.navyHarbor?.image), loadImage(cfg.fieldHospital?.image), loadImage(cfg.researchFacility?.image), loadImage(cfg.missileSilo?.image),
-    loadImage(cfg.missileBattery?.image),
+    loadImage(cfg.missileBattery?.image), loadImage(cfg.religiousInstitution?.image),
   ]);
   // offsetX/offsetY: where each building's art is drawn relative to its
   // faction's homeworld once built (see drawGatedBuildings below) - laid
@@ -709,6 +709,13 @@ async function main() {
     // hit when they're actually in range (see combatTick and
     // spawnMissile further down).
     { key: 'missileBattery', cfg: cfg.missileBattery || { name: 'Missile Battery', cost: 150, hp: 2000 }, unitCfgs: cfg.missileBatteryUnits || [], icon: '💣', img: missileBatteryImg, offsetX: 330, offsetY: 0 },
+    // Religious Institution's Clerics are real unitDefs entries too (merged
+    // below like every building here except Missile Silo) - each one just
+    // has attack forced to 0 and isCleric:true tacked on by
+    // collectClericUnits (index.html), same shape as Field Hospital's own
+    // medics above. What actually makes a Cleric behave differently is
+    // entirely in the per-unit update() loop and convertTick below.
+    { key: 'religiousInstitution', cfg: cfg.religiousInstitution || { name: 'Religious Institution', cost: 150, hp: 2000 }, unitCfgs: cfg.clericUnits || [], icon: '⛪', img: religiousInstitutionImg, offsetX: -330, offsetY: 0 },
   ];
   const buildingCfgByKey = Object.fromEntries(GATED_BUILDINGS.map((b) => [b.key, b.cfg]));
   const unitDefs = [
@@ -1457,6 +1464,14 @@ async function main() {
       // research finishes later, only ones built afterward do.
       isMedic: !!def.isMedic,
       healAmount: def.isMedic ? Math.round((Number(def.healAmount) || 0) * (1 + researchPercent(fac, 'regen') / 100)) : 0,
+      // Religious Institution Cleric (index.html's def.isCleric,
+      // collectClericUnits) - attack is already forced to 0 on the def
+      // itself, same shape as isMedic just above. No amount/percentage
+      // field to bake in here - converting is binary, not a value that
+      // scales with research (u.range, which IS what convertTick actually
+      // checks against, already gets the normal Extended Range research
+      // bonus for free via effectiveStat above, same as every other unit).
+      isCleric: !!def.isCleric,
       // Missile Battery unit (index.html's def.isMissileUnit,
       // collectMissileBatteryUnits) - a normal MOBILE unit in every
       // other respect (moves, chases, has its own map-maker-set Range,
@@ -2065,6 +2080,93 @@ async function main() {
     }
     return best;
   }
+  // ---------------------------------------------------------------------
+  // Religious Institution Clerics: a support unit with no attack at all,
+  // same shape as a Field Hospital medic above, but its one action is
+  // converting an enemy unit to its own side instead of healing an ally.
+  // "Mining Ships and other Clerics can never be converted" (map-maker's
+  // own spec) - a home base isn't a `units` array entry at all (it's the
+  // faction object itself) and a gated building is a structure, not a
+  // unit, so both are excluded here too; a Gun Turret/Missile Silo
+  // launcher/Missile Battery unit/ordinary combat unit/medic all ARE
+  // fair game, same as a real enemy "unit" reads in every other click-to-
+  // attack path in this file.
+  // ---------------------------------------------------------------------
+  function isConvertible(t) {
+    return !!t && t.alive !== false && !t.isFactionHome && !t.isMiner && !t.isCleric && !t.isGatedBuilding;
+  }
+  // AI-controlled Clerics pick their own target (a human just clicks one -
+  // see handleClick) - the nearest convertible enemy unit in range, same
+  // idea as nearestDamagedAlly above just restricted to enemies instead
+  // of allies.
+  function nearestConvertibleEnemy(u) {
+    let best = null, bestDist = Infinity;
+    for (const e of units) {
+      if (isAlly(u.factionId, e.factionId) || !isConvertible(e)) continue;
+      const dist = Math.hypot(e.x - u.x, e.y - u.y);
+      if (dist < bestDist) { bestDist = dist; best = e; }
+    }
+    return best;
+  }
+  // Ownership change is the entire mechanic - everywhere else in this file
+  // (isAlly, livingUnits, factionOf(u.factionId), drawUnit's own faction
+  // color, AI's per-faction thinking, selection restricted to
+  // activeFaction) is already keyed purely off u.factionId, so flipping
+  // this one field is what actually makes "they can act on behalf of the
+  // player that converted them" true everywhere at once. Standing orders
+  // are cancelled the same way a fresh build spawns clean (no leftover
+  // move/attack target aimed at whatever its old owner was doing), and
+  // its turn-lock is cleared so the new owner can use it immediately
+  // instead of it reading as still-locked from an action taken under its
+  // old owner. Stats (hp/maxHp/attack/range/speed) are deliberately left
+  // exactly as they are - a captured unit keeps its own current stats,
+  // it doesn't get retroactively re-baked with the new owner's research
+  // bonuses.
+  function convertUnit(t, newFactionId) {
+    t.factionId = newFactionId;
+    t.orderType = null; t.target = null; t.moveTarget = null; t.pathWaypoints = null;
+    t.selected = false;
+    t.attackedThisTurn = false; t.lockedUntilTurn = 0;
+  }
+  // A Cleric's own "attack" - walks into range of its target the same way
+  // combatTick/healTick do, but converts instead of damaging or healing,
+  // and the target is an ENEMY (set by handleClick's own click-to-order
+  // flow, or nearestConvertibleEnemy above for an AI-controlled Cleric).
+  // Same isLocked()/lockUnit() as everything else, so "convert one enemy
+  // unit each turn" (Turn-Based) / "each round" (Real-Time) is the exact
+  // same one-action-per-turn rule combat already follows - lockUnit()
+  // already means "once per turn" in Turn-Based mode and "once per the
+  // shared clock/round" in Real-Time mode, with zero extra code needed
+  // here to get that distinction right.
+  function convertTick(u, dt) {
+    const t = u.target;
+    if (!isConvertible(t)) { u.target = null; return; }
+    if (isLocked(u)) return;
+    const dist = Math.hypot(t.x - u.x, t.y - u.y);
+    u.facingAngle = facingToward(u, t.x, t.y);
+    if (dist > u.range) {
+      const sp = u.speed * MOVE_PX_PER_SPEED;
+      moveTowardWithAvoidance(u, t.x, t.y, sp, dt);
+      clampToWorld(u);
+      pushOutOfObstacles(u);
+      u._isMoving = true;
+    } else {
+      convertUnit(t, u.factionId);
+      // A distinct pulse (reusing the same `effects` array every weapon
+      // effect and the medic's own heal pulse already draw through),
+      // its own color so it reads as neither an attack nor a heal.
+      effects.push({ kind: 'explosion', x: t.x, y: t.y, color: '#c9a7ff', ttl: 0.3, life: 0.3 });
+      // A newly-converted unit could have been selected by, or held in a
+      // control group of, its OLD owner - convertUnit() above already
+      // deselects it for the live selection ring; a control group
+      // re-select already filters to livingUnits(activeFaction.id) at
+      // recall time (see the Ctrl+1-9 handling further down), so it
+      // silently drops out of its old owner's group the next time they
+      // recall it, with no extra bookkeeping needed here.
+      u.target = null; // it's not an enemy any more - nothing left to keep chasing
+      lockUnit(u);
+    }
+  }
   // Tag every faction object once so combatTick can tell a homeworld
   // target apart from a unit target without extra lookups.
   factions.forEach((f) => { f.isFactionHome = true; });
@@ -2175,8 +2277,13 @@ async function main() {
       // whole block exists to prevent for every other unit type.
       // Reported as a turret looking permanently "still locked" turn
       // after turn even though the player never re-ordered it.
+      // 'convert' (a Cleric's own order type) gets the exact same
+      // treatment - a Cleric that unlocks mid-turn shouldn't silently
+      // re-convert (or try to re-convert, if its old target is already
+      // gone/converted-elsewhere by then) the same old target the instant
+      // it can act again without the player choosing that.
       const skipClear = u.isTurret && u.autoAttack !== false;
-      if (!skipClear && (u.orderType === 'attack' || u.orderType === 'heal')) { u.orderType = null; u.target = null; }
+      if (!skipClear && (u.orderType === 'attack' || u.orderType === 'heal' || u.orderType === 'convert')) { u.orderType = null; u.target = null; }
     });
     renderBuildPanel();
     renderResearchPanel();
@@ -2499,6 +2606,24 @@ async function main() {
           if (u.target) healTick(u, dt);
         } else if (u.orderType === 'heal' && u.target) {
           healTick(u, dt);
+        } else if (u.orderType === 'move' && u.moveTarget && !isLocked(u)) {
+          runMoveOrder(u, dt);
+        }
+        continue;
+      }
+      // Religious Institution Cleric: same shape as the medic branch just
+      // above, just converting an enemy instead of healing an ally - an
+      // AI-controlled one auto-targets the nearest convertible enemy unit
+      // whenever it doesn't already have a valid one, a human-controlled
+      // one only converts on an explicit order (handleClick's own
+      // click-an-enemy-while-a-Cleric-is-selected branch) or moves if
+      // just given a move order.
+      if (u.isCleric) {
+        if (!fac.isHuman) {
+          if (!isConvertible(u.target)) u.target = nearestConvertibleEnemy(u);
+          if (u.target) convertTick(u, dt);
+        } else if (u.orderType === 'convert' && u.target) {
+          convertTick(u, dt);
         } else if (u.orderType === 'move' && u.moveTarget && !isLocked(u)) {
           runMoveOrder(u, dt);
         }
@@ -3497,7 +3622,15 @@ async function main() {
     }
     sel.forEach((u) => {
       if (isLocked(u)) return; // attacked this turn - can't take a new order yet
-      if (target) { u.orderType = 'attack'; u.target = target; u.moveTarget = null; u.pathWaypoints = null; }
+      // A Cleric can't attack at all - clicking an enemy orders it to
+      // convert instead, but only when that specific target is actually
+      // convertible (not a Mining Ship, another Cleric, a gated building,
+      // or a home base - see isConvertible). Clicking a non-convertible
+      // enemy while a Cleric is selected falls through to a plain move
+      // order to the clicked point instead of silently doing nothing, the
+      // same as clicking empty space would.
+      const validTarget = target && (!u.isCleric || isConvertible(target));
+      if (validTarget) { u.orderType = u.isCleric ? 'convert' : 'attack'; u.target = target; u.moveTarget = null; u.pathWaypoints = null; }
       else { issueMoveOrder(u, p.x, p.y); u.target = null; }
     });
     // The order is issued - drop the selection so the unit stops trailing
@@ -3567,6 +3700,7 @@ async function main() {
       : u.isTurret ? ` · ATK ${u.attack} · RNG ${u.range} · stationary`
       : u.isMissileLauncher ? ` · Missile DMG ${u.attack} · RNG ${missileRange(factionOf(u.factionId))} · stationary - click a target to fire`
       : u.isMedic ? ` · Heals ${u.healAmount} HP/turn · RNG ${u.range} · SPD ${u.speed.toFixed(1)} - click an ally to heal them`
+      : u.isCleric ? ` · Converts enemies · RNG ${u.range} · SPD ${u.speed.toFixed(1)} - click an enemy to convert them`
       : u.isGatedBuilding ? ''
       : u.isMissileUnit ? ` · Missile DMG ${u.attack} · RNG ${u.range} · SPD ${u.speed.toFixed(1)}`
       : ` · ATK ${u.attack} · RNG ${u.range} · SPD ${u.speed.toFixed(1)}`;
@@ -3701,6 +3835,8 @@ async function main() {
     const unitCosts = getCosts(def);
     const combatStats = def.isMedic
       ? `HP ${def.hp} · Heals ${Math.round((Number(def.healAmount) || 0) * (1 + researchPercent(activeFaction, 'regen') / 100))} HP/turn · RNG ${def.range} · SPD ${def.speed}`
+      : def.isCleric
+      ? `HP ${def.hp} · Converts enemies · RNG ${def.range} · SPD ${def.speed}`
       : def.isMissileUnit
       ? `HP ${def.hp} · Missile DMG ${def.attack} · RNG ${def.range} · SPD ${def.speed}`
       : `HP ${def.hp} · ATK ${def.attack} · RNG ${def.range} · SPD ${def.speed}`;

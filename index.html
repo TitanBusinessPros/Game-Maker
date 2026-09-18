@@ -777,6 +777,30 @@
     <button type="button" class="btn-add" id="addTurretBtn">+ Add a turret</button>
   </section>
 
+  <!-- 4j. Religious Institution -->
+  <section class="section" id="sec-religiousinstitution">
+    <h2><span class="num">4j</span> Religious Institution (optional) <button type="button" class="btn-danger building-remove" data-building="religiousInstitution" style="font-size:11px; padding:4px 10px; margin-left:8px; vertical-align:middle;">🗑 Remove this building</button></h2>
+    <div id="religiousInstitutionBody">
+      <p class="hint">A building for Clerics - support units that convert an enemy unit to your side instead of fighting. Works like Air Base above for the building itself (name it whatever fits, give it its own art, HP, and build cost, produced with the same countdown/queue as every other building). Each Cleric you add below has no attack at all: HP, convert range, speed, and cost. Once within range, a Cleric converts one enemy unit each turn (Turn-Based) or each round (Real-Time) - the converted unit keeps its own stats but switches sides and fights for its new owner from then on. Mining Ships and other Clerics can never be converted. Leave the Cleric list empty and this whole feature just doesn't show up in-game.</p>
+      <div class="row">
+        <div class="field"><label>Building name</label><input type="text" id="religiousInstitutionName" value="Religious Institution"></div>
+        <div class="field narrow"><label>Building HP</label><input type="number" id="religiousInstitutionHp" value="2000" min="1000" max="5000" step="100"></div>
+        <div class="field narrow"><label>Build cost</label><input type="number" id="religiousInstitutionCost" value="150" min="0" step="10"></div>
+      </div>
+      <div class="field">
+        <label>Religious Institution art</label>
+        <div class="upload-slot" data-slot="religiousInstitutionImage">
+          <div class="thumb">none</div>
+          <div class="meta"><div class="name">No file chosen</div><div class="status">required if you add any Clerics below</div></div>
+          <input type="file" accept="image/*" style="width:auto">
+        </div>
+      </div>
+      <div id="clericUnitList"></div>
+      <button type="button" class="btn-add" id="addClericUnitBtn">+ Add a Cleric</button>
+    </div>
+    <p class="hint building-removed-note" id="religiousInstitutionRemovedNote" style="display:none;">Religious Institution removed - it won't show up in-game (same as leaving its Cleric list empty). <button type="button" class="btn-add building-restore" data-building="religiousInstitution">+ Add it back</button></p>
+  </section>
+
   <!-- 5. Audio -->
   <section class="section" id="sec-audio">
     <h2><span class="num">5</span> Sounds</h2>
@@ -1370,6 +1394,7 @@ const CATEGORY_LABELS = {
   'structures/missile_silo': 'Missile Silo',
   'structures/navy_harbor': 'Navy Harbor',
   'structures/field_hospital': 'Field Hospital',
+  'structures/religious_institution': 'Religious Institution',
   'sounds/music': 'Background Music',
   'sounds/intro': 'Intro Music',
   'sounds/attack': 'Attack',
@@ -1382,7 +1407,7 @@ const CATEGORY_ORDER = [
   'maps',
   'characters/space_ships', 'characters/navy_ships', 'characters/jets', 'characters/helicopters', 'characters/infantry', 'characters/artillery', 'characters/missiles', 'characters/tanks',
   'worlds', 'bases', 'resources',
-  'structures/war_factory', 'structures/airport', 'structures/infantry_post', 'structures/helicopter_facility', 'structures/research_facility', 'structures/gun_turret', 'structures/missile_silo', 'structures/navy_harbor', 'structures/field_hospital',
+  'structures/war_factory', 'structures/airport', 'structures/infantry_post', 'structures/helicopter_facility', 'structures/research_facility', 'structures/gun_turret', 'structures/missile_silo', 'structures/navy_harbor', 'structures/field_hospital', 'structures/religious_institution',
   'sounds/music', 'sounds/intro', 'sounds/attack', 'sounds/building_destroyed', 'sounds/home_under_attack', 'sounds/endgame', 'sounds',
 ];
 
@@ -1427,6 +1452,7 @@ const SLOT_CATEGORY_HINTS = {
   researchFacilityImage: 'structures/research_facility',
   missileSiloImage: 'structures/missile_silo',
   missileBatteryImage: 'structures/missile_battery',
+  religiousInstitutionImage: 'structures/religious_institution',
   soundMusic: 'sounds/music',
   soundIntro: 'sounds/intro',
   soundAttack: 'sounds/attack',
@@ -1443,6 +1469,7 @@ const SLOT_PREFIX_CATEGORY_HINTS = [
   [/^heliunit_/, 'characters/helicopters'],
   [/^navyunit_/, 'characters/navy_ships'],
   [/^medic_/, 'characters/infantry'],
+  [/^cleric_/, 'characters/infantry'],
   [/^turret_/, 'structures/gun_turret'],
   // Missile Silo rows have two upload slots each - the launcher's own
   // sprite (missile_N) and a second, separate one for the projectile
@@ -1740,6 +1767,7 @@ const fieldHospitalUnitList = document.getElementById('fieldHospitalUnitList');
 const turretList = document.getElementById('turretList');
 const missileUnitList = document.getElementById('missileUnitList');
 const missileBatteryUnitList = document.getElementById('missileBatteryUnitList');
+const clericUnitList = document.getElementById('clericUnitList');
 const unitCounterState = { n: 0 };
 const airUnitCounterState = { n: 0 };
 const warUnitCounterState = { n: 0 };
@@ -1750,6 +1778,7 @@ const fieldHospitalUnitCounterState = { n: 0 };
 const turretCounterState = { n: 0 };
 const missileUnitCounterState = { n: 0 };
 const missileBatteryUnitCounterState = { n: 0 };
+const clericUnitCounterState = { n: 0 };
 
 // Weapon effect a unit's attack draws in play.html - purely cosmetic
 // (damage/range/etc. are unaffected), so it's just a dropdown here and a
@@ -1877,7 +1906,7 @@ const OPTIONAL_BUILDINGS = {
   airBase: airUnitList, warFactory: warUnitList,
   infantryPost: infantryUnitList, heliFacility: heliUnitList,
   navyHarbor: navyUnitList, fieldHospital: fieldHospitalUnitList, missileSilo: missileUnitList,
-  missileBattery: missileBatteryUnitList,
+  missileBattery: missileBatteryUnitList, religiousInstitution: clericUnitList,
 };
 document.querySelectorAll('.building-remove').forEach((btn) => {
   btn.addEventListener('click', () => {
@@ -2137,6 +2166,58 @@ function addFieldHospitalUnitRow(data = {}) {
   return row;
 }
 document.getElementById('addFieldHospitalUnitBtn').addEventListener('click', () => addFieldHospitalUnitRow());
+
+// ---------------------------------------------------------------------
+// Clerics (Religious Institution): same production-queue/build-panel/
+// spawnUnit path as every other gated-building unit (like Field
+// Hospital medics above), and shaped the same way a medic is - no
+// Attack or Weapon field at all, since a Cleric never deals damage.
+// Unlike a medic there's no "amount" field either - conversion is a
+// binary "you now belong to me," not a percentage/HP value - just a
+// convert RANGE, reusing the same u-range field every other unit type
+// already has.
+// ---------------------------------------------------------------------
+function addClericUnitRow(data = {}) {
+  const id = 'cleric_' + (clericUnitCounterState.n++);
+  const row = document.createElement('div');
+  row.className = 'unit-row';
+  row.dataset.unitId = id;
+  row.innerHTML = `
+    <button type="button" class="remove-unit" title="Remove Cleric">&times;</button>
+    <div class="row">
+      <div class="field"><label>Cleric name</label><input type="text" class="u-name" value="${escapeAttr(data.name || '')}" placeholder="e.g. Priest"></div>
+    </div>
+    <div class="upload-slot" data-slot="${id}">
+      <div class="thumb">none</div>
+      <div class="meta"><div class="name">No file chosen</div><div class="status">Cleric sprite - transparent PNG works best</div></div>
+      <input type="file" accept="image/*" style="width:auto">
+    </div>
+    <label style="display:flex; align-items:center; gap:6px; font-weight:normal; margin:8px 0 0;">
+      <input type="checkbox" class="u-rotate" ${data.rotateToFace !== false ? 'checked' : ''} style="width:auto;">
+      Rotate to face movement direction
+    </label>
+    <div class="row" style="margin-top:10px;">
+      <div class="field narrow"><label>HP</label><input type="number" class="u-hp" value="${data.hp ?? 150}" min="1"></div>
+      <div class="field narrow"><label>Convert range</label><input type="number" class="u-range" value="${data.range ?? 80}" min="0"></div>
+      <div class="field narrow"><label>Speed</label><input type="number" class="u-speed" value="${data.speed ?? 2}" min="0" step="0.1"></div>
+      <div class="field narrow"><label>Production time (s, 10-7200)</label><input type="number" class="u-prodtime" value="${data.prodTime ?? 30}" min="10" max="7200" step="5"></div>
+    </div>
+    <div class="field" style="margin-top:6px;">
+      <label>Cost</label>
+      <div class="u-costs"></div>
+    </div>
+  `;
+  renderCostFields(row, data.costs || (data.cost != null ? { gold: data.cost } : { gold: 300 }));
+  row.querySelector('.remove-unit').addEventListener('click', () => {
+    delete existingAssetUrls[id];
+    row.remove();
+  });
+  wireUploadSlot(row.querySelector('.upload-slot'));
+  clericUnitList.appendChild(row);
+  if (data.imageUrl) showExistingAsset(id, data.imageUrl);
+  return row;
+}
+document.getElementById('addClericUnitBtn').addEventListener('click', () => addClericUnitRow());
 
 // ---------------------------------------------------------------------
 // Game style: Real-Time (default, unchanged) vs Turn-Based hot-seat.
@@ -2561,7 +2642,7 @@ function setSaveStatus(text, cls) {
 
 const FIXED_UPLOAD_SLOTS = [
   'backgroundImage', 'goodBaseImage', 'resourceImage', 'miningUnitImage',
-  'airBaseImage', 'warFactoryImage', 'infantryPostImage', 'heliFacilityImage', 'navyHarborImage', 'fieldHospitalImage', 'researchFacilityImage', 'missileSiloImage', 'missileBatteryImage',
+  'airBaseImage', 'warFactoryImage', 'infantryPostImage', 'heliFacilityImage', 'navyHarborImage', 'fieldHospitalImage', 'researchFacilityImage', 'missileSiloImage', 'missileBatteryImage', 'religiousInstitutionImage',
   'soundMusic', 'soundIntro', 'soundAttack', 'soundBuildingDestroyed', 'soundHomeUnderAttack', 'soundEndgame',
 ];
 
@@ -2722,6 +2803,30 @@ function collectFieldHospitalUnits(uploadResults) {
     };
   });
 }
+// Clerics reuse the exact same production-queue/spawnUnit path as Field
+// Hospital medics above (see that function's own comment) - attack/
+// weapon are fixed, non-editable values for the same reason (a Cleric
+// never deals damage or fires a weapon effect), and isCleric:true is
+// what play.html's per-unit update loop/convertTick actually key off of.
+function collectClericUnits(uploadResults) {
+  const rows = Array.from(clericUnitList.querySelectorAll('.unit-row'));
+  return rows.map((row) => {
+    const id = row.dataset.unitId;
+    return {
+      name: row.querySelector('.u-name').value.trim() || 'Cleric',
+      imageUrl: uploadResults[id] || null,
+      hp: Number(row.querySelector('.u-hp').value) || 0,
+      range: Number(row.querySelector('.u-range').value) || 0,
+      speed: Number(row.querySelector('.u-speed').value) || 0,
+      prodTime: Math.max(10, Math.min(7200, Number(row.querySelector('.u-prodtime').value) || 30)),
+      costs: currentCostsFromRow(row),
+      attack: 0,
+      weapon: 'laser',
+      rotateToFace: row.querySelector('.u-rotate').checked,
+      isCleric: true,
+    };
+  });
+}
 
 async function buildMapDoc(status) {
   const unitSlots = Array.from(unitList.querySelectorAll('.unit-row')).map((row) => row.dataset.unitId);
@@ -2738,10 +2843,11 @@ async function buildMapDoc(status) {
   // Same two-slots-per-row shape as missileUnitSlots above - see
   // addMissileBatteryUnitRow/collectMissileBatteryUnits.
   const missileBatteryUnitSlots = Array.from(missileBatteryUnitList.querySelectorAll('.unit-row')).flatMap((row) => [row.dataset.unitId, `${row.dataset.unitId}_missile`]);
+  const clericUnitSlots = Array.from(clericUnitList.querySelectorAll('.unit-row')).map((row) => row.dataset.unitId);
   const computerSlots = Array.from(computerList.querySelectorAll('.computer-row')).map((row) => row.dataset.computerId);
   const resourceSlots = Array.from(document.querySelectorAll('#extraResourcesList .resource-row')).map((row) => row.dataset.resourceId);
   const obstacleSlots = Array.from(document.querySelectorAll('#obstaclesList .obstacle-row')).map((row) => row.dataset.obstacleId);
-  const uploadResults = await uploadSlotsWithLimit([...FIXED_UPLOAD_SLOTS, ...unitSlots, ...airUnitSlots, ...warUnitSlots, ...infantryUnitSlots, ...heliUnitSlots, ...navyUnitSlots, ...fieldHospitalUnitSlots, ...turretSlots, ...missileUnitSlots, ...missileBatteryUnitSlots, ...computerSlots, ...resourceSlots, ...obstacleSlots]);
+  const uploadResults = await uploadSlotsWithLimit([...FIXED_UPLOAD_SLOTS, ...unitSlots, ...airUnitSlots, ...warUnitSlots, ...infantryUnitSlots, ...heliUnitSlots, ...navyUnitSlots, ...fieldHospitalUnitSlots, ...turretSlots, ...missileUnitSlots, ...missileBatteryUnitSlots, ...clericUnitSlots, ...computerSlots, ...resourceSlots, ...obstacleSlots]);
   const units = collectUnits(uploadResults);
   const airUnits = collectAirUnits(uploadResults);
   const warUnits = collectWarUnits(uploadResults);
@@ -2752,6 +2858,7 @@ async function buildMapDoc(status) {
   const gunTurrets = collectTurrets(uploadResults);
   const missileUnits = collectMissileUnits(uploadResults);
   const missileBatteryUnits = collectMissileBatteryUnits(uploadResults);
+  const clericUnits = collectClericUnits(uploadResults);
   const computers = collectComputers(uploadResults);
   return {
     ownerId: currentUser.uid,
@@ -2894,6 +3001,18 @@ async function buildMapDoc(status) {
       image: uploadResults.missileBatteryImage,
     },
     missileBatteryUnits,
+    // Optional, gated like Air Base/War Factory/etc (its own building has
+    // to be built first, produced with the same queue/timer system) -
+    // shaped like Field Hospital's medics above (no Attack/Weapon, merged
+    // into play.html's unitDefs the same way) except its special action
+    // is converting an enemy unit to your side instead of healing one.
+    religiousInstitution: {
+      name: document.getElementById('religiousInstitutionName').value.trim() || 'Religious Institution',
+      hp: clampHomeworldHp(document.getElementById('religiousInstitutionHp').value),
+      cost: Number(document.getElementById('religiousInstitutionCost').value) || 150,
+      image: uploadResults.religiousInstitutionImage,
+    },
+    clericUnits,
     sounds: {
       music: uploadResults.soundMusic,
       intro: uploadResults.soundIntro,
@@ -2924,7 +3043,7 @@ function checklistGaps(mapDoc) {
     gaps.push('at least one unit (Air Base / War Factory / Infantry Post / Helicopter Facility / Navy Harbor / Missile Battery - Combat Units is no longer used)');
   }
   mapDoc.units.forEach((u, i) => { if (!u.imageUrl) gaps.push(`unit #${i + 1} (${u.name}) art`); });
-  // Same pattern 4 times: a gated building's own art (and each of its
+  // Same pattern for each gated building below: its own art (and each of its
   // units' art) is only required if that building's unit list actually
   // has something in it - an empty list means the whole feature is
   // absent from the map, so there's nothing to require art for.
@@ -2932,6 +3051,7 @@ function checklistGaps(mapDoc) {
     ['airBase', 'airUnits'], ['warFactory', 'warUnits'],
     ['infantryPost', 'infantryUnits'], ['heliFacility', 'heliUnits'],
     ['navyHarbor', 'navyUnits'], ['fieldHospital', 'fieldHospitalUnits'],
+    ['religiousInstitution', 'clericUnits'],
   ].forEach(([buildingKey, unitsKey]) => {
     const units = mapDoc[unitsKey];
     if (!units.length) return;
@@ -3334,6 +3454,16 @@ async function loadExistingMap() {
   if (Array.isArray(m.missileBatteryUnits) && m.missileBatteryUnits.length) {
     missileBatteryUnitList.innerHTML = '';
     m.missileBatteryUnits.forEach((u) => addMissileBatteryUnitRow(u));
+  }
+  if (m.religiousInstitution) {
+    document.getElementById('religiousInstitutionName').value = m.religiousInstitution.name || 'Religious Institution';
+    document.getElementById('religiousInstitutionHp').value = m.religiousInstitution.hp || 2000;
+    document.getElementById('religiousInstitutionCost').value = m.religiousInstitution.cost || 150;
+    if (m.religiousInstitution.image) showExistingAsset('religiousInstitutionImage', m.religiousInstitution.image);
+  }
+  if (Array.isArray(m.clericUnits) && m.clericUnits.length) {
+    clericUnitList.innerHTML = '';
+    m.clericUnits.forEach((u) => addClericUnitRow(u));
   }
 
   if (m.sounds) {

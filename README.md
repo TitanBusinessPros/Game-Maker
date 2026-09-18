@@ -360,6 +360,25 @@ line. Only this page has the logo/title/footer treatment so far -
    gives it. AI factions place turrets the
    same way, just picking a random valid spot instead of needing a
    click.
+4j. **Religious Institution** (optional) — a ninth gated building, same
+   name/art/HP/build-cost shape as Air Base/War Factory/Infantry Post/
+   Helicopter Facility/Navy Harbor/Missile Silo/Missile Battery above
+   (including its own **🗑 Remove this building** button), but its unit
+   list below it is a **Cleric** type, shaped like a Field Hospital medic
+   (item 4e) rather than a normal combat unit: no Attack or Weapon field
+   at all - instead **HP**, a **convert range**, **speed**, a **Rotate to
+   face movement direction** checkbox, **production time**, and
+   **costs**. Once within range, a Cleric converts one enemy unit to its
+   own side - not damage, an actual change of ownership - the same
+   one-action-per-turn rule every other unit follows (once per turn in
+   Turn-Based, once per round in Real-Time). A converted unit keeps its
+   own current stats and just switches sides, fighting for its new owner
+   from then on. **Mining Ships and other Clerics can never be
+   converted** - a home base and a gated building (a structure, not a
+   "unit") can't be either; every other unit type can, including Gun
+   Turrets, Missile Silo launchers, Missile Battery units, and Field
+   Hospital medics. Leave its Cleric list empty and the whole feature is
+   absent from the map, same as every other gated building.
 5. **Sounds** — background music, intro music, attack/building-destroyed/
    home-base-under-attack/game-over sfx. All optional, all `.mp3`.
 5a. **Free Resources Each Round** (optional) — its own section now (moved
@@ -996,6 +1015,35 @@ entirely by one map's saved data:
   stronger if that research finishes later, only ones built afterward
   do) - the one research topic that used to have no in-game effect at
   all now does.
+- **Religious Institution's Clerics** - another unit type with no attack
+  at all, shaped like Field Hospital's medics above but converting an
+  ENEMY unit instead of healing an ALLY. Select one (or several) and
+  click an enemy unit within its **convert range** to order the
+  conversion instead of an attack order - walks into range first if it
+  isn't already close enough, then flips that unit's ownership to the
+  Cleric's own faction (`u.factionId`, the single field every ownership
+  check in this file - `isAlly`, `livingUnits`, a unit's own faction
+  color, AI's per-faction thinking, selection - already keys off, so
+  changing it is the entire mechanic), same one-action-per-turn lock
+  every attack goes through ("convert one enemy unit each turn" in
+  Turn-Based, "each round" in Real-Time - the exact same
+  `isLocked`/`lockUnit` every other action already uses, not a separate
+  cooldown system). The converted unit keeps its own current stats
+  (HP, attack, whatever it already was) and simply fights for its new
+  owner from then on - conversion doesn't re-bake it with the new
+  faction's research bonuses, and any standing order or live selection
+  it held under its old owner is cancelled the moment it changes hands.
+  Shows as a distinct purple pulse (like the medic's own green heal
+  pulse, neither reads as an attack). **Mining Ships and other Clerics
+  can never be converted** - clicking one while a Cleric is selected
+  just falls back to a plain move order instead, same as clicking empty
+  space would - nor can a home base or a gated building (structures,
+  not "units"); every other unit type is fair game, Gun Turrets/Missile
+  Silo launchers/Missile Battery units/Field Hospital medics included.
+  An AI-controlled Cleric picks its own target automatically - the
+  nearest convertible enemy unit in range - the same idea as a Gun
+  Turret auto-acquiring the nearest enemy or a medic auto-picking the
+  nearest damaged ally.
 - **Research Facility** (mandatory, set on the map): same one-time-
   purchase build-panel row, same real attackable/destroyable entity, as
   the buildings above, but it gates the Research tab itself rather than
@@ -1319,7 +1367,8 @@ sub-picker - the last one backs `index.html`'s Terrain Obstacles section,
 3c), **Structures**
 (sub-picker: **War Factory**, **Airport**, **Infantry Post**,
 **Helicopter Facility**, **Research Facility**, **Gun Turret**,
-**Missile Silo**, **Missile Battery**, **Navy Harbor**, **Field Hospital**
+**Missile Silo**, **Missile Battery**, **Navy Harbor**, **Field Hospital**,
+**Religious Institution**
 - `structures/<type>`), **Sounds** (sub-picker: **Background
 Music**, **Intro Music**, **Attack**, **Building Destroyed**, **Home Base
 Under Attack**, **Game Over** - `sounds/<type>`). Any top-level category
