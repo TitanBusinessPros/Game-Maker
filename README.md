@@ -1577,6 +1577,24 @@ secret. `firestore.rules`/`storage.rules` in this repo are deployed via
 `firebase deploy --only firestore:rules,storage` (Firebase CLI, logged in
 as the project owner) - not something GitHub Pages hosting does for you.
 
+## `terms.html` / `privacy.html`
+
+Static legal pages, linked from every page's footer (see `index.html`,
+`play.html`, `admin.html`, `producer.html`). No script beyond a page-load
+theme toggle - plain HTML/CSS, dated "Last updated" in each page's own
+`<p class="updated">`. Kept high-level on purpose (accounts, uploads,
+credits/payments, hosting) rather than describing individual gameplay
+features, so most new features (Terrain Obstacles, pathfinding, the
+walking bob animation, etc.) never need a change here at all. What DOES
+need a review here: anything that changes what data is collected, adds a
+new third-party service, or changes how credits/payments work - e.g. the
+admin's own "Grant download credits" action and its `pendingCreditGrants`
+collection (see `functions/` section above) predated the last privacy
+update and had to be added afterward: a second Cloud Function distinct
+from the Stripe webhook, and a new Firestore collection queuing a credit
+grant for an email that hasn't signed in yet, neither of which the
+original wording covered.
+
 ## Hosting
 
 Static site on GitHub Pages (source = `main`, path `/`). No build step.
