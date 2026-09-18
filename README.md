@@ -172,8 +172,20 @@ line. Only this page has the logo/title/footer treatment so far -
    copies of the same obstacle; click a placed one to remove just that
    one. Nothing here is required to Finish & Save - a row with no points
    placed just contributes nothing. See `play.html`'s own obstacles/
-   `steerAroundObstacles` bullet further down for how units actually
-   avoid what gets placed.
+   pathfinding bullet further down for how units actually navigate around
+   what gets placed.
+   Every placement-map preview (Gold's, any Additional Resource's, and
+   every obstacle's) also shows small reference dots for every OTHER
+   row's own already-placed points - gold/resources in one color,
+   obstacles in another, labeled by name on hover - so placing a new
+   point never means guessing whether it lands right on top of something
+   else already there. Reported directly: "we need to show the resources
+   on the placement map so they don't overlap," after a Silver deposit
+   ended up sitting at the very edge of an obstacle cluster on a real
+   saved map without anyone noticing until testing it. Purely visual and
+   non-interactive (`renderReferenceMarkers`, `widgetKindAndLabel`) -
+   clicking one does nothing; removing a point only ever happens on
+   whichever row actually owns it.
 4. **Air Base** (optional) — a building for planes/jets/spaceships/etc.
    Give it a name (defaults to "Air Base"), its own **art**, **HP**
    (1000-5000, same range/field as Home Base's), and a build cost, then
@@ -752,77 +764,85 @@ entirely by one map's saved data:
   fits the theme) that units can't walk through. Each placed point
   becomes one real circle (`obstacles`, radius = that obstacle type's own
   "Size" field / 2), drawn under every unit/building the same way a
-  map-placed resource deposit is. Avoidance is deliberately *local
-  steering*, not real pathfinding - no grid, no A*, no awareness of a
-  whole cluster of obstacles at once: every place a unit moves toward a
-  goal in a straight line (a move order, or a combat/heal unit closing
-  distance on its target - `runMoveOrder`, `combatTick`, `healTick`, all
-  funneled through the same shared `moveTowardWithAvoidance`) looks only
-  at the single nearest obstacle actually blocking that straight line
-  (ahead of the unit, within combined radius of the line) and steers
-  along a tangent around its near edge instead - "take whatever the
-  closest option is to go around the placement," in the map-maker's own
-  words. That tick's total movement distance is walked in small (20px)
-  sub-steps, re-running the avoidance check fresh after each one, rather
-  than one single big jump - recomputing it only once per tick let a fast
-  unit (or just a slow frame - this engine caps `dt` at 0.05s, so a lag
-  spike alone was enough) cover more ground in one step than an
-  obstacle's own clearance band, jumping from one side of it to the other
-  between checks with nothing steering it through the *middle* of that
-  jump - it got stuck oscillating in place forever instead of ever
-  clearing the obstacle. A `pushOutOfObstacles` hard backstop runs after
-  every step regardless (and after `clampToWorld`, so the world-edge clamp
-  can never shove a unit back into one either) - it guarantees a unit's
-  own center can never actually end up inside an obstacle's collision
-  circle, covering whatever edge case the steering heuristic alone
-  doesn't fully solve (a sharp corner between two obstacles, for
-  instance). A map with no obstacles at all skips every bit of this and
-  moves in the original single straight-line step, so maps that don't use
-  the feature pay nothing for it. Known limitation, not silently hidden:
-  a long wall of obstacles or a tight cluster can still give a unit
-  trouble finding its way all the way through, the same as any
-  local-avoidance-only approach - there's no larger detour planned behind
-  it the way a real pathfinder would.
-  Two real bugs surfaced once this shipped, both reported as "mining
-  ships not navigating correctly" / "it stops moving" (it never actually
-  stopped - it just stopped making real progress): (1) the "nearest
-  blocking obstacle" search used to scan the unit's ENTIRE remaining
-  distance to its goal, so a long-distance move order treated any
-  obstacle merely sitting roughly on the eventual bearing - even one
-  still thousands of pixels away - as something to steer around right
-  now; with several obstacles placed close together along that bearing (a
-  map-maker's own test map, an 18-piece wall of them), "nearest of
-  several distant, nearly-tied obstacles" kept handing off as the unit
-  drifted, so it drifted sideways forever without ever actually closing
-  the distance. Fixed with `OBSTACLE_LOOKAHEAD` (350px, plus that
-  obstacle's own radius) - a unit only reacts once something is actually
-  close enough to matter. (2) Once genuinely near an obstacle, the "which
-  tangent points more toward the goal" choice was recomputed fresh every
-  20px sub-step - fine normally, but the instant the goal sits roughly in
-  line with the obstacle the two tangents are nearly tied, and tiny
-  per-substep position changes flipped which one briefly "won," so the
-  unit vibrated in place. Fixed by committing to one side per obstacle
-  encounter (`_avoidObstacle`/`_avoidSign`, cached on the unit itself,
-  cleared once that obstacle stops blocking) instead of re-deciding every
-  sub-step. A dense, overlapping wall (obstacles placed close enough that
-  neighboring collision circles actually intersect, with no real gap a
-  unit's own size can fit through) can still wedge a unit into a stable
-  trap even with both fixes, since committing to one side just means
-  reliably circling the SAME obstacle the SAME way forever if that's the
-  only option nearby - a `_stallTicks` counter watches for real
-  straight-line progress toward the goal stalling out over roughly 15
-  consecutive calls despite genuinely trying, and when it does, adds the
-  currently-stuck-on obstacle to a per-unit `_avoidIgnore` set so the unit
-  stops proactively steering around it and instead heads straight for its
-  goal again - `pushOutOfObstacles` still refuses to let it actually
-  overlap that (or any) obstacle regardless, so in practice this reads as
-  sliding along its surface toward whatever real obstacle is next, rather
-  than sitting frozen. This meaningfully improves - but, being still local
-  avoidance with no actual detour planning, can't fully guarantee escaping
-  - a truly solid, gapless wall; a map-maker who wants units to reliably
-  path between/around a cluster of obstacles should leave real gaps
-  (combined radius plus a unit's own clearance) between neighboring ones
-  rather than placing them touching or overlapping.
+  map-placed resource deposit is.
+  A real MOVE order (`issueMoveOrder` - a click-to-move, the minimap, or a
+  Mining Ship auto-ordering itself to a deposit) now plans an actual
+  route around whatever's in the way instead of only reacting moment to
+  moment - "I expected whatever units to go around the wall... we need
+  units to travel around the objects even if it means going completely
+  around," reported directly after the first version (local-only
+  reactive steering, no planning at all) got a unit wedged in a dense
+  cluster instead of routing around it. `findPathAround` builds a
+  tangent-style visibility graph over every obstacle once per match
+  (`buildPathGraph`, lazy on the first order that needs it - a map with
+  no obstacles never builds one at all): each obstacle contributes
+  `PATH_SAMPLES_PER_OBSTACLE` (12) points spaced evenly around a circle
+  well outside its real collision radius (`PATH_MARGIN`, 30px of extra
+  breathing room past the hard clearance - real margin, not a bare
+  minimum, matters below), connected to each other whenever a straight
+  line between them doesn't cut through any OTHER obstacle, plus each
+  obstacle's own points connect to their immediate neighbors so a route
+  can hug all the way around a single obstacle (or a whole overlapping
+  chain of them) when that's genuinely the only way through. A move order
+  splices its own start/goal into this fixed graph and runs Dijkstra -
+  the map-maker's own 18-piece "wall" test (several obstacles placed
+  close enough to actually overlap, with no gap through the middle at
+  all) now correctly routes all the way around whichever end of the wall
+  is shorter, rather than getting stuck attempting the middle. Each
+  planned leg is then walked as a plain straight line (no more reactive
+  steering layered underneath it - see below for why), with
+  `pushOutOfObstacles` kept on purely as a defensive backstop that should
+  essentially never trigger, given the graph's own real margin. A
+  straight line that's already clear skips pathfinding entirely (the
+  common case - a map with no obstacles nearby pays nothing beyond the
+  one check), and combat/heal units closing distance on a target
+  (`combatTick`/`healTick`) still use the original lighter-weight
+  reactive local steering (`moveTowardWithAvoidance`/
+  `steerAroundObstacles`) rather than full pathfinding, since a combat
+  target's position can change every tick and re-planning a whole route
+  that often isn't worth the cost - a target usually isn't hidden behind
+  a deliberate obstacle wall the way a resource deposit or a manually
+  clicked destination can be.
+  Three real bugs surfaced building this, all instructive about why a
+  visibility graph over circles needs real care: (1) the very first
+  version skipped checking a segment against whichever obstacle either of
+  its own two endpoints sat on - meant to avoid a false "intersects
+  itself" rejection right at the graze point, but it also let an edge
+  leave a point on one side of a circle and cut straight back through
+  that SAME circle's interior further along the same segment if the far
+  endpoint happened to be on the opposite side. Fixed by only skipping an
+  obstacle for the one narrow case that actually needs it (a ring edge
+  between two adjacent sample points on that same obstacle, which
+  legitimately dips slightly inside its own circle - real geometry, not
+  noise) and otherwise checking every segment against every obstacle,
+  with a small epsilon (`PATH_EPS`) so a segment that only grazes its own
+  source point's circle isn't falsely flagged by floating-point noise
+  alone. (2) A thin margin (6px past the bare collision clearance) let
+  the graph "find" gaps between two overlapping/adjacent obstacles that
+  were real on paper but too tight for the reactive local steering
+  underneath to thread reliably - minor sub-step drift kept re-crossing
+  back into one obstacle's clearance zone and deflecting into its
+  neighbor's, the exact trap this was supposed to fix. Raising the margin
+  to something a real unit can actually walk through (30px) makes the
+  graph correctly refuse razor-thin "gaps" like that, forcing the only
+  valid route through a genuinely gapless cluster to go around the whole
+  thing instead. (3) Once (2) exposed that reactive steering itself
+  wasn't precise enough to reliably thread even a real, wide-enough gap
+  without occasionally drifting off course, planned-route movement
+  dropped the reactive steering layer entirely in favor of walking each
+  leg as a plain straight line - every leg was already graph-verified
+  clear with real margin, so there was nothing left worth reacting to,
+  and nothing left to drift off of either.
+  A related, unrelated-to-obstacles bug surfaced alongside this: a fast
+  unit approaching a waypoint could cover more distance in one tick than
+  actually remained, overshooting clean past it and immediately
+  "arriving" from the other side too far the other way - a perpetual
+  ping-pong across the point that never landed within the 4px arrival
+  window. Multiple short legs (several waypoints close together) made
+  this far more likely to actually surface than the old single-final-
+  destination case ever had. Fixed by capping each tick's step at
+  whichever is smaller, the normal speed-based distance or however much
+  distance actually remains.
 - A small **▲ / ▼ tab centered under the topbar** collapses the entire
   topbar (resource/turn HUD, map name, Skip Turn, Pause/Sound/Save/Load/
   Download) down to just that tab, so only the map itself shows -

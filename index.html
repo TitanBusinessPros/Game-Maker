@@ -158,6 +158,20 @@
     cursor: pointer;
   }
   .placement-marker:hover { background: var(--bad); box-shadow: 0 0 0 2px var(--bad); }
+  /* Other rows' own already-placed points, shown for reference on THIS
+     widget's map so nothing new gets dropped right on top of them -
+     smaller, dimmer, and never clickable (removing a point only ever
+     happens on the row that actually owns it). Resource deposits (Gold
+     included) and obstacles get distinct colors since overlapping one
+     matters for very different reasons (a miner routing to a deposit vs.
+     a unit needing to walk around an obstacle). */
+  .placement-reference-marker {
+    position: absolute; width: 10px; height: 10px; margin: -5px 0 0 -5px;
+    border-radius: 50%; border: 2px solid #06121f; opacity: 0.85;
+    pointer-events: none;
+  }
+  .placement-reference-marker.ref-resource { background: #e8b93a; box-shadow: 0 0 0 1px #e8b93a; }
+  .placement-reference-marker.ref-obstacle { background: #8a5a3a; box-shadow: 0 0 0 1px #8a5a3a; }
   .placement-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; }
   .placement-count { font-size: 12px; color: var(--text-dim); }
   .placement-clear { font-size: 11px; padding: 4px 10px; }
@@ -1180,6 +1194,57 @@ function placementWidgetHTML(resourceKey, placement) {
 // straight from data-mode/data-points on the root element rather than
 // tracking it separately, same reasoning as every other row in this file
 // (collect straight from the DOM at save time, see readPlacement below).
+// Which category a placement-widget belongs to, purely for the
+// cross-widget reference markers below (renderReferenceMarkers) - a
+// distinct dot color/label so "there's already a resource deposit here"
+// reads differently from "there's already an obstacle here" when placing
+// a NEW point on some other row's own map. Falls back to "Placement" for
+// a shape this never expects (defensive only - every real caller of
+// wirePlacementWidget today is Gold, an Additional Resource, or an
+// Obstacle).
+function widgetKindAndLabel(widget) {
+  if (widget.id === 'goldPlacementWidget') return { kind: 'resource', label: 'Gold' };
+  const obstacleRow = widget.closest('.obstacle-row');
+  if (obstacleRow) {
+    const name = obstacleRow.querySelector('.obstacle-name');
+    return { kind: 'obstacle', label: (name && name.value.trim()) || 'Obstacle' };
+  }
+  const resourceRow = widget.closest('.resource-row');
+  if (resourceRow) {
+    const name = resourceRow.querySelector('.resource-name');
+    return { kind: 'resource', label: (name && name.value.trim()) || 'Resource' };
+  }
+  return { kind: 'resource', label: 'Placement' };
+}
+// Every OTHER placement-widget's own already-placed points, drawn as
+// small non-interactive reference dots on THIS widget's map - so placing
+// Gold (say) shows exactly where every obstacle and every other resource
+// already sits, and vice versa, instead of a map-maker unknowingly
+// dropping a new point right on top of one and only discovering the
+// overlap once actually playtesting (reported directly: a Silver deposit
+// ended up sitting right at the edge of an obstacle cluster this way).
+// Reads every other widget's live DOM state fresh each call rather than
+// tracking it separately - same reasoning as everything else in this
+// file (see readPlacement/collectExtraResources).
+function renderReferenceMarkers(root, wrap) {
+  wrap.querySelectorAll('.placement-reference-marker').forEach((el) => el.remove());
+  document.querySelectorAll('.placement-widget').forEach((widget) => {
+    if (widget === root) return;
+    if ((widget.dataset.mode || 'base') !== 'map') return;
+    let points;
+    try { points = JSON.parse(widget.dataset.points || '[]'); } catch { points = []; }
+    if (!points.length) return;
+    const { kind, label } = widgetKindAndLabel(widget);
+    points.forEach((p) => {
+      const marker = document.createElement('div');
+      marker.className = `placement-reference-marker ref-${kind}`;
+      marker.style.left = (p.x * 100) + '%';
+      marker.style.top = (p.y * 100) + '%';
+      marker.title = label;
+      wrap.appendChild(marker);
+    });
+  });
+}
 function wirePlacementWidget(root) {
   if (!root) return;
   const wrap = root.querySelector('.placement-canvas-wrap');
@@ -1207,7 +1272,7 @@ function wirePlacementWidget(root) {
         const pts = getPoints();
         pts.splice(idx, 1);
         setPoints(pts);
-        syncUI();
+        refreshAllPlacementPreviews();
       });
       wrap.appendChild(marker);
     });
@@ -1224,12 +1289,17 @@ function wirePlacementWidget(root) {
     const url = currentBackgroundPreviewUrl();
     wrap.style.backgroundImage = url ? `url(${url})` : 'none';
     renderMarkers();
+    renderReferenceMarkers(root, wrap);
   }
 
+  // Every mutation below refreshes ALL open placement widgets (not just
+  // this one) - adding/removing/clearing a point, or switching a
+  // resource's own mode, changes what every OTHER widget's reference
+  // markers need to show right now, not just this widget's own state.
   radios.forEach((r) => r.addEventListener('change', () => {
     if (!r.checked) return;
     root.dataset.mode = r.value;
-    syncUI();
+    refreshAllPlacementPreviews();
   }));
   wrap.addEventListener('click', (e) => {
     if (e.target !== wrap) return; // a marker's own click handler (above) already handled removing itself
@@ -1239,9 +1309,9 @@ function wirePlacementWidget(root) {
     const pts = getPoints();
     pts.push({ x: Number(x.toFixed(4)), y: Number(y.toFixed(4)) });
     setPoints(pts);
-    syncUI();
+    refreshAllPlacementPreviews();
   });
-  clearBtn.addEventListener('click', () => { setPoints([]); syncUI(); });
+  clearBtn.addEventListener('click', () => { setPoints([]); refreshAllPlacementPreviews(); });
 
   placementRefreshFns.push(syncUI);
   syncUI();

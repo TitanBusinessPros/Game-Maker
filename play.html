@@ -1137,6 +1137,202 @@ async function main() {
     return pts.map((p) => ({ x: p.x, y: p.y, radius: (o.size || 120) / 2, img: OBSTACLE_IMAGES[i] }));
   });
 
+  // ---------------------------------------------------------------------
+  // Obstacle pathfinding: a real visibility-graph path around obstacles,
+  // used for actual MOVE orders (issueMoveOrder below) - not the reactive
+  // local steering above (steerAroundObstacles/moveTowardWithAvoidance),
+  // which still runs underneath it for the fine-grained walk between
+  // waypoints. Local steering alone could still wedge a unit into a dense
+  // or "wall"-shaped cluster of obstacles with no real gap through the
+  // middle - reported directly: "I expected whatever units to go around
+  // the wall... we need units to travel around the objects even if it
+  // means going completely around." That needs actual route planning,
+  // not just "which way to nudge right now."
+  //
+  // Since obstacles never move once a match starts, every obstacle's own
+  // ring of sample points (and which pairs of them see each other clearly)
+  // is fixed for the whole match - computed ONCE here (buildPathGraph)
+  // rather than per move order. Each obstacle contributes
+  // PATH_SAMPLES_PER_OBSTACLE points spaced evenly around a circle just
+  // outside its real collision radius; a straight line between any two
+  // points (on the same or different obstacles) is a valid graph edge as
+  // long as it doesn't pass through any OTHER obstacle's inflated circle.
+  // A move order then just has to splice its own start/goal into this
+  // fixed graph (cheap - only those two points need fresh visibility
+  // checks) and run Dijkstra over it - the classic "tangent visibility
+  // graph" approach for circular obstacles, simplified by sampling each
+  // circle at fixed angles instead of computing exact bitangents (a
+  // slightly less optimal route, never a wrong one).
+  const PATH_SAMPLES_PER_OBSTACLE = 12;
+  // Extra clearance a planned path must keep beyond the hard collision
+  // radius - deliberately generous (bigger than one obstacle-avoidance
+  // sub-step, OBSTACLE_AVOIDANCE_STEP above). A thin margin let the graph
+  // "find" gaps between two overlapping/adjacent obstacles that were only
+  // a few pixels wider than the bare collision clearance - real enough on
+  // paper, but the reactive local steering underneath (which still walks
+  // each leg between waypoints) isn't perfectly precise, so minor
+  // sub-step drift kept re-crossing back into one obstacle's clearance
+  // zone and deflecting the unit into its neighbor's, trapping it exactly
+  // like before pathfinding existed at all - the map-maker's own dense
+  // "wall" test (several obstacles placed close enough to genuinely
+  // overlap) reproduced this. A wide-enough margin makes the graph refuse
+  // razor-thin "gaps" like that in the first place, so the only path it
+  // ever finds through a genuinely gapless cluster goes around the whole
+  // thing instead - "even if it means going completely around."
+  const PATH_MARGIN = 30;
+  function obstacleRadiusForPath(o) { return o.radius + UNIT_COLLISION_RADIUS + PATH_MARGIN; }
+  // Closest distance from circle center (cx,cy) to segment A-B, compared
+  // against r - the standard segment/circle test used to decide whether a
+  // candidate graph edge (or a fresh start/goal visibility check) actually
+  // passes through a given obstacle.
+  // A small tolerance (subtracted from r) so a segment that starts or
+  // ends EXACTLY on a sample point's own circle (as every sample point
+  // does, by construction) isn't falsely flagged as intersecting that
+  // same circle purely from floating-point noise sitting a hair under r -
+  // never enough to matter for whether it also clips a DIFFERENT, nearby
+  // obstacle it has no special relationship with.
+  const PATH_EPS = 0.5;
+  function segmentIntersectsCircle(A, B, cx, cy, r) {
+    const dx = B.x - A.x, dy = B.y - A.y;
+    const len2 = dx * dx + dy * dy;
+    if (len2 < 1e-6) return Math.hypot(A.x - cx, A.y - cy) < r - PATH_EPS;
+    let t = ((cx - A.x) * dx + (cy - A.y) * dy) / len2;
+    t = Math.max(0, Math.min(1, t));
+    const px = A.x + t * dx, py = A.y + t * dy;
+    return Math.hypot(px - cx, py - cy) < r - PATH_EPS;
+  }
+  // ringSkipIdx: the ONE obstacle to skip, used only for a ring edge
+  // connecting two adjacent sample points on that SAME obstacle's own
+  // circle - the chord between them genuinely dips slightly inside their
+  // own circle (that's just geometry, not floating-point noise, so the
+  // epsilon above doesn't cover it), which is fine and expected; it must
+  // never mean "and also feel free to pass back through this obstacle
+  // anywhere else." Every other kind of edge (cross-obstacle, and a real
+  // unit's own start/goal visibility to a sample point) passes -1 and
+  // gets checked against every obstacle, including whichever one either
+  // endpoint happens to sit on - skipping an obstacle for its own
+  // endpoint used to let an edge leave a point on its boundary and cut
+  // straight back through that same obstacle's interior further along
+  // the same segment (an edge from a point on one side of a circle
+  // straight through to a destination on the OTHER side still "skipped"
+  // that circle entirely, even though the middle of the segment plunged
+  // right through its center) - the map-maker's own "wall" test map hit
+  // this reliably on unlucky angles.
+  function segmentClearsObstacles(A, B, ringSkipIdx) {
+    for (let oi = 0; oi < obstacles.length; oi++) {
+      if (oi === ringSkipIdx) continue;
+      const o = obstacles[oi];
+      if (segmentIntersectsCircle(A, B, o.x, o.y, obstacleRadiusForPath(o))) return false;
+    }
+    return true;
+  }
+  let pathGraph = null; // { nodes: [{x,y,obstacleIdx}], adj: [[{to,dist}, ...], ...] } - built lazily, once
+  function buildPathGraph() {
+    const nodes = [];
+    obstacles.forEach((o, oi) => {
+      const r = obstacleRadiusForPath(o);
+      for (let k = 0; k < PATH_SAMPLES_PER_OBSTACLE; k++) {
+        const ang = (k / PATH_SAMPLES_PER_OBSTACLE) * Math.PI * 2;
+        nodes.push({ x: o.x + Math.cos(ang) * r, y: o.y + Math.sin(ang) * r, obstacleIdx: oi });
+      }
+    });
+    const adj = nodes.map(() => []);
+    // Ring edges: each obstacle's own sample points connect to their
+    // immediate neighbors around its circle, so a path can hug all the
+    // way around a single obstacle (or a chain of overlapping ones) when
+    // that's genuinely the only way through, not just jump between
+    // obstacles that already have a clear line between them.
+    obstacles.forEach((o, oi) => {
+      const base = oi * PATH_SAMPLES_PER_OBSTACLE;
+      for (let k = 0; k < PATH_SAMPLES_PER_OBSTACLE; k++) {
+        const a = base + k, b = base + (k + 1) % PATH_SAMPLES_PER_OBSTACLE;
+        // Still checked against every OTHER obstacle (just not this one,
+        // whose own chord this naturally dips inside of) - two adjacent
+        // sample points can otherwise sit close enough to a different,
+        // overlapping obstacle that hugging straight between them would
+        // cut through IT instead.
+        if (!segmentClearsObstacles(nodes[a], nodes[b], oi)) continue;
+        const d = Math.hypot(nodes[a].x - nodes[b].x, nodes[a].y - nodes[b].y);
+        adj[a].push({ to: b, dist: d }); adj[b].push({ to: a, dist: d });
+      }
+    });
+    // Cross edges: any two sample points on DIFFERENT obstacles that have
+    // a clear line between them - this is what actually lets a path jump
+    // from one obstacle's neighborhood to another's, or leap straight
+    // past a whole cluster once there's a gap. Checked against every
+    // obstacle with no skip at all (not even the two the points sit on) -
+    // a sample point only ever grazes its OWN circle at that one exact
+    // spot (covered by segmentIntersectsCircle's own small epsilon), so
+    // there's nothing to skip; skipping either one outright let an edge
+    // leave a point on one side of it and cut straight back through that
+    // same circle's interior further along the same segment.
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        if (nodes[i].obstacleIdx === nodes[j].obstacleIdx) continue;
+        if (segmentClearsObstacles(nodes[i], nodes[j], -1)) {
+          const d = Math.hypot(nodes[i].x - nodes[j].x, nodes[i].y - nodes[j].y);
+          adj[i].push({ to: j, dist: d }); adj[j].push({ to: i, dist: d });
+        }
+      }
+    }
+    pathGraph = { nodes, adj };
+  }
+  // Real route from (sx,sy) to (tx,ty) around every obstacle in the way -
+  // an array of waypoints ending in the exact goal point. A straight line
+  // that's already clear returns just [{x:tx,y:ty}], so a normal order on
+  // a map with no obstacles nearby costs nothing beyond the one check.
+  function findPathAround(sx, sy, tx, ty) {
+    const start = { x: sx, y: sy }, goal = { x: tx, y: ty };
+    if (segmentClearsObstacles(start, goal, -1)) return [{ x: tx, y: ty }];
+    if (!pathGraph) buildPathGraph();
+    const { nodes, adj } = pathGraph;
+    const startIdx = nodes.length, goalIdx = nodes.length + 1;
+    const fullAdj = adj.map((list) => list.slice());
+    fullAdj.push([]); fullAdj.push([]);
+    for (let i = 0; i < nodes.length; i++) {
+      if (segmentClearsObstacles(start, nodes[i], -1)) {
+        const d = Math.hypot(start.x - nodes[i].x, start.y - nodes[i].y);
+        fullAdj[startIdx].push({ to: i, dist: d }); fullAdj[i].push({ to: startIdx, dist: d });
+      }
+      if (segmentClearsObstacles(goal, nodes[i], -1)) {
+        const d = Math.hypot(goal.x - nodes[i].x, goal.y - nodes[i].y);
+        fullAdj[goalIdx].push({ to: i, dist: d }); fullAdj[i].push({ to: goalIdx, dist: d });
+      }
+    }
+    // Plain O(N^2) Dijkstra - graph sizes here (tens to a few hundred
+    // nodes for any reasonable number of placed obstacles) make the
+    // simplicity worth it over a real priority queue.
+    const N = nodes.length + 2;
+    const dist = new Array(N).fill(Infinity); dist[startIdx] = 0;
+    const prev = new Array(N).fill(-1);
+    const visited = new Array(N).fill(false);
+    for (let iter = 0; iter < N; iter++) {
+      let u = -1, best = Infinity;
+      for (let i = 0; i < N; i++) if (!visited[i] && dist[i] < best) { best = dist[i]; u = i; }
+      if (u === -1 || u === goalIdx) break;
+      visited[u] = true;
+      for (const e of fullAdj[u]) if (dist[u] + e.dist < dist[e.to]) { dist[e.to] = dist[u] + e.dist; prev[e.to] = u; }
+    }
+    if (dist[goalIdx] === Infinity) return [{ x: tx, y: ty }]; // no route found (shouldn't normally happen) - fall back to a straight order; local steering is still the backstop underneath it
+    const chain = [];
+    for (let cur = goalIdx; cur !== -1; cur = prev[cur]) chain.push(cur === startIdx ? start : cur === goalIdx ? goal : nodes[cur]);
+    chain.reverse();
+    return chain.slice(1); // drop the start point itself - the rest are waypoints to walk through, ending at goal
+  }
+  // The one place a real MOVE order should ever be created - always sets
+  // moveTarget to the true final destination (still what isLocked-style
+  // order-active checks and save/load read) AND a concrete waypoint route
+  // to actually walk there (pathWaypoints/pathIndex, consumed by
+  // runMoveOrder below). Skips pathfinding entirely when there are no
+  // obstacles on the map at all, so a map that doesn't use the feature
+  // pays nothing for it.
+  function issueMoveOrder(u, tx, ty) {
+    u.orderType = 'move';
+    u.moveTarget = { x: tx, y: ty };
+    u.pathWaypoints = obstacles.length ? findPathAround(u.x, u.y, tx, ty) : [{ x: tx, y: ty }];
+    u.pathIndex = 0;
+  }
+
   const units = [];
   let nextUnitId = 1;
   function factionOf(id) { return factions[id]; }
@@ -1409,9 +1605,10 @@ async function main() {
       id: nextUnitId++, factionId, defIndex: -1, isMiner: true,
       hp, maxHp: hp, attack: 0, range: 0, speed: 1.6,
       img: miningImg, x, y, alive: true, selected: false,
-      orderType: deposit ? 'move' : null, moveTarget: deposit ? { x: deposit.x, y: deposit.y } : null,
+      orderType: null, moveTarget: null,
       target: null, lockedUntilTurn: 0, facingAngle: 0,
     };
+    if (deposit) issueMoveOrder(u, deposit.x, deposit.y);
     units.push(u);
     return u;
   }
@@ -1632,14 +1829,49 @@ async function main() {
     return Math.atan2(ty - u.y, tx - u.x) + Math.PI / 2;
   }
 
+  // Walks the real route issueMoveOrder planned (pathWaypoints/pathIndex)
+  // one waypoint at a time instead of straight at moveTarget directly -
+  // moveTarget stays the true final destination (still what order-active
+  // checks and save/load read), but the actual walk follows the planned
+  // route around whatever obstacles are in the way, with the reactive
+  // local steering (moveTowardWithAvoidance) still doing the fine-grained
+  // walk between any two waypoints as a backstop.
+  // Walks each leg of the planned route (issueMoveOrder's pathWaypoints)
+  // as a plain straight line, NOT through moveTowardWithAvoidance's own
+  // reactive steering - every leg was already verified obstacle-clear
+  // (with real margin) when the route was planned, so there's nothing
+  // left to react to. Running the reactive steerer on top of an already-
+  // planned leg was actively counterproductive: threading a genuinely
+  // tight-but-clear gap between two obstacles, it could still nudge the
+  // unit a few px off the ideal line, re-triggering avoidance around
+  // whichever obstacle it drifted nearest to and deflecting it into its
+  // NEIGHBOR's clearance zone instead - a brand new trap the planner
+  // never anticipated, since it only ever checked the ideal line. Plain
+  // straight-line walking has nothing to drift off course from.
+  // pushOutOfObstacles stays on purely as a defensive backstop (should
+  // essentially never trigger, given the planner's own margin).
   function runMoveOrder(u, dt) {
-    const dx = u.moveTarget.x - u.x, dy = u.moveTarget.y - u.y;
+    if (!u.pathWaypoints || !u.pathWaypoints.length) { u.orderType = null; u.moveTarget = null; u.pathWaypoints = null; return; }
+    const wp = u.pathWaypoints[u.pathIndex];
+    const dx = wp.x - u.x, dy = wp.y - u.y;
     const dist = Math.hypot(dx, dy);
-    if (dist < 4) { u.orderType = null; u.moveTarget = null; }
-    else {
-      u.facingAngle = facingToward(u, u.moveTarget.x, u.moveTarget.y);
+    if (dist < 4) {
+      u.pathIndex++;
+      if (u.pathIndex >= u.pathWaypoints.length) { u.orderType = null; u.moveTarget = null; u.pathWaypoints = null; }
+    } else {
+      u.facingAngle = facingToward(u, wp.x, wp.y);
       const sp = u.speed * MOVE_PX_PER_SPEED;
-      moveTowardWithAvoidance(u, u.moveTarget.x, u.moveTarget.y, sp, dt);
+      // Capped at `dist` - a fast unit (or a waypoint only just out of
+      // the dist<4 "arrived" window) could otherwise cover more ground
+      // in one tick than actually remained, overshooting clean past the
+      // waypoint and immediately "arriving" from the OTHER side next
+      // tick too far the other way - a perpetual ping-pong across it
+      // that never lands within 4px, so the order never actually
+      // completed. Multiple short legs (a planned route with several
+      // waypoints close together) made this far more likely to surface
+      // than the old single-destination case ever did.
+      const step = Math.min(sp * dt, dist);
+      u.x += (dx / dist) * step; u.y += (dy / dist) * step;
       clampToWorld(u);
       pushOutOfObstacles(u);
     }
@@ -2966,7 +3198,7 @@ async function main() {
       if (sel.length) {
         sel.forEach((u) => {
           if (isLocked(u)) return; // attacked this turn - can't take a new order yet
-          u.orderType = 'move'; u.moveTarget = { x: worldX, y: worldY }; u.target = null;
+          issueMoveOrder(u, worldX, worldY); u.target = null;
         });
         deselectAll(); // see handleClick's comment - same "stuck to the mouse" fix applies here
       }
@@ -3136,8 +3368,8 @@ async function main() {
     }
     sel.forEach((u) => {
       if (isLocked(u)) return; // attacked this turn - can't take a new order yet
-      if (target) { u.orderType = 'attack'; u.target = target; u.moveTarget = null; }
-      else { u.orderType = 'move'; u.moveTarget = { x: p.x, y: p.y }; u.target = null; }
+      if (target) { u.orderType = 'attack'; u.target = target; u.moveTarget = null; u.pathWaypoints = null; }
+      else { issueMoveOrder(u, p.x, p.y); u.target = null; }
     });
     // The order is issued - drop the selection so the unit stops trailing
     // every future click. Without this, a selected unit stayed selected
