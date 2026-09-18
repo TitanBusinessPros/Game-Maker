@@ -783,6 +783,46 @@ entirely by one map's saved data:
   trouble finding its way all the way through, the same as any
   local-avoidance-only approach - there's no larger detour planned behind
   it the way a real pathfinder would.
+  Two real bugs surfaced once this shipped, both reported as "mining
+  ships not navigating correctly" / "it stops moving" (it never actually
+  stopped - it just stopped making real progress): (1) the "nearest
+  blocking obstacle" search used to scan the unit's ENTIRE remaining
+  distance to its goal, so a long-distance move order treated any
+  obstacle merely sitting roughly on the eventual bearing - even one
+  still thousands of pixels away - as something to steer around right
+  now; with several obstacles placed close together along that bearing (a
+  map-maker's own test map, an 18-piece wall of them), "nearest of
+  several distant, nearly-tied obstacles" kept handing off as the unit
+  drifted, so it drifted sideways forever without ever actually closing
+  the distance. Fixed with `OBSTACLE_LOOKAHEAD` (350px, plus that
+  obstacle's own radius) - a unit only reacts once something is actually
+  close enough to matter. (2) Once genuinely near an obstacle, the "which
+  tangent points more toward the goal" choice was recomputed fresh every
+  20px sub-step - fine normally, but the instant the goal sits roughly in
+  line with the obstacle the two tangents are nearly tied, and tiny
+  per-substep position changes flipped which one briefly "won," so the
+  unit vibrated in place. Fixed by committing to one side per obstacle
+  encounter (`_avoidObstacle`/`_avoidSign`, cached on the unit itself,
+  cleared once that obstacle stops blocking) instead of re-deciding every
+  sub-step. A dense, overlapping wall (obstacles placed close enough that
+  neighboring collision circles actually intersect, with no real gap a
+  unit's own size can fit through) can still wedge a unit into a stable
+  trap even with both fixes, since committing to one side just means
+  reliably circling the SAME obstacle the SAME way forever if that's the
+  only option nearby - a `_stallTicks` counter watches for real
+  straight-line progress toward the goal stalling out over roughly 15
+  consecutive calls despite genuinely trying, and when it does, adds the
+  currently-stuck-on obstacle to a per-unit `_avoidIgnore` set so the unit
+  stops proactively steering around it and instead heads straight for its
+  goal again - `pushOutOfObstacles` still refuses to let it actually
+  overlap that (or any) obstacle regardless, so in practice this reads as
+  sliding along its surface toward whatever real obstacle is next, rather
+  than sitting frozen. This meaningfully improves - but, being still local
+  avoidance with no actual detour planning, can't fully guarantee escaping
+  - a truly solid, gapless wall; a map-maker who wants units to reliably
+  path between/around a cluster of obstacles should leave real gaps
+  (combined radius plus a unit's own clearance) between neighboring ones
+  rather than placing them touching or overlapping.
 - A small **▲ / ▼ tab centered under the topbar** collapses the entire
   topbar (resource/turn HUD, map name, Skip Turn, Pause/Sound/Save/Load/
   Download) down to just that tab, so only the map itself shows -
