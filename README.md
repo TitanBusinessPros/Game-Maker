@@ -759,6 +759,24 @@ entirely by one map's saved data:
   `2*homeRadius+800` per side - exactly the size admin.html's own
   MAP_SIZE_INFO hint already documents: 1640/3320/5840/10880 for
   Tiny/Small/Medium/Large) instead of from faction positions at all.
+- **📊 Stats dropdown** - a small live scoreboard, opened from its own
+  button in the topbar next to Pause/Sound/Save/Load/Download. Lists every
+  faction (colored to match its HUD chip) with two running totals for the
+  whole match, **⚔ Kills** and **☠ Losses**, incremented the instant
+  something actually dies (`applyDamageToTarget`'s own death branch) -
+  whoever landed the killing blow gets a kill, whoever owned whatever died
+  gets a loss, covering units, turrets, launchers, gated buildings, and a
+  home base itself alike. These are cumulative for the whole match, never
+  reset per round/turn - 5 kills in round 1 plus 3 in round 2 just reads
+  as 8 the moment the 8th one lands, there's no separate per-round number
+  to add up anywhere. Saved/loaded along with everything else
+  (`serializeState`/its own load handler) - a save from before this
+  existed just starts both counters at 0 on load rather than erroring.
+  Positioned in JS from the Stats button's own current on-screen spot each
+  time it's opened (not a fixed CSS offset), so it lands in the right
+  place whether the topbar has wrapped onto a second line on a narrow
+  window or not; clicking anywhere else closes it, the same as any other
+  dropdown/menu.
 - **Terrain Obstacles** (`index.html`'s 3c section) - solid scenery a
   map-maker places on the map (boulders, mountains, wreckage, whatever
   fits the theme) that units can't walk through. Each placed point

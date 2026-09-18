@@ -39,6 +39,28 @@
     background:rgba(11,14,20,0.9); color:var(--text); border:1px solid var(--border); border-top:none;
     border-radius:0 0 8px 8px; padding:2px 16px; font-size:11px; cursor:pointer; line-height:1.6;
   }
+  /* 📊 Stats dropdown - a live per-faction scoreboard (kills/losses),
+     opened from its own topbar button next to Pause/Sound/Save/Load/
+     Download. `top`/`left` are set in JS each time it's opened, from the
+     button's own current on-screen position (accounts for the topbar
+     wrapping to more than one line on a narrow window, and for the whole
+     topbar being collapsed/hidden - see the ▲/▼ tab). Never put `display`
+     in this element's own inline style - #statsDropdown[hidden] is what
+     actually shows/hides it, and an inline display would silently beat
+     that rule regardless of the hidden attribute (bit this project before,
+     twice, on #libraryModal/#buyCreditsModal in index.html).
+  */
+  #statsDropdown {
+    position:fixed; z-index:22; min-width:200px; max-width:280px; max-height:70vh; overflow-y:auto;
+    background:rgba(11,14,20,0.97); border:1px solid var(--border); border-radius:8px;
+    padding:10px 12px; font-size:12px; box-shadow:0 8px 24px rgba(0,0,0,0.5);
+  }
+  #statsDropdown[hidden] { display:none; }
+  #statsDropdown h4 { margin:0 0 8px; font-size:12px; color:var(--dim); font-weight:600; }
+  .statsRow { display:flex; justify-content:space-between; gap:10px; padding:5px 0; border-top:1px solid var(--border); }
+  .statsRow:first-of-type { border-top:none; }
+  .statsRow .statsName { font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .statsRow .statsNums { color:var(--dim); white-space:nowrap; }
   /* Left = map title, fixed. Middle = HUD + turn status, grows/wraps to
      fill whatever's left. Right = every action button (Pause through the
      panel toggle) as one cluster, pinned to the right edge via
@@ -297,9 +319,11 @@
         📂 Load<input id="loadInput" type="file" accept=".json" style="display:none;">
       </label>
       <button id="downloadBtn">⬇ index.html</button>
+      <button id="statsBtn">📊 Stats</button>
       <button id="panelToggleBtn">☰</button>
     </div>
   </div>
+  <div id="statsDropdown" hidden></div>
   <button id="hudToggleBtn" title="Hide map info">▲</button>
 
   <canvas id="canvas"></canvas>
@@ -823,6 +847,11 @@ async function main() {
       // player and for a hot-seat "Human"-controlled slot) - see aiThink
       // and AI_DIFFICULTY below for what it actually changes.
       difficulty: (!isPlayer && AI_DIFFICULTY[src?.difficulty]) ? src.difficulty : 'medium',
+      // Live scoreboard totals (the 📊 Stats dropdown) - a running count
+      // for the whole match, never reset per round/turn, so "5 kills round
+      // 1 + 3 kills round 2" just shows 8 the moment the 8th one lands,
+      // not something that resets and has to be re-summed anywhere.
+      stats: { kills: 0, losses: 0 },
     });
   }
   const player = factions[0];
@@ -1905,13 +1934,24 @@ async function main() {
   // just apply damage to a target and handle its death the same way, the
   // only difference is WHEN this runs relative to the attack being
   // ordered (instantly vs. after real travel time).
-  function applyDamageToTarget(t, dmg) {
+  function applyDamageToTarget(t, dmg, attackerFactionId) {
     t.hp -= dmg;
     playSfx(sounds.attack);
     if (t.hp <= 0) {
       t.hp = 0;
       if (t.maxHp === undefined || t.isFactionHome) playSfx(sounds.homeUnderAttack);
       if (!t.isFactionHome && t.alive !== undefined) { t.alive = false; playSfx(sounds.buildingDestroyed); }
+      // 📊 Stats dropdown: whoever landed the killing blow gets a kill,
+      // whoever owned whatever just died gets a loss. A home base target
+      // IS the faction object itself (tagged isFactionHome by the
+      // factions.forEach below, not a real entry in `units`), so it has
+      // no .factionId of its own - everything else (unit, turret,
+      // launcher, gated building) already carries one.
+      if (attackerFactionId !== undefined) {
+        const ownerId = t.factionId !== undefined ? t.factionId : t.id;
+        factionOf(attackerFactionId).stats.kills++;
+        factionOf(ownerId).stats.losses++;
+      }
       // A destroyed Air Base/War Factory/Infantry Post/Helicopter
       // Facility/Research Facility/Missile Silo actually revokes what it
       // unlocked - "once that building is gone no troops can be built
@@ -1978,7 +2018,7 @@ async function main() {
       lockUnit(u);
     } else {
       fireWeaponEffect(u, t);
-      applyDamageToTarget(t, u.attack);
+      applyDamageToTarget(t, u.attack, u.factionId);
       lockUnit(u);
     }
   }
@@ -2522,7 +2562,7 @@ async function main() {
       const dist = Math.hypot(t.x - m.x, t.y - m.y);
       m.facingAngle = facingToward(m, t.x, t.y);
       if (dist < 12) {
-        applyDamageToTarget(t, m.damage);
+        applyDamageToTarget(t, m.damage, m.factionId);
         effects.push({ kind: 'explosion', x: t.x, y: t.y, color: '#ff5f6d', ttl: 0.35, life: 0.35 });
         missiles.splice(i, 1);
         continue;
@@ -3170,6 +3210,7 @@ async function main() {
     drawTurretRangeRing();
 
     renderHud();
+    renderStatsDropdown();
     renderMinimap();
     updateHomeHpBar();
     updateProductionStatus();
@@ -3199,6 +3240,49 @@ async function main() {
       document.getElementById('turnLabel').textContent = `Turn ${turnNumber} · next in ${mins}:${String(secs).padStart(2, '0')}`;
     }
   }
+
+  // 📊 Stats dropdown - a live per-faction scoreboard (f.stats.kills/
+  // .losses, incremented in applyDamageToTarget whenever something
+  // actually dies). Running totals for the whole match, never reset per
+  // round/turn or per screen redraw, so "5 kills round 1 + 3 kills round
+  // 2" just reads as 8 the instant the 8th one lands - there's nothing
+  // to re-sum anywhere, the number IS the running total. Only rebuilds
+  // its DOM content while actually open (called every frame from render()
+  // like renderHud(), but a no-op the rest of the time) - cheap either
+  // way at this scale, but pointless work to do while hidden.
+  const statsDropdownEl = document.getElementById('statsDropdown');
+  function renderStatsDropdown() {
+    if (statsDropdownEl.hidden) return;
+    statsDropdownEl.innerHTML = '<h4>📊 Match Stats</h4>' + factions.map((f) => {
+      const label = turnMode ? `Team ${f.team ?? '?'}` : (f.team === player.team ? '🤝' : '');
+      return `<div class="statsRow"><span class="statsName" style="color:${f.color}">${f.name}${label ? ' ' + label : ''}</span><span class="statsNums">⚔ ${f.stats.kills} · ☠ ${f.stats.losses}</span></div>`;
+    }).join('');
+  }
+  // Positioned in JS (not fixed CSS) from the button's own current
+  // on-screen rect - the topbar can wrap onto more than one line on a
+  // narrow window, and can be collapsed away entirely via the ▲/▼ tab,
+  // so a hardcoded "just below the topbar" offset would drift out of
+  // place in either case.
+  const statsBtn = document.getElementById('statsBtn');
+  statsBtn.addEventListener('click', () => {
+    const opening = statsDropdownEl.hidden;
+    statsDropdownEl.hidden = !opening;
+    if (opening) {
+      const r = statsBtn.getBoundingClientRect();
+      statsDropdownEl.style.top = (r.bottom + 6) + 'px';
+      statsDropdownEl.style.left = 'auto';
+      statsDropdownEl.style.right = Math.max(8, window.innerWidth - r.right) + 'px';
+      renderStatsDropdown();
+    }
+  });
+  // Click anywhere outside the open dropdown (and not the button that
+  // opens it, which already has its own toggle above) closes it - same
+  // "click elsewhere to dismiss" behavior as any other dropdown/menu.
+  document.addEventListener('click', (e) => {
+    if (!statsDropdownEl.hidden && e.target !== statsBtn && !statsDropdownEl.contains(e.target)) {
+      statsDropdownEl.hidden = true;
+    }
+  });
 
   function renderMinimap() {
     mctx.clearRect(0, 0, 180, 180);
@@ -4000,7 +4084,7 @@ async function main() {
   function serializeState() {
     return {
       cfg, turnNumber, turnTimer, activeIdx, hotseatTimer, moveNumber,
-      factions: factions.map((f) => ({ id: f.id, resources: f.resources, hp: f.hp, team: f.team, built: f.built, buildQueue: f.buildQueue, researched: [...f.research.researched], active: f.research.active })),
+      factions: factions.map((f) => ({ id: f.id, resources: f.resources, hp: f.hp, team: f.team, built: f.built, buildQueue: f.buildQueue, researched: [...f.research.researched], active: f.research.active, stats: f.stats })),
       units: units.filter((u) => u.alive).map((u) => ({ factionId: u.factionId, defIndex: u.defIndex, isMiner: !!u.isMiner, isTurret: !!u.isTurret, isMissileLauncher: !!u.isMissileLauncher, isGatedBuilding: !!u.isGatedBuilding, buildingKey: u.buildingKey, x: u.x, y: u.y, hp: u.hp, maxHp: u.maxHp })),
     };
   }
@@ -4024,6 +4108,10 @@ async function main() {
       // instead of leaving every resource lookup below reading undefined.
       f.resources = typeof fd.resources === 'object' && fd.resources ? fd.resources : { ...freshWallet(), gold: fd.resources ?? 1000 };
       f.hp = fd.hp; f.team = fd.team;
+      // A save from before the 📊 Stats dropdown existed has no fd.stats
+      // at all - keep this faction's freshly-initialized {kills:0,
+      // losses:0} instead of overwriting it with undefined.
+      if (fd.stats) f.stats = fd.stats;
       if (fd.built) f.built = fd.built;
       if (fd.buildQueue) f.buildQueue = fd.buildQueue;
       f.research.researched = new Set(fd.researched); f.research.active = fd.active;
