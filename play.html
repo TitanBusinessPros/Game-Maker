@@ -2124,7 +2124,19 @@ async function main() {
       // medic that unlocks mid-turn shouldn't silently re-heal its old
       // target the instant it can act again without the player choosing
       // that.
-      if (!u.isTurret && (u.orderType === 'attack' || u.orderType === 'heal')) { u.orderType = null; u.target = null; }
+      // The turret exemption above only actually holds when Auto Attack
+      // is ON - that's the case that re-acquires nearestEnemy() every
+      // frame regardless of orderType, making a clear here pointless. A
+      // turret with Auto Attack turned OFF (manual-only, "click the
+      // turret then click an enemy") has nothing else that ever clears
+      // u.target - left exempted, it silently kept re-firing at the same
+      // stale target and re-locking itself every single turn forever,
+      // with no new click ever given, which is exactly the bug this
+      // whole block exists to prevent for every other unit type.
+      // Reported as a turret looking permanently "still locked" turn
+      // after turn even though the player never re-ordered it.
+      const skipClear = u.isTurret && u.autoAttack !== false;
+      if (!skipClear && (u.orderType === 'attack' || u.orderType === 'heal')) { u.orderType = null; u.target = null; }
     });
     renderBuildPanel();
     renderResearchPanel();

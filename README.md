@@ -1053,6 +1053,17 @@ entirely by one map's saved data:
   it can be selected, destroyed, and targeted by enemies like anything
   else. AI factions place them too, picking a random valid spot in the
   same ring instead of needing a click.
+  In Turn-Based mode, a turret with Auto Attack **off** now also gets its
+  standing target cleared the moment its own turn comes back around, the
+  same "fresh order needed each turn" reset every other unit already got
+  (`advanceTurn()`) - it used to be exempted from that reset entirely, on
+  the assumption that a turret always re-acquires its own target every
+  frame regardless, which is only true with Auto Attack ON. With it off,
+  nothing else ever cleared `u.target`, so a manually-clicked turret just
+  kept silently re-firing at the same stale target and re-locking itself
+  every single turn on its own, forever, with no new click ever given -
+  reported as a turret that looks permanently stuck locked turn after
+  turn, and as a turret firing without being ordered to.
 - **Missile Silo** (optional, gated building - index.html's item 4f):
   placed exactly like a Gun Turret (same ring, same arm-then-click flow,
   same speed-0/never-moves shape) but additionally requires the Missile
