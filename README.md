@@ -248,7 +248,7 @@ line. Only this page has the logo/title/footer treatment so far -
    regardless of this checkbox or of what it's firing at; this only
    controls whether the *projectile's* own sprite turns to face the
    direction it's flying), an **Auto Attack** checkbox (**off** by
-   default, unlike Gun Turrets' own - see 4h below - since a launcher has
+   default, unlike Gun Turrets' own - see 4i below - since a launcher has
    always been manual-only for a human player: leave it unchecked and
    nothing changes, a player still has to click the launcher then click
    an enemy. Check it and the launcher fires on its own at whatever comes
@@ -258,7 +258,7 @@ line. Only this page has the logo/title/footer treatment so far -
    - unlike every other
    unit/turret type, a launcher's range isn't set here; see `play.html`'s
    own bullet on this further down for why. In `play.html`, a launcher is
-   placed the same way a Gun Turret is (see 4h below) - click **Place**,
+   placed the same way a Gun Turret is (see 4i below) - click **Place**,
    then click anywhere between 50 and 300 range of your Home Base -
    rather than produced with a timer (and so not subject to the 10-unit
    queue cap either, it isn't a queue at all) like Air Base's own units,
@@ -266,7 +266,27 @@ line. Only this page has the logo/title/footer treatment so far -
    standing first, unlike Gun Turrets (which have no gating building at
    all). Leave its launcher list empty and the whole feature is absent
    from the map, same as the six buildings above.
-4g. **Research Facility** — NOT optional, unlike the buildings
+4g. **Missile Battery** (optional) — an eighth gated building, same
+   name/art/HP/build-cost shape as Air Base above (including its own
+   **🗑 Remove this building** button) - unlike Missile Silo just above,
+   this one produces a **mobile** unit type: it has all the normal
+   combat-unit fields (**name**, **art**, **HP**, **Range**, **Speed**,
+   **production time**, **Rotate to face movement direction**) *plus* the
+   Missile Silo launcher's own missile-specific fields (**Missile HP
+   damage** in place of a plain Attack number, **Missile speed**,
+   **missile art** as a second separate upload, **Rotate missile to face
+   its travel direction**) - no Weapon dropdown at all, same reasoning as
+   the launcher: the missile itself is the entire attack, there's no
+   separate cosmetic effect to pick. Has its own **Auto Attack** checkbox
+   too (on by default, same as every other unit type now - see 4i
+   below). Unlike a Missile Silo launcher, this unit is merged into the
+   same buildable-unit system Air Base/War Factory/etc. units use - built
+   with a timer into the same 10-unit queue, moves and chases a target
+   like any other combat unit, just firing a real traveling missile
+   instead of an instant hit once it's actually in range. Leave its unit
+   list empty and the whole feature is absent from the map, same as every
+   other gated building.
+4h. **Research Facility** — NOT optional, unlike the buildings
    above: every map has the same built-in research tree (the Research
    tab in `play.html`), so this is the one building every player has to
    construct before they can research anything there at all. Same
@@ -276,16 +296,16 @@ line. Only this page has the logo/title/footer treatment so far -
    also the one thing every faction can always afford to build with
    nothing else built first - in `play.html`, it gates everything else on
    this list: Air Base/War Factory/Infantry Post/Helicopter Facility/
-   Navy Harbor/Field Hospital/Missile Silo, every unit under them, Gun
-   Turrets, and the Mining Ship are all locked (Build/Place buttons
-   disabled, a "requires Research Facility first" note in their stats
-   line) until a faction's own Research Facility is standing - not just
-   research itself like before. AI factions follow the same rule (an
-   unbuilt Research Facility is the only thing an AI will spend on until
-   it's built), and destroying a faction's Research Facility re-locks
-   everything else again, same as destroying any other gated building
-   re-locks its own units.
-4h. **Gun Turrets** (optional) — shaped differently from the buildings
+   Navy Harbor/Field Hospital/Missile Silo/Missile Battery, every unit
+   under them, Gun Turrets, and the Mining Ship are all locked (Build/
+   Place buttons disabled, a "requires Research Facility first" note in
+   their stats line) until a faction's own Research Facility is standing
+   - not just research itself like before. AI factions follow the same
+   rule (an unbuilt Research Facility is the only thing an AI will spend
+   on until it's built), and destroying a faction's Research Facility
+   re-locks everything else again, same as destroying any other gated
+   building re-locks its own units.
+4i. **Gun Turrets** (optional) — shaped differently from the buildings
    above: no gating building of its own, no production timer, and no
    Speed field (they're stationary by design - the field doesn't exist
    for these rows at all). Add as many turret types as you want, each
@@ -944,6 +964,40 @@ entirely by one map's saved data:
   once that faction's turn comes back around. Destroying a Missile Silo
   re-locks its launchers from being placed again, same as destroying any
   other gated building re-locks its own units.
+- **Missile Battery** (optional, gated building - index.html's item 4g):
+  a MOBILE version of the Missile Silo idea above - its units are merged
+  into the normal `unitDefs`/build-queue system (built with a timer into
+  the same faction-owned 10-unit queue every other gated building uses,
+  moves and gets moved/attacked exactly like any other combat unit,
+  clamped to the world's own bounds the same way), the only difference
+  from an ordinary combat unit being `isMissileUnit:true` on its def -
+  `combatTick` reads its own map-maker-set Range (not `missileRange()` -
+  that's Missile Silo-only) and, once something is actually in range,
+  calls the exact same `spawnMissile()` a stationary launcher does
+  instead of an instant hit ("the attack for these units are the
+  missiles themselves - they don't have an attack outside of firing
+  missiles"). `spawnMissile()` itself was generalized to read the missile
+  image/speed/rotate-to-face settings straight off whichever unit is
+  firing (baked on at spawn time by both `spawnMissileLauncher` and
+  `spawnUnit`) instead of always looking them up via
+  `missileDefs[launcher.defIndex]`, which only ever made sense for
+  an actual stationary launcher - a Missile Battery unit's own `defIndex`
+  points into the completely separate `unitDefs` array instead.
+- **Auto Attack**, index.html's own per-unit-type checkbox, is no longer
+  Gun-Turret/Missile-Silo-only - every unit type now has it (Combat
+  Units, Air Base/War Factory/Infantry Post/Helicopter Facility/Navy
+  Harbor, and Missile Battery above), on by default. On, a unit engages
+  whatever's in its own range entirely on its own, no order needed - off,
+  a player has to click the unit then click an enemy, same as always.
+  Explicit orders always win: a unit already told to move or attack keeps
+  doing exactly that, Auto Attack only ever kicks in for a unit with
+  nothing else to do. This only ever changes anything for a HUMAN
+  player's own units - an AI-controlled unit already always auto-fights
+  regardless of this field (unconditionally, in the per-unit update
+  loop's own separate `!fac.isHuman` branch), so defaulting it on for
+  every unit type is what keeps every already-saved map's AI behavior
+  completely unchanged; the actual behavior change this introduces is
+  opt-out; not opt-in.
 - **⬇ Download as index.html** - packages the map's data inline into a
   fully standalone copy of this page. This used to only bundle the map's
   *data* (unit stats, names, etc.) while every image/sound field stayed a
@@ -1090,7 +1144,8 @@ map creator sets the size.
 **Worlds**, **Bases**, **Resources** (flat, no sub-picker), **Structures**
 (sub-picker: **War Factory**, **Airport**, **Infantry Post**,
 **Helicopter Facility**, **Research Facility**, **Gun Turret**,
-**Missile Silo**, **Navy Harbor**, **Field Hospital** - `structures/<type>`), **Sounds** (sub-picker: **Background
+**Missile Silo**, **Missile Battery**, **Navy Harbor**, **Field Hospital**
+- `structures/<type>`), **Sounds** (sub-picker: **Background
 Music**, **Intro Music**, **Attack**, **Building Destroyed**, **Home Base
 Under Attack**, **Game Over** - `sounds/<type>`). Any top-level category
 with `children` in `CATEGORY_TREE` gets this same sub-picker UI - it used

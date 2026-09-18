@@ -521,7 +521,7 @@
   <!-- 3b. Research Tree -->
   <section class="section" id="sec-research">
     <h2><span class="num">3b</span> Research Tree</h2>
-    <p class="hint">Every faction shares this same research tree once their Research Facility is built (item 4g below). Each item has 3 levels a faction can research in order, from Level 1 up - set what percentage bonus each level actually gives; leave one at 0 to make that level a no-op. Mining Rate's Level 1 also unlocks the Mining Ship itself, same as always; Rapid Repair Crews boosts a Field Hospital medic's heal amount (item 4e below); Extended Range boosts every unit's and Gun Turret's own attack/heal range.</p>
+    <p class="hint">Every faction shares this same research tree once their Research Facility is built (item 4h below). Each item has 3 levels a faction can research in order, from Level 1 up - set what percentage bonus each level actually gives; leave one at 0 to make that level a no-op. Mining Rate's Level 1 also unlocks the Mining Ship itself, same as always; Rapid Repair Crews boosts a Field Hospital medic's heal amount (item 4e below); Extended Range boosts every unit's and Gun Turret's own attack/heal range.</p>
     <div id="researchTopicsList"></div>
   </section>
 
@@ -704,9 +704,33 @@
     <p class="hint building-removed-note" id="missileSiloRemovedNote" style="display:none;">Missile Silo removed - it won't show up in-game (same as leaving its launcher list empty). <button type="button" class="btn-add building-restore" data-building="missileSilo">+ Add it back</button></p>
   </section>
 
-  <!-- 4g. Research Facility -->
+  <!-- 4g. Missile Battery -->
+  <section class="section" id="sec-missilebattery">
+    <h2><span class="num">4g</span> Missile Battery (optional) <button type="button" class="btn-danger building-remove" data-building="missileBattery" style="font-size:11px; padding:4px 10px; margin-left:8px; vertical-align:middle;">🗑 Remove this building</button></h2>
+    <div id="missileBatteryBody">
+      <p class="hint">A building for MOBILE missile-firing units, unlike the stationary Missile Silo above - these move around the map like a normal combat unit (their own Speed and Range, they chase a target and can be chased), but the attack for these units is the missiles themselves - they have no attack outside of firing a missile once something's in range. Works like Air Base above for the building itself - name it whatever fits, give it its own art, HP, and build cost. Leave the unit list empty and this whole feature just doesn't show up in-game.</p>
+      <div class="row">
+        <div class="field"><label>Building name</label><input type="text" id="missileBatteryName" value="Missile Battery"></div>
+        <div class="field narrow"><label>Building HP</label><input type="number" id="missileBatteryHp" value="2000" min="1000" max="5000" step="100"></div>
+        <div class="field narrow"><label>Build cost</label><input type="number" id="missileBatteryCost" value="150" min="0" step="10"></div>
+      </div>
+      <div class="field">
+        <label>Missile Battery art</label>
+        <div class="upload-slot" data-slot="missileBatteryImage">
+          <div class="thumb">none</div>
+          <div class="meta"><div class="name">No file chosen</div><div class="status">required if you add any units below</div></div>
+          <input type="file" accept="image/*" style="width:auto">
+        </div>
+      </div>
+      <div id="missileBatteryUnitList"></div>
+      <button type="button" class="btn-add" id="addMissileBatteryUnitBtn">+ Add a mobile missile unit</button>
+    </div>
+    <p class="hint building-removed-note" id="missileBatteryRemovedNote" style="display:none;">Missile Battery removed - it won't show up in-game (same as leaving its unit list empty). <button type="button" class="btn-add building-restore" data-building="missileBattery">+ Add it back</button></p>
+  </section>
+
+  <!-- 4h. Research Facility -->
   <section class="section" id="sec-researchfacility">
-    <h2><span class="num">4g</span> Research Facility</h2>
+    <h2><span class="num">4h</span> Research Facility</h2>
     <p class="hint">Not optional like the buildings above - every map has a research tree (see the Research tab in-game), so this is the one building every player has to build before they can start researching ANYTHING at all. Name it whatever fits (Research Facility, Lab, Observatory&hellip;) and give it its own art, HP, and build cost.</p>
     <div class="row">
       <div class="field"><label>Building name</label><input type="text" id="researchFacilityName" value="Research Facility"></div>
@@ -723,9 +747,9 @@
     </div>
   </section>
 
-  <!-- 4h. Gun Turrets -->
+  <!-- 4i. Gun Turrets -->
   <section class="section" id="sec-turrets">
-    <h2><span class="num">4h</span> Gun Turrets (optional)</h2>
+    <h2><span class="num">4i</span> Gun Turrets (optional)</h2>
     <p class="hint">Stationary defenses - not built next to your Home Base automatically like other units. Instead, in-game, building one puts you into a placement mode: click anywhere between 50 and 300 range of your Home Base to place it there. It never moves once placed (Speed is ignored for these), and fires on its own at whatever enemy comes into range. Add as many turret types as you want; leave the list empty and this feature just doesn't show up in-game.</p>
     <div id="turretList"></div>
     <button type="button" class="btn-add" id="addTurretBtn">+ Add a turret</button>
@@ -1324,6 +1348,7 @@ const SLOT_CATEGORY_HINTS = {
   fieldHospitalImage: 'structures/field_hospital',
   researchFacilityImage: 'structures/research_facility',
   missileSiloImage: 'structures/missile_silo',
+  missileBatteryImage: 'structures/missile_battery',
   soundMusic: 'sounds/music',
   soundIntro: 'sounds/intro',
   soundAttack: 'sounds/attack',
@@ -1347,6 +1372,10 @@ const SLOT_PREFIX_CATEGORY_HINTS = [
   // more specific pattern has to be checked first.
   [/^missile_\d+_missile$/, 'characters/missiles'],
   [/^missile_\d+$/, 'structures/missile_silo'],
+  // Missile Battery rows have the same two-upload-slots-per-row shape as
+  // Missile Silo above (unit body + separate missile projectile art).
+  [/^missilebattery_\d+_missile$/, 'characters/missiles'],
+  [/^missilebattery_\d+$/, 'characters/artillery'],
 ];
 function defaultCategoryForSlot(slotKey) {
   // Map background art has its own per-size sub-categories in admin.html
@@ -1631,6 +1660,7 @@ const navyUnitList = document.getElementById('navyUnitList');
 const fieldHospitalUnitList = document.getElementById('fieldHospitalUnitList');
 const turretList = document.getElementById('turretList');
 const missileUnitList = document.getElementById('missileUnitList');
+const missileBatteryUnitList = document.getElementById('missileBatteryUnitList');
 const unitCounterState = { n: 0 };
 const airUnitCounterState = { n: 0 };
 const warUnitCounterState = { n: 0 };
@@ -1640,6 +1670,7 @@ const navyUnitCounterState = { n: 0 };
 const fieldHospitalUnitCounterState = { n: 0 };
 const turretCounterState = { n: 0 };
 const missileUnitCounterState = { n: 0 };
+const missileBatteryUnitCounterState = { n: 0 };
 
 // Weapon effect a unit's attack draws in play.html - purely cosmetic
 // (damage/range/etc. are unaffected), so it's just a dropdown here and a
@@ -1700,6 +1731,11 @@ function makeUnitRow(list, idPrefix, counterState, data = {}, gated = false) {
       Rotate to face movement direction
     </label>
     <p class="hint" style="margin:2px 0 0;">On by default. Turn off for sprites drawn facing one fixed way (like army men/infantry) - rotating those to face diagonal movement makes them look like they're flying sideways instead of walking.</p>
+    <label style="display:flex; align-items:center; gap:6px; font-weight:normal; margin:8px 0 0;">
+      <input type="checkbox" class="u-auto-attack" ${data.autoAttack !== false ? 'checked' : ''} style="width:auto;">
+      Auto Attack
+    </label>
+    <p class="hint" style="margin:2px 0 0;">On by default - this unit engages anything that comes into its own range on its own, no order needed (an existing move/attack order you give it always takes priority). Uncheck and a player has to click the unit, then click an enemy, every time - an AI-controlled one fights automatically either way, this only changes a human player's own copy of this unit.</p>
     <div class="field" style="margin-top:6px;">
       <label>Cost</label>
       <div class="u-costs"></div>
@@ -1762,6 +1798,7 @@ const OPTIONAL_BUILDINGS = {
   airBase: airUnitList, warFactory: warUnitList,
   infantryPost: infantryUnitList, heliFacility: heliUnitList,
   navyHarbor: navyUnitList, fieldHospital: fieldHospitalUnitList, missileSilo: missileUnitList,
+  missileBattery: missileBatteryUnitList,
 };
 document.querySelectorAll('.building-remove').forEach((btn) => {
   btn.addEventListener('click', () => {
@@ -1891,6 +1928,84 @@ function addMissileUnitRow(data = {}) {
   return row;
 }
 document.getElementById('addMissileUnitBtn').addEventListener('click', () => addMissileUnitRow());
+
+// ---------------------------------------------------------------------
+// Missile Battery: a MOBILE unit (own Speed/Range, moves and chases like
+// any normal combat unit) whose only attack is firing a real, traveling
+// missile - the same missile mechanic as the stationary Missile Silo
+// launcher above (missile HP damage, missile speed, its own separate
+// missile art, "rotate missile to face its travel direction"), just on
+// a unit that walks around instead of standing still. No Weapon
+// dropdown at all, same reasoning as the Missile Silo launcher - the
+// missile itself IS the attack, there's no separate cosmetic effect to
+// pick. Produced with the same building-queue/countdown system as Air
+// Base's own units (production time field), unlike the Missile Silo
+// launcher above (placed in a ring, no queue at all).
+// ---------------------------------------------------------------------
+function addMissileBatteryUnitRow(data = {}) {
+  const id = 'missilebattery_' + (missileBatteryUnitCounterState.n++);
+  const row = document.createElement('div');
+  row.className = 'unit-row';
+  row.dataset.unitId = id;
+  row.innerHTML = `
+    <button type="button" class="remove-unit" title="Remove unit">&times;</button>
+    <div class="row">
+      <div class="field"><label>Unit name</label><input type="text" class="u-name" value="${escapeAttr(data.name || '')}" placeholder="e.g. Missile Trooper"></div>
+    </div>
+    <div class="upload-slot" data-slot="${id}">
+      <div class="thumb">none</div>
+      <div class="meta"><div class="name">No file chosen</div><div class="status">unit sprite - transparent PNG works best</div></div>
+      <input type="file" accept="image/*" style="width:auto">
+    </div>
+    <div class="row" style="margin-top:10px;">
+      <div class="field narrow"><label>HP</label><input type="number" class="u-hp" value="${data.hp ?? 150}" min="1"></div>
+      <div class="field narrow"><label>Missile HP damage</label><input type="number" class="u-attack" value="${data.attack ?? 150}" min="0"></div>
+      <div class="field narrow"><label>Range</label><input type="number" class="u-range" value="${data.range ?? 400}" min="0"></div>
+      <div class="field narrow"><label>Speed</label><input type="number" class="u-speed" value="${data.speed ?? 2}" min="0" step="0.1"></div>
+      <div class="field narrow"><label>Production time (s, 10-7200 = up to 120 min)</label><input type="number" class="u-prodtime" value="${data.prodTime ?? 30}" min="10" max="7200" step="5"></div>
+    </div>
+    <label style="display:flex; align-items:center; gap:6px; font-weight:normal; margin:8px 0 0;">
+      <input type="checkbox" class="u-rotate" ${data.rotateToFace !== false ? 'checked' : ''} style="width:auto;">
+      Rotate to face movement direction
+    </label>
+    <div class="field" style="margin-top:10px;">
+      <label>Missile art (the projectile itself, shown traveling to its target)</label>
+      <div class="upload-slot" data-slot="${id}_missile">
+        <div class="thumb">none</div>
+        <div class="meta"><div class="name">No file chosen</div><div class="status">missile sprite - transparent PNG works best</div></div>
+        <input type="file" accept="image/*" style="width:auto">
+      </div>
+      <div class="row" style="margin-top:8px;">
+        <div class="field narrow"><label>Missile speed</label><input type="number" class="u-missile-speed" value="${data.missileSpeed ?? 4}" min="0.1" step="0.1"></div>
+      </div>
+      <label style="display:flex; align-items:center; gap:6px; font-weight:normal; margin:8px 0 0;">
+        <input type="checkbox" class="u-missile-rotate" ${data.missileRotateToFace !== false ? 'checked' : ''} style="width:auto;">
+        Rotate missile to face its travel direction
+      </label>
+    </div>
+    <label style="display:flex; align-items:center; gap:6px; font-weight:normal; margin:8px 0 0;">
+      <input type="checkbox" class="u-auto-attack" ${data.autoAttack !== false ? 'checked' : ''} style="width:auto;">
+      Auto Attack
+    </label>
+    <p class="hint" style="margin:2px 0 0;">On by default - fires on its own at whatever comes into its own range, no order needed (an existing move/attack order always takes priority). Uncheck and a player has to click the unit, then click an enemy, every time - an AI-controlled one fights automatically either way, this only changes a human player's own copy of this unit.</p>
+    <div class="field" style="margin-top:6px;">
+      <label>Cost</label>
+      <div class="u-costs"></div>
+    </div>
+  `;
+  renderCostFields(row, data.costs || (data.cost != null ? { gold: data.cost } : { gold: 300 }));
+  row.querySelector('.remove-unit').addEventListener('click', () => {
+    delete existingAssetUrls[id];
+    delete existingAssetUrls[`${id}_missile`];
+    row.remove();
+  });
+  row.querySelectorAll('.upload-slot').forEach(wireUploadSlot);
+  missileBatteryUnitList.appendChild(row);
+  if (data.imageUrl) showExistingAsset(id, data.imageUrl);
+  if (data.missileImageUrl) showExistingAsset(`${id}_missile`, data.missileImageUrl);
+  return row;
+}
+document.getElementById('addMissileBatteryUnitBtn').addEventListener('click', () => addMissileBatteryUnitRow());
 
 // ---------------------------------------------------------------------
 // Field Hospital medics: produced with the same building-queue/countdown
@@ -2289,7 +2404,7 @@ function setSaveStatus(text, cls) {
 
 const FIXED_UPLOAD_SLOTS = [
   'backgroundImage', 'goodBaseImage', 'resourceImage', 'miningUnitImage',
-  'airBaseImage', 'warFactoryImage', 'infantryPostImage', 'heliFacilityImage', 'navyHarborImage', 'fieldHospitalImage', 'researchFacilityImage', 'missileSiloImage',
+  'airBaseImage', 'warFactoryImage', 'infantryPostImage', 'heliFacilityImage', 'navyHarborImage', 'fieldHospitalImage', 'researchFacilityImage', 'missileSiloImage', 'missileBatteryImage',
   'soundMusic', 'soundIntro', 'soundAttack', 'soundBuildingDestroyed', 'soundHomeUnderAttack', 'soundEndgame',
 ];
 
@@ -2336,6 +2451,7 @@ function collectUnitRows(list, uploadResults) {
       costs: currentCostsFromRow(row),
       weapon: row.querySelector('.u-weapon').value || 'laser',
       rotateToFace: row.querySelector('.u-rotate').checked,
+      autoAttack: row.querySelector('.u-auto-attack').checked,
     };
     // Only gated-building rows have the production-time field at all
     // (see makeUnitRow's `gated` flag) - clamp it the same way
@@ -2392,6 +2508,35 @@ function collectMissileUnits(uploadResults) {
     };
   });
 }
+// Missile Battery units - a MOBILE unit (real Speed/Range/prodTime/
+// rotateToFace, unlike the stationary Missile Silo launcher above) that
+// still has the launcher's own missile-specific fields (missile speed,
+// separate missile art, missile rotate checkbox) instead of a normal
+// Attack+Weapon pair - play.html's own isMissileUnit:true (set here,
+// same pattern as collectFieldHospitalUnits baking isMedic:true) is what
+// makes combatTick fire a real missile instead of an instant hit.
+function collectMissileBatteryUnits(uploadResults) {
+  const rows = Array.from(missileBatteryUnitList.querySelectorAll('.unit-row'));
+  return rows.map((row) => {
+    const id = row.dataset.unitId;
+    return {
+      name: row.querySelector('.u-name').value.trim() || 'Unnamed Unit',
+      imageUrl: uploadResults[id] || null,
+      hp: Number(row.querySelector('.u-hp').value) || 0,
+      attack: Number(row.querySelector('.u-attack').value) || 0,
+      range: Number(row.querySelector('.u-range').value) || 0,
+      speed: Number(row.querySelector('.u-speed').value) || 0,
+      prodTime: Math.max(10, Math.min(7200, Number(row.querySelector('.u-prodtime').value) || 30)),
+      rotateToFace: row.querySelector('.u-rotate').checked,
+      missileSpeed: Number(row.querySelector('.u-missile-speed').value) || 4,
+      missileImageUrl: uploadResults[`${id}_missile`] || null,
+      missileRotateToFace: row.querySelector('.u-missile-rotate').checked,
+      autoAttack: row.querySelector('.u-auto-attack').checked,
+      costs: currentCostsFromRow(row),
+      isMissileUnit: true,
+    };
+  });
+}
 // Field Hospital medics reuse the same production-queue/build-panel/
 // spawnUnit path every other gated-building unit does (see play.html's
 // unitDefs merge, which does NOT exclude fieldHospital the way it
@@ -2433,9 +2578,12 @@ async function buildMapDoc(status) {
   // Two upload-slot ids per row (launcher + missile art) - see
   // addMissileUnitRow/collectMissileUnits.
   const missileUnitSlots = Array.from(missileUnitList.querySelectorAll('.unit-row')).flatMap((row) => [row.dataset.unitId, `${row.dataset.unitId}_missile`]);
+  // Same two-slots-per-row shape as missileUnitSlots above - see
+  // addMissileBatteryUnitRow/collectMissileBatteryUnits.
+  const missileBatteryUnitSlots = Array.from(missileBatteryUnitList.querySelectorAll('.unit-row')).flatMap((row) => [row.dataset.unitId, `${row.dataset.unitId}_missile`]);
   const computerSlots = Array.from(computerList.querySelectorAll('.computer-row')).map((row) => row.dataset.computerId);
   const resourceSlots = Array.from(document.querySelectorAll('#extraResourcesList .resource-row')).map((row) => row.dataset.resourceId);
-  const uploadResults = await uploadSlotsWithLimit([...FIXED_UPLOAD_SLOTS, ...unitSlots, ...airUnitSlots, ...warUnitSlots, ...infantryUnitSlots, ...heliUnitSlots, ...navyUnitSlots, ...fieldHospitalUnitSlots, ...turretSlots, ...missileUnitSlots, ...computerSlots, ...resourceSlots]);
+  const uploadResults = await uploadSlotsWithLimit([...FIXED_UPLOAD_SLOTS, ...unitSlots, ...airUnitSlots, ...warUnitSlots, ...infantryUnitSlots, ...heliUnitSlots, ...navyUnitSlots, ...fieldHospitalUnitSlots, ...turretSlots, ...missileUnitSlots, ...missileBatteryUnitSlots, ...computerSlots, ...resourceSlots]);
   const units = collectUnits(uploadResults);
   const airUnits = collectAirUnits(uploadResults);
   const warUnits = collectWarUnits(uploadResults);
@@ -2445,6 +2593,7 @@ async function buildMapDoc(status) {
   const fieldHospitalUnits = collectFieldHospitalUnits(uploadResults);
   const gunTurrets = collectTurrets(uploadResults);
   const missileUnits = collectMissileUnits(uploadResults);
+  const missileBatteryUnits = collectMissileBatteryUnits(uploadResults);
   const computers = collectComputers(uploadResults);
   return {
     ownerId: currentUser.uid,
@@ -2573,6 +2722,17 @@ async function buildMapDoc(status) {
       image: uploadResults.missileSiloImage,
     },
     missileUnits,
+    // Optional, gated like Air Base/War Factory/etc (its own building has
+    // to be built first, produced with the same queue/timer system) -
+    // unlike missileSilo/missileUnits above, these units ARE merged into
+    // play.html's unitDefs (mobile, not placed in a ring).
+    missileBattery: {
+      name: document.getElementById('missileBatteryName').value.trim() || 'Missile Battery',
+      hp: clampHomeworldHp(document.getElementById('missileBatteryHp').value),
+      cost: Number(document.getElementById('missileBatteryCost').value) || 150,
+      image: uploadResults.missileBatteryImage,
+    },
+    missileBatteryUnits,
     sounds: {
       music: uploadResults.soundMusic,
       intro: uploadResults.soundIntro,
@@ -2599,8 +2759,8 @@ function checklistGaps(mapDoc) {
   // same as always). What replaces "at least one combat unit" is "at
   // least one buildable unit somewhere" - Air Base and War Factory
   // count now too.
-  if ([mapDoc.units, mapDoc.airUnits, mapDoc.warUnits, mapDoc.infantryUnits, mapDoc.heliUnits, mapDoc.navyUnits].every((list) => list.length === 0)) {
-    gaps.push('at least one unit (Air Base / War Factory / Infantry Post / Helicopter Facility / Navy Harbor - Combat Units is no longer used)');
+  if ([mapDoc.units, mapDoc.airUnits, mapDoc.warUnits, mapDoc.infantryUnits, mapDoc.heliUnits, mapDoc.navyUnits, mapDoc.missileBatteryUnits].every((list) => list.length === 0)) {
+    gaps.push('at least one unit (Air Base / War Factory / Infantry Post / Helicopter Facility / Navy Harbor / Missile Battery - Combat Units is no longer used)');
   }
   mapDoc.units.forEach((u, i) => { if (!u.imageUrl) gaps.push(`unit #${i + 1} (${u.name}) art`); });
   // Same pattern 4 times: a gated building's own art (and each of its
@@ -2631,6 +2791,18 @@ function checklistGaps(mapDoc) {
     mapDoc.missileUnits.forEach((u, i) => {
       if (!u.imageUrl) gaps.push(`${mapDoc.missileSilo.name} launcher #${i + 1} (${u.name}) art`);
       if (!u.missileImageUrl) gaps.push(`${mapDoc.missileSilo.name} launcher #${i + 1} (${u.name}) missile art`);
+    });
+  }
+  // Missile Battery: same "only required once its unit list actually has
+  // something in it" gate, same "needs BOTH its own sprite and its
+  // missile's own sprite" per-unit requirement as Missile Silo above -
+  // it's a mobile unit, but the missile projectile still needs its own
+  // art regardless.
+  if (mapDoc.missileBatteryUnits.length) {
+    if (!mapDoc.missileBattery.image) gaps.push(`${mapDoc.missileBattery.name} art`);
+    mapDoc.missileBatteryUnits.forEach((u, i) => {
+      if (!u.imageUrl) gaps.push(`${mapDoc.missileBattery.name} unit #${i + 1} (${u.name}) art`);
+      if (!u.missileImageUrl) gaps.push(`${mapDoc.missileBattery.name} unit #${i + 1} (${u.name}) missile art`);
     });
   }
   return gaps;
@@ -2981,6 +3153,16 @@ async function loadExistingMap() {
   if (Array.isArray(m.missileUnits) && m.missileUnits.length) {
     missileUnitList.innerHTML = '';
     m.missileUnits.forEach((u) => addMissileUnitRow(u));
+  }
+  if (m.missileBattery) {
+    document.getElementById('missileBatteryName').value = m.missileBattery.name || 'Missile Battery';
+    document.getElementById('missileBatteryHp').value = m.missileBattery.hp || 2000;
+    document.getElementById('missileBatteryCost').value = m.missileBattery.cost || 150;
+    if (m.missileBattery.image) showExistingAsset('missileBatteryImage', m.missileBattery.image);
+  }
+  if (Array.isArray(m.missileBatteryUnits) && m.missileBatteryUnits.length) {
+    missileBatteryUnitList.innerHTML = '';
+    m.missileBatteryUnits.forEach((u) => addMissileBatteryUnitRow(u));
   }
 
   if (m.sounds) {

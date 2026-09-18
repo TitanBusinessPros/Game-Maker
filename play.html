@@ -630,9 +630,10 @@ async function main() {
   // 'warFactory') is read by the build panel below to gate them behind
   // that faction actually having built the matching building, and by
   // update()'s production-queue processing.
-  const [airBaseImg, warFactoryImg, infantryPostImg, heliFacilityImg, navyHarborImg, fieldHospitalImg, researchFacilityImg, missileSiloImg] = await Promise.all([
+  const [airBaseImg, warFactoryImg, infantryPostImg, heliFacilityImg, navyHarborImg, fieldHospitalImg, researchFacilityImg, missileSiloImg, missileBatteryImg] = await Promise.all([
     loadImage(cfg.airBase?.image), loadImage(cfg.warFactory?.image), loadImage(cfg.infantryPost?.image),
     loadImage(cfg.heliFacility?.image), loadImage(cfg.navyHarbor?.image), loadImage(cfg.fieldHospital?.image), loadImage(cfg.researchFacility?.image), loadImage(cfg.missileSilo?.image),
+    loadImage(cfg.missileBattery?.image),
   ]);
   // offsetX/offsetY: where each building's art is drawn relative to its
   // faction's homeworld once built (see drawGatedBuildings below) - laid
@@ -675,6 +676,14 @@ async function main() {
     // move, aren't produced with a timer, and are placed in a ring around
     // Home Base instead of spawning next to it.
     { key: 'missileSilo', cfg: cfg.missileSilo || { name: 'Missile Silo', cost: 150, hp: 2000 }, unitCfgs: cfg.missileUnits || [], icon: '🚀', img: missileSiloImg, offsetX: 0, offsetY: -140 },
+    // Missile Battery: unlike Missile Silo above, these units ARE merged
+    // into unitDefs below (not excluded) - they're mobile (real Speed,
+    // real Range, move and chase like any other combat unit via
+    // spawnUnit/runMoveOrder/combatTick), just with isMissileUnit:true so
+    // combatTick fires a real traveling missile instead of an instant
+    // hit when they're actually in range (see combatTick and
+    // spawnMissile further down).
+    { key: 'missileBattery', cfg: cfg.missileBattery || { name: 'Missile Battery', cost: 150, hp: 2000 }, unitCfgs: cfg.missileBatteryUnits || [], icon: '💣', img: missileBatteryImg, offsetX: 330, offsetY: 0 },
   ];
   const buildingCfgByKey = Object.fromEntries(GATED_BUILDINGS.map((b) => [b.key, b.cfg]));
   const unitDefs = [
@@ -682,6 +691,12 @@ async function main() {
     ...GATED_BUILDINGS.filter((b) => b.key !== 'missileSilo').flatMap((b) => b.unitCfgs.map((u) => ({ ...u, buildingKey: b.key }))),
   ];
   const unitImages = await Promise.all(unitDefs.map((u) => loadImage(u.imageUrl)));
+  // Only Missile Battery units (def.isMissileUnit) actually have a
+  // missileImageUrl at all - loadImage(undefined) resolves to null for
+  // every other unit, same graceful-fallback pattern used everywhere
+  // else in this file, so this array can be indexed by defIndex
+  // unconditionally without checking buildingKey first.
+  const unitMissileImages = await Promise.all(unitDefs.map((u) => loadImage(u.missileImageUrl)));
 
   // Gun Turrets: deliberately NOT merged into unitDefs like the gated-
   // building units above - they don't move, don't get a normal build
@@ -1032,6 +1047,30 @@ async function main() {
       // research finishes later, only ones built afterward do.
       isMedic: !!def.isMedic,
       healAmount: def.isMedic ? Math.round((Number(def.healAmount) || 0) * (1 + researchPercent(fac, 'regen') / 100)) : 0,
+      // Missile Battery unit (index.html's def.isMissileUnit,
+      // collectMissileBatteryUnits) - a normal MOBILE unit in every
+      // other respect (moves, chases, has its own map-maker-set Range,
+      // unlike the stationary Missile Silo launcher which reads range
+      // from research instead), but combatTick fires a real traveling
+      // missile at it instead of an instant hit once in range (see
+      // combatTick's own isMissileUnit check and spawnMissile below,
+      // which reads missileImg/missileSpeed/missileRotateToFace
+      // straight off the unit object rather than a separate defs array -
+      // works identically whether this came from a Missile Silo launcher
+      // or a Missile Battery unit).
+      isMissileUnit: !!def.isMissileUnit,
+      missileImg: unitMissileImages[defIndex],
+      missileSpeed: def.missileSpeed,
+      missileRotateToFace: def.missileRotateToFace !== false,
+      // index.html's "Auto Attack" checkbox - defaults ON here (unlike
+      // Missile Silo's own launcher, which defaults off) because an
+      // AI-controlled unit already always auto-fights regardless of this
+      // field, and defaulting on is what keeps that completely unchanged
+      // for every already-saved map; the actual behavior change this
+      // introduces is opt-out, not opt-in - a HUMAN player's own units
+      // now also auto-engage anything in range by default instead of
+      // needing a click every time, same as Gun Turrets already did.
+      autoAttack: def.autoAttack !== false,
     };
     units.push(u);
     return u;
@@ -1102,6 +1141,17 @@ async function main() {
       // shape as a Gun Turret's Auto Attack.
       lockedUntilTurn: 0, facingAngle: 0, rotateToFace: false,
       autoAttack: def.autoAttack === true,
+      // Baked on here (rather than spawnMissile re-deriving them from
+      // missileDefs[launcher.defIndex] every time it fires) so
+      // spawnMissile can read them the same way regardless of whether
+      // the caller is a stationary Missile Silo launcher (defIndex into
+      // missileDefs) or a mobile Missile Battery unit (defIndex into the
+      // completely separate unitDefs array) - see spawnUnit's own
+      // missileImg/missileSpeed/missileRotateToFace for the other side
+      // of this.
+      missileImg: missileProjectileImages[defIndex],
+      missileSpeed: def.missileSpeed,
+      missileRotateToFace: def.missileRotateToFace !== false,
     };
     units.push(u);
     return u;
@@ -1251,17 +1301,24 @@ async function main() {
   // target is destroyed before the missile makes it there, it disappears
   // from the screen" rather than exploding on nothing or retargeting.
   const missiles = [];
+  // Reads the missile's own image/speed/rotate settings straight off the
+  // firing unit itself (missileImg/missileSpeed/missileRotateToFace -
+  // baked on at spawn time by both spawnMissileLauncher and spawnUnit,
+  // see their own comments) rather than looking them up via
+  // missileDefs[launcher.defIndex], which only ever made sense for an
+  // actual stationary launcher - a Missile Battery unit's defIndex
+  // points into the completely separate unitDefs array instead. Works
+  // identically for either caller as a result.
   function spawnMissile(launcher, target) {
-    const def = missileDefs[launcher.defIndex];
     missiles.push({
       x: launcher.x, y: launcher.y, factionId: launcher.factionId, target,
-      damage: launcher.attack, speed: (Number(def.missileSpeed) || 4) * MOVE_PX_PER_SPEED,
-      img: missileProjectileImages[launcher.defIndex], facingAngle: 0,
+      damage: launcher.attack, speed: (Number(launcher.missileSpeed) || 4) * MOVE_PX_PER_SPEED,
+      img: launcher.missileImg, facingAngle: 0,
       // index.html's "Rotate missile to face its travel direction"
-      // checkbox on the launcher row - defaults true for a map saved
-      // before this field existed, same convention as a normal unit's
-      // own rotateToFace.
-      rotateToFace: def.missileRotateToFace !== false,
+      // checkbox - defaults true for a unit/launcher saved before this
+      // field existed, same convention as a normal unit's own
+      // rotateToFace.
+      rotateToFace: launcher.missileRotateToFace !== false,
     });
   }
   function fireWeaponEffect(u, t) {
@@ -1459,7 +1516,13 @@ async function main() {
       const sp = u.speed * MOVE_PX_PER_SPEED;
       u.x += (t.x - u.x) / dist * sp * dt; u.y += (t.y - u.y) / dist * sp * dt;
       clampToWorld(u);
-    } else if (u.isMissileLauncher) {
+    } else if (u.isMissileLauncher || u.isMissileUnit) {
+      // A Missile Battery unit (mobile) fires exactly like a stationary
+      // Missile Silo launcher once actually in its own range - a real,
+      // separately-tracked missile that takes real time to travel there,
+      // not an instant hit - "the attack for these units are the
+      // missiles themselves, they don't have an attack outside of firing
+      // missiles."
       spawnMissile(u, t);
       lockUnit(u);
     } else {
@@ -1940,9 +2003,24 @@ async function main() {
       } else if (!fac.isHuman) {
         if (!u.target) u.target = nearestEnemy(u);
         combatTick(u, dt);
-      } else {
-        if (u.orderType === 'attack' && u.target) combatTick(u, dt);
-        else if (u.orderType === 'move' && u.moveTarget && !isLocked(u)) runMoveOrder(u, dt);
+      } else if (u.orderType === 'attack' && u.target) {
+        combatTick(u, dt);
+      } else if (u.orderType === 'move' && u.moveTarget && !isLocked(u)) {
+        runMoveOrder(u, dt);
+      } else if (u.autoAttack === true) {
+        // index.html's "Auto Attack" checkbox, now on every ordinary unit
+        // type (Combat Units, Air Base/War Factory/Infantry Post/
+        // Helicopter Facility/Navy Harbor, Missile Battery) - same idea
+        // as a Gun Turret's own Auto Attack, just deliberately LOWER
+        // priority than any explicit order a player already gave (an
+        // idle unit with nothing else to do self-engages; one already
+        // moving or attacking on command keeps doing exactly that,
+        // unbothered). Only ever reachable here in the first place
+        // (isHuman branch) when there's no standing order at all -
+        // AI-controlled units already always auto-fight regardless of
+        // this field, completely unaffected either way.
+        if (!u.target || u.target.hp <= 0 || u.target.alive === false) u.target = nearestEnemy(u);
+        if (u.target) { u.orderType = 'attack'; combatTick(u, dt); }
       }
     }
 
@@ -2881,6 +2959,7 @@ async function main() {
       : u.isMissileLauncher ? ` · Missile DMG ${u.attack} · RNG ${missileRange(factionOf(u.factionId))} · stationary - click a target to fire`
       : u.isMedic ? ` · Heals ${u.healAmount} HP/turn · RNG ${u.range} · SPD ${u.speed.toFixed(1)} - click an ally to heal them`
       : u.isGatedBuilding ? ''
+      : u.isMissileUnit ? ` · Missile DMG ${u.attack} · RNG ${u.range} · SPD ${u.speed.toFixed(1)}`
       : ` · ATK ${u.attack} · RNG ${u.range} · SPD ${u.speed.toFixed(1)}`;
     textEl.innerHTML = `<strong>${def.name}</strong><br>HP ${Math.round(u.hp)}/${u.maxHp}${statsLine}${isLocked(u) ? '<br><span style="color:var(--warn)">🔒 locked until next turn</span>' : ''}`;
   }
@@ -3013,6 +3092,8 @@ async function main() {
     const unitCosts = getCosts(def);
     const combatStats = def.isMedic
       ? `HP ${def.hp} · Heals ${Math.round((Number(def.healAmount) || 0) * (1 + researchPercent(activeFaction, 'regen') / 100))} HP/turn · RNG ${def.range} · SPD ${def.speed}`
+      : def.isMissileUnit
+      ? `HP ${def.hp} · Missile DMG ${def.attack} · RNG ${def.range} · SPD ${def.speed}`
       : `HP ${def.hp} · ATK ${def.attack} · RNG ${def.range} · SPD ${def.speed}`;
     // Live production progress for THIS specific unit type, not just the
     // building's own separate summary line - "producing… 12s left" while
