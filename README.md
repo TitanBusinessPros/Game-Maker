@@ -997,7 +997,19 @@ entirely by one map's saved data:
   loop's own separate `!fac.isHuman` branch), so defaulting it on for
   every unit type is what keeps every already-saved map's AI behavior
   completely unchanged; the actual behavior change this introduces is
-  opt-out; not opt-in.
+  opt-out; not opt-in. Auto Attack only ever engages something already
+  within the unit's own range (`nearestEnemyInRange()`, bounded to
+  `u.range`, dropping the target the instant it's out of range - BEFORE
+  combatTick ever runs, so combatTick's own out-of-range chase step never
+  triggers for it) - it never marches a unit off toward some distant
+  enemy the way an explicit attack order (or AI's own unrestricted
+  `nearestEnemy()`) does. Reported as "the units go and hunt down
+  enemies no matter how far away they are... across the map" from an
+  earlier version that reused plain `nearestEnemy()` (no range limit)
+  for Auto Attack too - an idle unit with nothing in range now just
+  stands still instead, the same way a Gun Turret already effectively
+  does (it never moves either way, so "in range" was always the only
+  thing that mattered for it).
 - **⬇ Download as index.html** - packages the map's data inline into a
   fully standalone copy of this page. This used to only bundle the map's
   *data* (unit stats, names, etc.) while every image/sound field stayed a

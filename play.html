@@ -1248,6 +1248,35 @@ async function main() {
     }
     return best;
   }
+  // Same search as nearestEnemy above, but only ever returns something
+  // actually within u's own range (starts bestDist at u.range instead of
+  // Infinity) - used by a mobile unit's own Auto Attack fallback below,
+  // NOT by AI (which keeps using plain nearestEnemy() and marching
+  // wherever it needs to, unchanged - that's deliberate, existing AI
+  // aggression, not part of this). Auto Attack chasing a target with
+  // nearestEnemy() + combatTick's own out-of-range chase step meant a
+  // unit would walk clear across the map hunting down anything, however
+  // far away - reported as "the units go and hunt down enemies no matter
+  // how far away they are." An idle Auto-Attack unit should only ever
+  // engage what's already in its own range and otherwise just stand
+  // still, the same way a Gun Turret already effectively does (it just
+  // never moves at all, so "in range" is the only thing that ever
+  // mattered for it in the first place).
+  function nearestEnemyInRange(u) {
+    let best = null, bestDist = u.range;
+    for (const f of factions) {
+      if (isAlly(u.factionId, f.id)) continue;
+      if (f.hp <= 0) continue;
+      const hd = Math.hypot(f.x - u.x, f.y - u.y);
+      if (hd <= bestDist) { best = f; bestDist = hd; }
+    }
+    for (const e of units) {
+      if (!e.alive || e.mining || isAlly(u.factionId, e.factionId)) continue;
+      const d = Math.hypot(e.x - u.x, e.y - u.y);
+      if (d <= bestDist) { best = e; bestDist = d; }
+    }
+    return best;
+  }
 
   let gameOver = false, paused = false, matchStarted = false;
   // Turret placement mode - see the Gun Turrets build-panel row, the
@@ -2018,8 +2047,18 @@ async function main() {
         // unbothered). Only ever reachable here in the first place
         // (isHuman branch) when there's no standing order at all -
         // AI-controlled units already always auto-fight regardless of
-        // this field, completely unaffected either way.
-        if (!u.target || u.target.hp <= 0 || u.target.alive === false) u.target = nearestEnemy(u);
+        // this field, completely unaffected either way. Uses
+        // nearestEnemyInRange (bounded to u.range), NOT plain
+        // nearestEnemy - the target is dropped the instant it's out of
+        // range, BEFORE combatTick ever runs, so combatTick's own
+        // out-of-range branch (walk toward it) never triggers here at
+        // all. A pure Auto-Attack unit with nothing in range just stands
+        // still - it never marches off after something distant the way
+        // an explicit attack order (or AI) does.
+        if (u.target && (u.target.hp <= 0 || u.target.alive === false || Math.hypot(u.target.x - u.x, u.target.y - u.y) > u.range)) {
+          u.target = null;
+        }
+        if (!u.target) u.target = nearestEnemyInRange(u);
         if (u.target) { u.orderType = 'attack'; combatTick(u, dt); }
       }
     }
