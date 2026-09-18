@@ -843,6 +843,26 @@ entirely by one map's saved data:
   destination case ever had. Fixed by capping each tick's step at
   whichever is smaller, the normal speed-based distance or however much
   distance actually remains.
+- A moving unit gets a small walking wobble - a vertical bounce plus a
+  slight rotational sway (`drawUnit`'s own `BOB_PX`/`BOB_SPEED`/
+  `SWAY_RAD`) - "so they look a little alive" instead of sliding across
+  the map as a rigid, motionless sprite. Timed off a shared clock but
+  phase-offset per unit (its own id), so a whole squad moving together
+  doesn't visibly bounce in lockstep. Driven by `u._isMoving`, reset to
+  false every tick before any movement branch runs and only ever set true
+  the exact ticks a unit's x/y actually changed from walking
+  (`runMoveOrder`, and `combatTick`/`healTick`'s own chase-into-range
+  steps) - idle, in range and just firing, locked, or frozen for another
+  faction's turn all correctly read as standing still, and a Gun
+  Turret/Missile Silo/gated building never sets it in the first place
+  (they never move), so none of them ever wobble. Purely cosmetic - never
+  touches the unit's real x/y, and the HP bar/selection ring/lock icon
+  stay anchored to its actual position rather than bouncing with it. The
+  rotational sway is skipped for a unit with "Rotate to face movement
+  direction" turned off, for the same reason that setting skips the
+  normal facing rotation - it would reintroduce the same "fixed-
+  orientation art looks wrong tilted" problem that checkbox exists to
+  avoid.
 - A small **▲ / ▼ tab centered under the topbar** collapses the entire
   topbar (resource/turn HUD, map name, Skip Turn, Pause/Sound/Save/Load/
   Download) down to just that tab, so only the map itself shows -

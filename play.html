@@ -1874,6 +1874,7 @@ async function main() {
       u.x += (dx / dist) * step; u.y += (dy / dist) * step;
       clampToWorld(u);
       pushOutOfObstacles(u);
+      u._isMoving = true;
     }
   }
 
@@ -1965,6 +1966,7 @@ async function main() {
       moveTowardWithAvoidance(u, t.x, t.y, sp, dt);
       clampToWorld(u);
       pushOutOfObstacles(u);
+      u._isMoving = true;
     } else if (u.isMissileLauncher || u.isMissileUnit) {
       // A Missile Battery unit (mobile) fires exactly like a stationary
       // Missile Silo launcher once actually in its own range - a real,
@@ -1998,6 +2000,7 @@ async function main() {
       moveTowardWithAvoidance(u, t.x, t.y, sp, dt);
       clampToWorld(u);
       pushOutOfObstacles(u);
+      u._isMoving = true;
     } else {
       t.hp = Math.min(t.maxHp, t.hp + u.healAmount);
       // A distinct green pulse (reusing the same `effects` array every
@@ -2377,6 +2380,13 @@ async function main() {
     for (const u of units) {
       if (!u.alive) continue;
       if (u.isGatedBuilding) continue; // pure HP - never moves, never fights back, just a real target (see spawnGatedBuildingEntity)
+      // Reset every tick, before any branch below decides whether this
+      // unit actually moves this frame - drawUnit's own walking-bob
+      // animation reads this to know whether to bob at all, so a unit
+      // that's locked, frozen (not its faction's turn), idle, or already
+      // in range and just firing in place never looks like it's still
+      // walking.
+      u._isMoving = false;
       const fac = factionOf(u.factionId);
       // Turn-Based mode: a faction that isn't the active one is fully
       // frozen - none of its units (turrets included, at the map-maker's
@@ -2639,6 +2649,28 @@ async function main() {
     if (p.x < -60 || p.x > canvas.width + 60 || p.y < -60 || p.y > canvas.height + 60) return;
     const size = (u.isGatedBuilding ? GATED_BUILDING_SIZE : UNIT_SIZE) * camera.zoom;
     if (u.selected) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p.x, p.y, size / 2 + 5, 0, 7); ctx.stroke(); }
+    // A moving unit gets a small, cheap "still feels alive" walking
+    // wobble - a vertical bounce plus a slight rotational sway - instead
+    // of just sliding across the map as a rigid, motionless sprite.
+    // Timed off a shared clock but phase-offset per unit (its own id) so
+    // a whole squad moving together doesn't bounce in visible lockstep.
+    // u._isMoving (update()'s per-unit loop, reset every tick before any
+    // movement branch runs) is only ever true the exact ticks a unit's
+    // x/y actually changed from walking - stationary (idle, in range and
+    // firing, locked, frozen for another faction's turn) always reads
+    // false, so nothing here ever applies to something standing still. A
+    // Gun Turret/Missile Silo/gated building never sets it in the first
+    // place (they never move), so this is a no-op for them regardless.
+    // Purely cosmetic - never touches the unit's real x/y, and the HP
+    // bar/selection ring/lock icon below all stay anchored to its actual
+    // position, not the bounce.
+    const BOB_PX = 3, BOB_SPEED = 9, SWAY_RAD = 0.09;
+    let bobY = 0, swayAngle = 0;
+    if (u._isMoving) {
+      const phase = performance.now() / 1000 * BOB_SPEED + u.id * 0.9;
+      bobY = Math.sin(phase) * BOB_PX * camera.zoom;
+      swayAngle = Math.cos(phase) * SWAY_RAD;
+    }
     // Only the sprite itself rotates to face where the unit is headed
     // (same as After Earth's own Unit.draw()) - the HP bar/lock icon below
     // stay screen-aligned, same as the real game keeps them too. A
@@ -2648,12 +2680,13 @@ async function main() {
     // entirely instead - facingAngle still updates normally underneath,
     // just never applied to the draw, for sprites drawn facing one fixed
     // way (infantry/army-men art) that look like they're flying sideways
-    // instead of walking once rotated toward diagonal movement.
+    // instead of walking once rotated toward diagonal movement - the sway
+    // above is skipped right along with it, for the same reason.
     if (u.img) {
       const fit = fittedSize(u.img, size);
       ctx.save();
-      ctx.translate(p.x, p.y);
-      if (u.rotateToFace !== false) ctx.rotate(u.facingAngle || 0);
+      ctx.translate(p.x, p.y + bobY);
+      if (u.rotateToFace !== false) ctx.rotate((u.facingAngle || 0) + swayAngle);
       ctx.drawImage(u.img, -fit.w / 2, -fit.h / 2, fit.w, fit.h);
       ctx.restore();
     } else if (u.isGatedBuilding) {
@@ -2666,7 +2699,7 @@ async function main() {
       ctx.font = `${Math.round(size * 0.55)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(b.icon, p.x, p.y);
       ctx.textBaseline = 'alphabetic';
-    } else { ctx.fillStyle = factionOf(u.factionId).color; ctx.beginPath(); ctx.arc(p.x, p.y, size / 2, 0, 7); ctx.fill(); }
+    } else { ctx.fillStyle = factionOf(u.factionId).color; ctx.beginPath(); ctx.arc(p.x, p.y + bobY, size / 2, 0, 7); ctx.fill(); }
     const pct = Math.max(0, u.hp / u.maxHp);
     ctx.fillStyle = '#2a3550'; ctx.fillRect(p.x - size / 2, p.y - size / 2 - 7, size, 3);
     ctx.fillStyle = factionOf(u.factionId).color; ctx.fillRect(p.x - size / 2, p.y - size / 2 - 7, size * pct, 3);
