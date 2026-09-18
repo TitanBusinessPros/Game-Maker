@@ -529,6 +529,7 @@ const HOMEWORLD_SIZE = 90;
 const DEPOSIT_SIZE = 56;
 const GATED_BUILDING_SIZE = 56;
 const MISSILE_SIZE = 20; // the flying projectile itself, drawn smaller than the stationary launcher that fired it
+const UNIT_COLLISION_RADIUS = 20; // half of UNIT_SIZE-ish - how much clearance a moving unit needs from an obstacle's own edge, used by steerAroundObstacles/pushOutOfObstacles below
 const AI_TICK_SECONDS = 6; // medium's value - other difficulties scale it via AI_DIFFICULTY below
 // Per-computer-player difficulty, set on the build page (index.html's
 // "AI Difficulty" select on each Computer Player row). tickSeconds:
@@ -891,6 +892,102 @@ async function main() {
     u.y = Math.min(worldMaxY, Math.max(worldMinY, u.y));
   }
 
+  // Local obstacle avoidance for Terrain Obstacles (index.html's 3c
+  // section) - deliberately NOT real pathfinding (no grid/A*, no
+  // awareness of a whole cluster of obstacles at once). Every place a
+  // unit moves in a straight line toward a goal (runMoveOrder, combatTick
+  // and healTick's own chase-into-range steps) asks this for a
+  // (possibly deflected) direction first: it looks only at the single
+  // nearest obstacle that actually blocks the straight line to the goal
+  // (ahead of the unit, within combined radius of the line), and steers
+  // along a tangent around its near edge - "take whatever the closest
+  // option is to go around the placement," in the map-maker's own words.
+  // A long wall of obstacles or a tight cluster can still give a unit
+  // trouble finding its way through, same as any local-avoidance-only
+  // approach - there's no larger detour planning behind this.
+  function steerAroundObstacles(u, dx, dy, dist) {
+    if (!obstacles.length || dist < 1) return { x: dx / dist, y: dy / dist };
+    const dirX = dx / dist, dirY = dy / dist;
+    let blocker = null, blockerDist = Infinity;
+    for (const o of obstacles) {
+      const ox = o.x - u.x, oy = o.y - u.y;
+      const along = ox * dirX + oy * dirY;
+      if (along <= 0 || along > dist + o.radius) continue; // behind the unit, or past its goal already
+      const perp = ox * dirY - oy * dirX; // signed distance from the straight line to the goal
+      const clearance = o.radius + UNIT_COLLISION_RADIUS;
+      if (Math.abs(perp) > clearance) continue; // the straight line already clears it
+      const odist = Math.hypot(ox, oy);
+      if (odist < blockerDist) { blockerDist = odist; blocker = o; }
+    }
+    if (!blocker) return { x: dirX, y: dirY };
+    const ox = blocker.x - u.x, oy = blocker.y - u.y;
+    const odist = Math.max(1, Math.hypot(ox, oy));
+    const nx = ox / odist, ny = oy / odist; // unit vector from the mover toward the obstacle's center
+    // Two tangent directions run perpendicular to that normal - pick
+    // whichever one keeps moving most toward the actual goal (least
+    // course change), rather than tracking a per-unit left/right bias,
+    // so the choice falls naturally out of the geometry every frame
+    // instead of ever needing to flip a remembered sign. Only safe to
+    // recompute this fresh every call because moveTowardWithAvoidance
+    // below only ever calls this across small sub-steps - recomputing it
+    // across one huge step (a slow frame, or just a fast unit) let the
+    // unit hop clean from one side of the obstacle to the other between
+    // calls and get stuck flip-flopping in place forever.
+    const t1x = -ny, t1y = nx, t2x = ny, t2y = -nx;
+    const use1 = (t1x * dirX + t1y * dirY) >= (t2x * dirX + t2y * dirY);
+    return use1 ? { x: t1x, y: t1y } : { x: t2x, y: t2y };
+  }
+  // Every place a unit chases a moving/fixed point (a move order, or
+  // closing distance on a combat/heal target) funnels through here
+  // instead of moving the whole tick's distance in one straight-line
+  // step. Splitting it into small sub-steps (and re-running
+  // steerAroundObstacles fresh each one) matters once real obstacles are
+  // on the map: a single big step - a laggy frame's larger dt, or just a
+  // fast unit - can otherwise cover more ground than an obstacle's own
+  // clearance band in one go, jumping the unit from one side of it to the
+  // other between calls with nothing steering it through the middle of
+  // that jump, which left it oscillating in place indefinitely instead of
+  // ever clearing the obstacle. No obstacles on the map at all keeps the
+  // original single-step behavior (and its cost) exactly as before.
+  const OBSTACLE_AVOIDANCE_STEP = 20;
+  function moveTowardWithAvoidance(u, tx, ty, sp, dt) {
+    const totalDist = sp * dt;
+    if (!obstacles.length) {
+      const dx = tx - u.x, dy = ty - u.y, dist = Math.hypot(dx, dy) || 1;
+      u.x += (dx / dist) * totalDist; u.y += (dy / dist) * totalDist;
+      return;
+    }
+    let remaining = totalDist;
+    while (remaining > 0.001) {
+      const dx = tx - u.x, dy = ty - u.y, dist = Math.hypot(dx, dy);
+      if (dist < 0.5) break;
+      const step = Math.min(remaining, OBSTACLE_AVOIDANCE_STEP, dist);
+      const dir = steerAroundObstacles(u, dx, dy, dist);
+      u.x += dir.x * step; u.y += dir.y * step;
+      pushOutOfObstacles(u);
+      remaining -= step;
+    }
+  }
+  // Hard backstop run right after any movement (and after clampToWorld,
+  // so a unit pushed to the map's edge doesn't just get shoved right back
+  // into an obstacle by the clamp) - guarantees a unit's own center can
+  // never actually end up inside an obstacle's collision circle, even in
+  // whatever edge case the steering heuristic above doesn't fully solve
+  // on its own (a sharp corner between two obstacles, a very fast unit
+  // closing the last bit of distance in one tick, etc).
+  function pushOutOfObstacles(u) {
+    for (const o of obstacles) {
+      const dx = u.x - o.x, dy = u.y - o.y;
+      const dist = Math.hypot(dx, dy);
+      const minDist = o.radius + UNIT_COLLISION_RADIUS;
+      if (dist >= minDist) continue;
+      if (dist < 0.001) { u.x = o.x + minDist; u.y = o.y; continue; }
+      const push = minDist - dist;
+      u.x += (dx / dist) * push;
+      u.y += (dy / dist) * push;
+    }
+  }
+
   // index.html's Resource & Mining placement widget: 'base' (default,
   // unset on any map saved before this existed) keeps the original
   // per-faction deposit near each home base, untouched below. 'map' means
@@ -951,6 +1048,23 @@ async function main() {
       if (!pts) return [];
       return pts.map((pos) => ({ factionId: null, resourceId: r.id, x: pos.x, y: pos.y, img: EXTRA_RESOURCE_IMAGES[i] }));
     }));
+
+  // Terrain Obstacles (index.html's 3c section) - solid, non-combat
+  // scenery placed on the map ("place a boulder or mountain and units
+  // have to go around it"). Always map-mode-only (see index.html's
+  // obstaclePlacementWidgetHTML - there's no "near each base" concept for
+  // scenery), so every row with at least one placed point becomes one
+  // real circle here per point, at world coordinates the same way a
+  // map-placed Gold deposit does above. A row with zero points placed
+  // (readPlacement falls back to {mode:'base'} when empty) just
+  // contributes nothing, same as never having added it.
+  const OBSTACLES_CFG = cfg.obstacles || [];
+  const OBSTACLE_IMAGES = await Promise.all(OBSTACLES_CFG.map((o) => loadImage(o.image)));
+  const obstacles = OBSTACLES_CFG.flatMap((o, i) => {
+    const pts = placementWorldPoints(o.placement);
+    if (!pts) return [];
+    return pts.map((p) => ({ x: p.x, y: p.y, radius: (o.size || 120) / 2, img: OBSTACLE_IMAGES[i] }));
+  });
 
   const units = [];
   let nextUnitId = 1;
@@ -1453,8 +1567,10 @@ async function main() {
     if (dist < 4) { u.orderType = null; u.moveTarget = null; }
     else {
       u.facingAngle = facingToward(u, u.moveTarget.x, u.moveTarget.y);
-      const sp = u.speed * MOVE_PX_PER_SPEED; u.x += dx / dist * sp * dt; u.y += dy / dist * sp * dt;
+      const sp = u.speed * MOVE_PX_PER_SPEED;
+      moveTowardWithAvoidance(u, u.moveTarget.x, u.moveTarget.y, sp, dt);
       clampToWorld(u);
+      pushOutOfObstacles(u);
     }
   }
 
@@ -1543,8 +1659,9 @@ async function main() {
       // problem since it already dropped its target here.
       if (u.isMissileLauncher || u.isTurret) { u.target = null; return; }
       const sp = u.speed * MOVE_PX_PER_SPEED;
-      u.x += (t.x - u.x) / dist * sp * dt; u.y += (t.y - u.y) / dist * sp * dt;
+      moveTowardWithAvoidance(u, t.x, t.y, sp, dt);
       clampToWorld(u);
+      pushOutOfObstacles(u);
     } else if (u.isMissileLauncher || u.isMissileUnit) {
       // A Missile Battery unit (mobile) fires exactly like a stationary
       // Missile Silo launcher once actually in its own range - a real,
@@ -1575,8 +1692,9 @@ async function main() {
     u.facingAngle = facingToward(u, t.x, t.y);
     if (dist > u.range) {
       const sp = u.speed * MOVE_PX_PER_SPEED;
-      u.x += (t.x - u.x) / dist * sp * dt; u.y += (t.y - u.y) / dist * sp * dt;
+      moveTowardWithAvoidance(u, t.x, t.y, sp, dt);
       clampToWorld(u);
+      pushOutOfObstacles(u);
     } else {
       t.hp = Math.min(t.maxHp, t.hp + u.healAmount);
       // A distinct green pulse (reusing the same `effects` array every
@@ -2312,6 +2430,25 @@ async function main() {
       ctx.fillText('💎', p.x, p.y);
     }
   }
+  // Terrain Obstacles - same drawing shape as drawExtraDeposit above
+  // (per-item image, plain circle + emoji fallback), sized off the
+  // obstacle's own real world-space radius (index.html's "Size (px)"
+  // field / 2) instead of the fixed DEPOSIT_SIZE every resource marker
+  // uses, so what's drawn actually matches the collision circle units
+  // steer around (steerAroundObstacles/pushOutOfObstacles).
+  function drawObstacle(o) {
+    const p = toScreen(o.x, o.y);
+    const size = o.radius * 2 * camera.zoom;
+    if (o.img) {
+      const fit = fittedSize(o.img, size);
+      ctx.drawImage(o.img, p.x - fit.w / 2, p.y - fit.h / 2, fit.w, fit.h);
+    } else {
+      ctx.fillStyle = '#6b5b47';
+      ctx.beginPath(); ctx.arc(p.x, p.y, size / 2, 0, 7); ctx.fill();
+      ctx.font = `${Math.round(size * 0.5)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('⛰️', p.x, p.y);
+    }
+  }
   // Air Base/War Factory/etc used to be drawn here as a purely
   // decorative marker near the homeworld, not a real unit - replaced by
   // spawnGatedBuildingEntity() pushing a real entity into `units`, drawn
@@ -2677,6 +2814,7 @@ async function main() {
 
     for (const d of deposits) drawDeposit(d);
     for (const d of extraDeposits) drawExtraDeposit(d);
+    for (const o of obstacles) drawObstacle(o);
     for (const f of factions) if (f.hp > 0) drawFactionHome(f);
     for (const u of units) if (u.alive) drawUnit(u);
     drawMissiles();
@@ -3816,7 +3954,7 @@ async function main() {
   // (and just poking around in devtools) inspect real engine state instead
   // of guessing screen coordinates.
   window.__GM_DEBUG = {
-    factions, units, deposits, camera, get turnNumber() { return turnNumber; }, toScreen, effects,
+    factions, units, deposits, obstacles, camera, get turnNumber() { return turnNumber; }, toScreen, effects,
     turnMode, get activeFaction() { return activeFaction; }, get hotseatTimer() { return hotseatTimer; },
     get moveNumber() { return moveNumber; }, GATED_BUILDINGS, turretDefs, missileDefs,
     get placingTurret() { return placingTurret; }, get placingMissile() { return placingMissile; },

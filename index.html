@@ -525,6 +525,14 @@
     <div id="researchTopicsList"></div>
   </section>
 
+  <!-- 3c. Terrain Obstacles -->
+  <section class="section" id="sec-obstacles">
+    <h2><span class="num">3c</span> Terrain Obstacles (optional)</h2>
+    <p class="hint">Boulders, mountains, wreckage, whatever fits your theme - solid scenery units can't walk through. Add one row per obstacle TYPE, upload art (or pick one from the shared library) or leave it blank for a generic mountain marker, then click the map below each one to place as many copies of it as you like. Units automatically steer around whatever you place instead of getting stuck on it.</p>
+    <div id="obstaclesList"></div>
+    <button type="button" class="btn-add" id="addObstacleBtn">+ Add obstacle</button>
+  </section>
+
   <!-- Combat Units: replaced by Air Base / War Factory below as the way
        to add buildable units. Kept in the DOM (hidden, empty, nothing
        auto-added to it) purely so old maps that still have units saved
@@ -1376,6 +1384,7 @@ const SLOT_PREFIX_CATEGORY_HINTS = [
   // Missile Silo above (unit body + separate missile projectile art).
   [/^missilebattery_\d+_missile$/, 'characters/missiles'],
   [/^missilebattery_\d+$/, 'characters/artillery'],
+  [/^obstacle_/, 'terrain'],
 ];
 function defaultCategoryForSlot(slotKey) {
   // Map background art has its own per-size sub-categories in admin.html
@@ -2160,6 +2169,84 @@ function collectExtraResources(uploadResults) {
   });
 }
 
+// Terrain Obstacles (3c) - same one-row-per-type / read-from-DOM-at-save
+// shape as Additional Resources above, minus the income/cost machinery
+// (an obstacle isn't a resource - nothing ever grants or spends it) and
+// with its own always-map-mode placement widget (obstaclePlacementWidgetHTML
+// below - no "near each base" option makes sense for scenery, so the
+// base/map radio toggle is left out of its markup entirely; readPlacement/
+// wirePlacementWidget both already tolerate a root with no radios at all -
+// they just read/write root.dataset.mode directly, hardcoded to "map"
+// here). play.html turns each placed point plus this row's chosen size
+// into one impassable circle units steer around (see its own obstacles/
+// steerAroundObstacles).
+let obstacles = []; // [{id, name}] - just enough to track rows; size/image/placement live in the DOM, read at save time (see collectObstacles)
+let obstacleCounter = 0;
+function obstaclePlacementWidgetHTML(obstacleId, placement) {
+  const { points } = normalizePlacement(placement);
+  return `
+    <div class="placement-widget" data-mode="map" data-points='${JSON.stringify(points)}'>
+      <label>Placement</label>
+      <div class="placement-map">
+        <div class="placement-canvas-wrap"></div>
+        <div class="placement-footer">
+          <span class="placement-count"></span>
+          <button type="button" class="btn-secondary placement-clear">Clear all</button>
+        </div>
+        <p class="hint" style="margin:6px 0 0;">Click the map to place one of these obstacles there. Click a placed one to remove just that one. Upload map background art above (Map Basics) to see it here.</p>
+      </div>
+    </div>`;
+}
+function addObstacleRow(o) {
+  const row = document.createElement('div');
+  row.className = 'resource-row obstacle-row';
+  row.dataset.obstacleId = o.id;
+  row.style.marginBottom = '14px';
+  row.innerHTML = `
+    <div class="row" style="align-items:flex-end;">
+      <div class="field"><label>Obstacle name</label><input type="text" class="obstacle-name" value="${escapeAttr(o.name || '')}" placeholder="e.g. Boulder"></div>
+      <div class="field narrow"><label>Size (px)</label><input type="number" class="obstacle-size" value="${o.size ?? 120}" min="20" step="10"></div>
+      <button type="button" class="remove-unit obstacle-remove" title="Remove obstacle">&times;</button>
+    </div>
+    <div class="upload-slot" data-slot="${o.id}">
+      <div class="thumb">none</div>
+      <div class="meta"><div class="name">No file chosen</div><div class="status">optional - shows a generic mountain marker if left blank</div></div>
+      <input type="file" accept="image/*" style="width:auto">
+    </div>
+    ${obstaclePlacementWidgetHTML(o.id, o.placement)}
+  `;
+  row.querySelector('.obstacle-remove').addEventListener('click', () => {
+    delete existingAssetUrls[o.id];
+    obstacles = obstacles.filter((x) => x.id !== o.id);
+    const idx = placementRefreshFns.indexOf(syncPlacement);
+    if (idx !== -1) placementRefreshFns.splice(idx, 1);
+    row.remove();
+  });
+  wireUploadSlot(row.querySelector('.upload-slot'));
+  row.querySelector('.upload-slot input[type=file]').addEventListener('change', refreshAllPlacementPreviews);
+  const syncPlacement = wirePlacementWidget(row.querySelector('.placement-widget'));
+  document.getElementById('obstaclesList').appendChild(row);
+  if (o.image) showExistingAsset(o.id, o.image);
+  return row;
+}
+document.getElementById('addObstacleBtn').addEventListener('click', () => {
+  const o = { id: 'obstacle_' + (obstacleCounter++), name: '' };
+  obstacles.push(o);
+  addObstacleRow(o);
+});
+function collectObstacles(uploadResults) {
+  return Array.from(document.querySelectorAll('#obstaclesList .obstacle-row')).map((row) => {
+    const id = row.dataset.obstacleId;
+    return {
+      id,
+      name: row.querySelector('.obstacle-name').value.trim() || 'Obstacle',
+      size: Number(row.querySelector('.obstacle-size').value) || 120,
+      image: uploadResults[id] || null,
+      placement: readPlacement(row.querySelector('.placement-widget')),
+    };
+  });
+}
+
 // Free resources each round - one checkbox+amount row per resource that
 // currently exists (Gold included), replacing the old single "gold per
 // round" checkbox. currentGrantsFromDOM() reads back whatever's
@@ -2583,7 +2670,8 @@ async function buildMapDoc(status) {
   const missileBatteryUnitSlots = Array.from(missileBatteryUnitList.querySelectorAll('.unit-row')).flatMap((row) => [row.dataset.unitId, `${row.dataset.unitId}_missile`]);
   const computerSlots = Array.from(computerList.querySelectorAll('.computer-row')).map((row) => row.dataset.computerId);
   const resourceSlots = Array.from(document.querySelectorAll('#extraResourcesList .resource-row')).map((row) => row.dataset.resourceId);
-  const uploadResults = await uploadSlotsWithLimit([...FIXED_UPLOAD_SLOTS, ...unitSlots, ...airUnitSlots, ...warUnitSlots, ...infantryUnitSlots, ...heliUnitSlots, ...navyUnitSlots, ...fieldHospitalUnitSlots, ...turretSlots, ...missileUnitSlots, ...missileBatteryUnitSlots, ...computerSlots, ...resourceSlots]);
+  const obstacleSlots = Array.from(document.querySelectorAll('#obstaclesList .obstacle-row')).map((row) => row.dataset.obstacleId);
+  const uploadResults = await uploadSlotsWithLimit([...FIXED_UPLOAD_SLOTS, ...unitSlots, ...airUnitSlots, ...warUnitSlots, ...infantryUnitSlots, ...heliUnitSlots, ...navyUnitSlots, ...fieldHospitalUnitSlots, ...turretSlots, ...missileUnitSlots, ...missileBatteryUnitSlots, ...computerSlots, ...resourceSlots, ...obstacleSlots]);
   const units = collectUnits(uploadResults);
   const airUnits = collectAirUnits(uploadResults);
   const warUnits = collectWarUnits(uploadResults);
@@ -2617,6 +2705,9 @@ async function buildMapDoc(status) {
     // generalized).
     resources: collectExtraResources(uploadResults),
     resourceGrants: currentGrantsFromDOM(),
+    // Terrain Obstacles (3c) - impassable scenery, not a resource. See
+    // collectObstacles/play.html's own obstacles/steerAroundObstacles.
+    obstacles: collectObstacles(uploadResults),
     // Research Tree (item 3b) - percentage per level, per topic. See
     // play.html's TECH_TREE/researchPercent() for how a level's percent
     // actually gets applied once a faction researches it.
@@ -3023,6 +3114,16 @@ async function loadExistingMap() {
   }, 0);
   document.getElementById('extraResourcesList').innerHTML = '';
   if (Array.isArray(m.resources)) m.resources.forEach((r) => addExtraResourceRow(r));
+  // Terrain Obstacles (3c) - same restore shape as Additional Resources
+  // just above (id-counter picks up past the highest existing obstacle_N
+  // id so a re-saved map never hands out a colliding id).
+  obstacles = Array.isArray(m.obstacles) ? m.obstacles.map((o) => ({ id: o.id, name: o.name || '' })) : [];
+  obstacleCounter = obstacles.reduce((max, o) => {
+    const match = /^obstacle_(\d+)$/.exec(o.id);
+    return match ? Math.max(max, Number(match[1]) + 1) : max;
+  }, 0);
+  document.getElementById('obstaclesList').innerHTML = '';
+  if (Array.isArray(m.obstacles)) m.obstacles.forEach((o) => addObstacleRow(o));
   // m.resourceGrants is the current shape; m.goldPerRound is a fallback
   // for a map saved before this was generalized to multiple resources
   // (it only ever meant a flat Gold amount).

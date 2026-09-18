@@ -158,6 +158,22 @@ line. Only this page has the logo/title/footer treatment so far -
    three separate name fields) instead. A map saved before either of
    these fields existed loads with every topic at its default name and
    percentages.
+3c. **Terrain Obstacles** (optional) — solid, non-combat scenery ("place a
+   boulder or mountain and units have to go around it"). Add one row per
+   obstacle *type*: a name, a **Size** in pixels (its real world
+   footprint - the collision circle units steer around uses exactly this,
+   at half that as the radius), an optional **art** upload/library pick
+   (falls back to a plain circle with a generic 🏔️-style mountain marker
+   if left blank, same fallback pattern as an Additional Resource's own
+   deposit art), and its own **click-the-map** placement widget - always
+   in map-placement mode (there's no "near each base" option for
+   scenery), reused from the same widget Gold/Additional Resources use in
+   map mode. Click the map as many times as you like to place that many
+   copies of the same obstacle; click a placed one to remove just that
+   one. Nothing here is required to Finish & Save - a row with no points
+   placed just contributes nothing. See `play.html`'s own obstacles/
+   `steerAroundObstacles` bullet further down for how units actually
+   avoid what gets placed.
 4. **Air Base** (optional) — a building for planes/jets/spaceships/etc.
    Give it a name (defaults to "Air Base"), its own **art**, **HP**
    (1000-5000, same range/field as Home Base's), and a build cost, then
@@ -731,6 +747,42 @@ entirely by one map's saved data:
   `2*homeRadius+800` per side - exactly the size admin.html's own
   MAP_SIZE_INFO hint already documents: 1640/3320/5840/10880 for
   Tiny/Small/Medium/Large) instead of from faction positions at all.
+- **Terrain Obstacles** (`index.html`'s 3c section) - solid scenery a
+  map-maker places on the map (boulders, mountains, wreckage, whatever
+  fits the theme) that units can't walk through. Each placed point
+  becomes one real circle (`obstacles`, radius = that obstacle type's own
+  "Size" field / 2), drawn under every unit/building the same way a
+  map-placed resource deposit is. Avoidance is deliberately *local
+  steering*, not real pathfinding - no grid, no A*, no awareness of a
+  whole cluster of obstacles at once: every place a unit moves toward a
+  goal in a straight line (a move order, or a combat/heal unit closing
+  distance on its target - `runMoveOrder`, `combatTick`, `healTick`, all
+  funneled through the same shared `moveTowardWithAvoidance`) looks only
+  at the single nearest obstacle actually blocking that straight line
+  (ahead of the unit, within combined radius of the line) and steers
+  along a tangent around its near edge instead - "take whatever the
+  closest option is to go around the placement," in the map-maker's own
+  words. That tick's total movement distance is walked in small (20px)
+  sub-steps, re-running the avoidance check fresh after each one, rather
+  than one single big jump - recomputing it only once per tick let a fast
+  unit (or just a slow frame - this engine caps `dt` at 0.05s, so a lag
+  spike alone was enough) cover more ground in one step than an
+  obstacle's own clearance band, jumping from one side of it to the other
+  between checks with nothing steering it through the *middle* of that
+  jump - it got stuck oscillating in place forever instead of ever
+  clearing the obstacle. A `pushOutOfObstacles` hard backstop runs after
+  every step regardless (and after `clampToWorld`, so the world-edge clamp
+  can never shove a unit back into one either) - it guarantees a unit's
+  own center can never actually end up inside an obstacle's collision
+  circle, covering whatever edge case the steering heuristic alone
+  doesn't fully solve (a sharp corner between two obstacles, for
+  instance). A map with no obstacles at all skips every bit of this and
+  moves in the original single straight-line step, so maps that don't use
+  the feature pay nothing for it. Known limitation, not silently hidden:
+  a long wall of obstacles or a tight cluster can still give a unit
+  trouble finding its way all the way through, the same as any
+  local-avoidance-only approach - there's no larger detour planned behind
+  it the way a real pathfinder would.
 - A small **▲ / ▼ tab centered under the topbar** collapses the entire
   topbar (resource/turn HUD, map name, Skip Turn, Pause/Sound/Save/Load/
   Download) down to just that tab, so only the map itself shows -
@@ -1153,7 +1205,9 @@ world" info as `index.html`'s own map-size hover tooltip, just phrased
 per-size instead of as a comparison table), so whoever's curating the
 library sees it right where they're about to upload, not only where a
 map creator sets the size.
-**Worlds**, **Bases**, **Resources** (flat, no sub-picker), **Structures**
+**Worlds**, **Bases**, **Resources**, **Terrain & Obstacles** (flat, no
+sub-picker - the last one backs `index.html`'s Terrain Obstacles section,
+3c), **Structures**
 (sub-picker: **War Factory**, **Airport**, **Infantry Post**,
 **Helicopter Facility**, **Research Facility**, **Gun Turret**,
 **Missile Silo**, **Missile Battery**, **Navy Harbor**, **Field Hospital**
