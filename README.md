@@ -1219,6 +1219,57 @@ entirely by one map's saved data:
   stands still instead, the same way a Gun Turret already effectively
   does (it never moves either way, so "in range" was always the only
   thing that mattered for it).
+- **No more overkill-locking a whole squad of missile-armed units on one
+  target** - a Field Hospital medic aside, this was the last of a family
+  of "locks for no reason" reports fixed together. An instant-hit attack
+  (the plain `else` branch in `combatTick`) already self-limited
+  correctly - `applyDamageToTarget` sets the target dead synchronously,
+  so by the time the *next* unit in that same frame's pass over `units`
+  checks it, an already-dead target is caught by `combatTick`'s own
+  dead-target check before it ever reaches `lockUnit()`. A **missile**
+  (Missile Silo launcher or Missile Battery unit) doesn't have that
+  luxury - it takes real travel time to land, so the target still reads
+  as fully alive to every other missile-armed unit that targets it the
+  same tick, and every one of them fired and locked too. Reported
+  directly: "20 jets attack one tank and it only takes 3 to kill it, but
+  all 20 lock up" (the jets in that report were Missile Battery units).
+  Fixed by summing the damage of every already-in-flight missile aimed
+  at that exact target and refusing to fire (and not locking) once that
+  sum alone is already lethal - `t.hp - incomingDamage <= 0` - so only as
+  many units actually commit as it truly takes, the same guarantee an
+  instant-hit weapon already had for free.
+- **A Field Hospital medic no longer locks for healing an ally that
+  didn't need it** - `t.hp = Math.min(t.maxHp, t.hp + u.healAmount)` was
+  a silent no-op against an already-full-HP ally, but `lockUnit()` fired
+  anyway, burning the medic's one action for the turn/round for zero
+  effect. Reported directly: "healers can heal without people needing to
+  be healed and it causes them to lock up for no reason." Fixed at both
+  ends: `healTick` itself now bails (without locking, the same way it
+  already bails on a dead target) the instant it notices `t.hp >=
+  t.maxHp`, and the click-to-order path (clicking an ally while a medic
+  is selected) now only actually issues the heal order if that ally is
+  missing HP at all - clicking an already-full ally just selects it
+  normally instead, the same "do something reasonable with an invalid
+  target" fallback a Cleric's own convert-order click already uses.
+- **A computer-controlled faction's own turn is now fully off-limits to
+  whoever's at the keyboard**, in Turn-Based mode - reported two ways:
+  "during another player's turn I can control their mining vessels" and
+  "when it switches over to a computer character and I have my units
+  screen open... it lets me build a computer's units and structures plus
+  defenses." Both were the same root cause: every turn-freeze check in
+  this file (the per-unit update loop, `isLocked`/`lockUnit`) only ever
+  cared WHICH faction was active, never WHETHER that faction was actually
+  a human sitting at this device or a computer playing itself out -
+  `renderBuildPanel`/`renderResearchPanel` had no such check at all, and
+  neither did the canvas's own `mousedown`/`dblclick`/keyboard-shortcut
+  listeners, so a human could freely select, command, and build for an
+  AI-controlled faction the instant it became that faction's turn. Fixed
+  by gating all of it (Real-Time mode is unaffected - `activeFaction` is
+  always the human player there) behind `turnMode && !activeFaction.isHuman`:
+  mouse and keyboard input on the canvas is ignored outright during a
+  computer's own turn, and the Build/Research tabs show a "🤖 {name}'s
+  turn" placeholder (with a reminder that ⏭ Skip Turn is still there if
+  you don't want to wait it out) instead of live, clickable controls.
 - **⬇ Download as index.html** - packages the map's data inline into a
   fully standalone copy of this page. This used to only bundle the map's
   *data* (unit stats, names, etc.) while every image/sound field stayed a

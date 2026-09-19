@@ -2029,6 +2029,23 @@ async function main() {
       // not an instant hit - "the attack for these units are the
       // missiles themselves, they don't have an attack outside of firing
       // missiles."
+      // Unlike an instant hit (the plain `else` branch below), a missile
+      // takes real time to land - so a target already doomed by missiles
+      // already in flight still LOOKS alive (t.hp > 0, t.alive !== false)
+      // to every other missile-armed unit that targets it the same tick,
+      // and every one of them would otherwise fire and lock too. Reported
+      // directly: "20 jets attack one tank and it only takes 3 to kill it,
+      // but all 20 lock up" - the jets in that report were Missile Battery
+      // units, where this can actually happen (an instant-hit unit can't
+      // hit this at all - see combatTick's own dead-target check at the
+      // top, which already catches a target that's ACTUALLY dead by the
+      // time a later unit's turn to act comes around in the same pass).
+      // Summing already-in-flight damage against this exact target and
+      // refusing to pile on once it's already lethal means only as many
+      // units fire as it actually takes, same as an instant-hit weapon
+      // already gets for free.
+      const incomingDamage = missiles.reduce((sum, m) => m.target === t ? sum + m.damage : sum, 0);
+      if (t.hp - incomingDamage <= 0) { u.target = null; return; }
       spawnMissile(u, t);
       lockUnit(u);
     } else {
@@ -2047,6 +2064,15 @@ async function main() {
   function healTick(u, dt) {
     const t = u.target;
     if (!t || t.hp <= 0 || t.alive === false) { u.target = null; return; }
+    // Nothing to heal - clamp-to-maxHp below would be a silent no-op, but
+    // lockUnit() would still fire, burning the medic's one action for the
+    // turn/round for literally no effect. Reported directly: "healers can
+    // heal without anyone needing it and it locks them up for no reason."
+    // Bails the same way an already-dead target does above - without
+    // locking - so a stale heal order against a target that's since
+    // topped off (by another medic, Free Resources, whatever) is
+    // discovered and dropped, not silently "used" anyway.
+    if (t.hp >= t.maxHp) { u.target = null; return; }
     if (isLocked(u)) return;
     const dist = Math.hypot(t.x - u.x, t.y - u.y);
     u.facingAngle = facingToward(u, t.x, t.y);
@@ -3485,6 +3511,18 @@ async function main() {
   }, { passive: false });
   canvas.addEventListener('mousedown', (evt) => {
     if (gameOver || paused || !matchStarted) return;
+    // Turn-Based mode only - a computer-controlled faction's own turn
+    // must be untouchable by whoever's physically at the keyboard, same
+    // as it already is for a human faction that isn't currently active.
+    // Real-Time mode never hits this (activeFaction is always the human
+    // player there, unchanged from before this check existed). Reported
+    // directly: a human could select and command an AI faction's own
+    // units - including its Mining Ship - the instant it became that
+    // faction's turn, and could still use the Build/Research panels to
+    // spend ITS resources too (see renderBuildPanel/renderResearchPanel's
+    // own matching guard below) - nothing before this ever checked WHO
+    // activeFaction actually was, only WHICH faction it was.
+    if (turnMode && !activeFaction.isHuman) return;
     dragStart = { x: evt.clientX, y: evt.clientY };
     isRightDrag = evt.button === 2;
     dragMoved = false;
@@ -3581,7 +3619,14 @@ async function main() {
     // combat unit selected alongside a medic just gets no order from
     // this click; it isn't a valid heal target itself, but it isn't
     // reassigned to anything else either).
-    if (own && !own.isGatedBuilding) {
+    // Only actually a valid heal order if `own` has HP missing at all -
+    // clicking an already-full-HP ally falls through to the normal
+    // "select this unit" behavior just below instead of handing the
+    // medic a heal order that would just lock it for doing nothing (see
+    // healTick's own matching guard - this is the UX half, so a medic
+    // never even LOOKS like it's about to heal something that doesn't
+    // need it in the first place).
+    if (own && !own.isGatedBuilding && own.hp < own.maxHp) {
       const medics = selectedUnits().filter((u) => u.isMedic && u !== own);
       if (medics.length) {
         medics.forEach((u) => {
@@ -3672,6 +3717,10 @@ async function main() {
   // that selection afterward, not replace any click-handling logic.
   canvas.addEventListener('dblclick', (evt) => {
     if (gameOver || paused || !matchStarted || placingTurret || placingMissile) return;
+    // Same "not your turn" guard as mousedown above - dblclick is its own
+    // separate listener with no dependency on dragStart, so it needs its
+    // own check rather than inheriting mousedown's.
+    if (turnMode && !activeFaction.isHuman) return;
     const r = canvas.getBoundingClientRect();
     const p = toWorld(evt.clientX - r.left, evt.clientY - r.top);
     const own = livingUnits(activeFaction.id).find((u) => Math.hypot(u.x - p.x, u.y - p.y) < (u.isGatedBuilding ? GATED_BUILDING_SIZE : UNIT_SIZE) / 2 + 8);
@@ -3729,6 +3778,10 @@ async function main() {
   // every group empty again.
   const controlGroups = {};
   window.addEventListener('keydown', (e) => {
+    // Same "not your turn" guard as mousedown/dblclick above - a
+    // computer-controlled faction's turn is fully off-limits to whoever's
+    // at the keyboard, control groups included.
+    if (turnMode && !activeFaction.isHuman) return;
     if (e.key === 'Escape') {
       if (placingTurret) { setPlacingTurret(null); renderBuildPanel(); return; }
       if (placingMissile) { setPlacingMissile(null); renderBuildPanel(); return; }
@@ -3886,7 +3939,22 @@ async function main() {
       if (btnEl) { btnEl.textContent = btnText; btnEl.disabled = btnDisabled; }
     });
   }
+  // Turn-Based mode only: while a computer-controlled faction is active,
+  // the human at the keyboard has no faction of their own on screen right
+  // now - showing (and letting them click) the currently-active
+  // faction's own live Build/Research panels let them spend ITS
+  // resources and queue ITS units/buildings, exactly as if they owned it.
+  // Real-Time mode never hits this (activeFaction is always the human
+  // player there). Returns true (and renders the waiting placeholder)
+  // when the panel should NOT show live controls.
+  function renderWaitingForComputerIfNeeded(tabId, label) {
+    if (!(turnMode && !activeFaction.isHuman)) return false;
+    const el = document.getElementById(tabId);
+    el.innerHTML = `<div class="techRow"><div class="name">🤖 ${activeFaction.name}'s turn</div><div class="desc">${label} - use ⏭ Skip Turn if you don't want to wait it out.</div></div>`;
+    return true;
+  }
   function renderBuildPanel() {
+    if (renderWaitingForComputerIfNeeded('tab-build', 'A computer-controlled faction is taking its turn')) return;
     const el = document.getElementById('tab-build');
     el.innerHTML = '';
     const homeBar = document.createElement('div');
@@ -4013,6 +4081,7 @@ async function main() {
     updateProductionStatus(); // populate the buildStats-* text immediately, not just on the next frame
   }
   function renderResearchPanel() {
+    if (renderWaitingForComputerIfNeeded('tab-research', 'Research is unavailable to you until it’s your turn again')) return;
     const el = document.getElementById('tab-research');
     el.innerHTML = '';
     const researchFacility = buildingCfgByKey.researchFacility;
