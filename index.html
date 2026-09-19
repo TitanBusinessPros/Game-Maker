@@ -798,6 +798,9 @@
           <input type="file" accept="image/*" style="width:auto">
         </div>
       </div>
+      <label style="display:flex; align-items:center; gap:6px; font-size:13px; margin:4px 0 12px;">
+        <input type="checkbox" id="clericsConvertStationaryEnabled" checked style="width:auto;"> Clerics can also convert stationary Gun Turrets &amp; Missile Silo launchers (not just troops)
+      </label>
       <div id="clericUnitList"></div>
       <button type="button" class="btn-add" id="addClericUnitBtn">+ Add a Cleric</button>
     </div>
@@ -3028,6 +3031,12 @@ async function buildMapDoc(status) {
       hp: clampHomeworldHp(document.getElementById('religiousInstitutionHp').value),
       cost: Number(document.getElementById('religiousInstitutionCost').value) || 150,
       image: uploadResults.religiousInstitutionImage,
+      // Whether a Cleric can convert a stationary Gun Turret/Missile Silo
+      // launcher, not just a mobile "troop" unit - defaults true (checked)
+      // so a map saved before this checkbox existed keeps exactly the
+      // behavior it already had (play.html's isConvertible() allowed
+      // turrets/launchers unconditionally before this existed at all).
+      convertStationary: document.getElementById('clericsConvertStationaryEnabled').checked,
     },
     clericUnits,
     sounds: {
@@ -3476,6 +3485,11 @@ async function loadExistingMap() {
     document.getElementById('religiousInstitutionName').value = m.religiousInstitution.name || 'Religious Institution';
     document.getElementById('religiousInstitutionHp').value = m.religiousInstitution.hp || 2000;
     document.getElementById('religiousInstitutionCost').value = m.religiousInstitution.cost || 150;
+    // A map saved before this checkbox existed has no convertStationary
+    // field at all - defaults to checked (true) either way, matching the
+    // unconditional behavior play.html already had before this setting
+    // existed, not just this checkbox's own HTML default.
+    document.getElementById('clericsConvertStationaryEnabled').checked = m.religiousInstitution.convertStationary !== false;
     if (m.religiousInstitution.image) showExistingAsset('religiousInstitutionImage', m.religiousInstitution.image);
   }
   if (Array.isArray(m.clericUnits) && m.clericUnits.length) {

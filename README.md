@@ -377,7 +377,17 @@ line. Only this page has the logo/title/footer treatment so far -
    converted** - a home base and a gated building (a structure, not a
    "unit") can't be either; every other unit type can, including Gun
    Turrets, Missile Silo launchers, Missile Battery units, and Field
-   Hospital medics. Leave its Cleric list empty and the whole feature is
+   Hospital medics. A **"Clerics can also convert stationary Gun Turrets
+   & Missile Silo launchers (not just troops)"** checkbox, checked by
+   default, controls just the two truly stationary unit types (placed
+   once, speed 0, never move again) - unchecking it means a Cleric can
+   still convert any mobile unit (regular combat units, Missile Battery
+   units, Field Hospital medics) but a Gun Turret or Missile Silo
+   launcher is treated the same as a Mining Ship/home base/gated
+   building: not a valid convert target at all, clicking one with a
+   Cleric selected falls through to a plain move order instead. Defaults
+   checked so a map saved before this existed keeps the exact behavior
+   it already had. Leave its Cleric list empty and the whole feature is
    absent from the map, same as every other gated building.
 5. **Sounds** — background music, intro music, attack/building-destroyed/
    home-base-under-attack/game-over sfx. All optional, all `.mp3`.
@@ -1064,12 +1074,21 @@ entirely by one map's saved data:
   can never be converted** - clicking one while a Cleric is selected
   just falls back to a plain move order instead, same as clicking empty
   space would - nor can a home base or a gated building (structures,
-  not "units"); every other unit type is fair game, Gun Turrets/Missile
-  Silo launchers/Missile Battery units/Field Hospital medics included.
-  An AI-controlled Cleric picks its own target automatically - the
-  nearest convertible enemy unit in range - the same idea as a Gun
-  Turret auto-acquiring the nearest enemy or a medic auto-picking the
-  nearest damaged ally.
+  not "units"); every other unit type is fair game by default, Gun
+  Turrets/Missile Silo launchers/Missile Battery units/Field Hospital
+  medics included - EXCEPT Gun Turrets and Missile Silo launchers
+  specifically (the only two truly stationary unit types - placed once,
+  speed 0, never move again) if the map-maker unchecked index.html's
+  Religious Institution "Clerics can also convert stationary Gun
+  Turrets & Missile Silo launchers" checkbox (`isConvertible()`,
+  `CLERICS_CONVERT_STATIONARY` from `cfg.religiousInstitution.
+  convertStationary`, defaults `!== false` so a map saved before this
+  checkbox existed keeps converting them same as always) - a mobile
+  Missile Battery unit is unaffected by this setting either way, only
+  the two stationary types are gated by it. An AI-controlled Cleric
+  picks its own target automatically - the nearest convertible enemy
+  unit in range - the same idea as a Gun Turret auto-acquiring the
+  nearest enemy or a medic auto-picking the nearest damaged ally.
 - **Research Facility** (mandatory, set on the map): same one-time-
   purchase build-panel row, same real attackable/destroyable entity, as
   the buildings above, but it gates the Research tab itself rather than

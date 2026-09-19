@@ -2189,13 +2189,21 @@ async function main() {
   // "Mining Ships and other Clerics can never be converted" (map-maker's
   // own spec) - a home base isn't a `units` array entry at all (it's the
   // faction object itself) and a gated building is a structure, not a
-  // unit, so both are excluded here too; a Gun Turret/Missile Silo
-  // launcher/Missile Battery unit/ordinary combat unit/medic all ARE
-  // fair game, same as a real enemy "unit" reads in every other click-to-
-  // attack path in this file.
+  // unit, so both are excluded here too; a Missile Battery unit/ordinary
+  // combat unit/medic are always fair game, same as a real enemy "unit"
+  // reads in every other click-to-attack path in this file. A Gun
+  // Turret/Missile Silo launcher (the only two STATIONARY unit types -
+  // placed once, speed 0, never move again) are fair game too UNLESS the
+  // map-maker unchecked index.html's Religious Institution "Clerics can
+  // also convert stationary Gun Turrets & Missile Silo launchers"
+  // checkbox - defaults to true (`!== false`) so a map saved before this
+  // setting existed keeps exactly the behavior it already had.
   // ---------------------------------------------------------------------
+  const CLERICS_CONVERT_STATIONARY = cfg.religiousInstitution?.convertStationary !== false;
   function isConvertible(t) {
-    return !!t && t.alive !== false && !t.isFactionHome && !t.isMiner && !t.isCleric && !t.isGatedBuilding;
+    if (!t || t.alive === false || t.isFactionHome || t.isMiner || t.isCleric || t.isGatedBuilding) return false;
+    if (!CLERICS_CONVERT_STATIONARY && (t.isTurret || t.isMissileLauncher)) return false;
+    return true;
   }
   // AI-controlled Clerics pick their own target (a human just clicks one -
   // see handleClick) - the nearest convertible enemy unit in range, same
