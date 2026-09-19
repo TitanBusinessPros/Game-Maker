@@ -1449,9 +1449,17 @@ document.querySelectorAll('.upload-slot input[type=file]').forEach((input) => {
 // the fast path compared to uploading your own file.
 // ---------------------------------------------------------------------
 // Matches admin.html's CATEGORY_TREE, so tabs read "Space Ships" instead of
-// the raw "characters/space_ships" id and appear in a sensible order; any
-// category id not listed here (old data from before this restructuring, or
-// a future addition) still shows up, just alphabetized after these.
+// the raw "characters/space_ships" id and appear in a sensible order. This
+// list (and CATEGORY_ORDER below) is now the sole, authoritative source of
+// which tabs the picker shows at all (see openLibraryPicker) - a category
+// id left out of both never gets a tab, period, not even if something is
+// actually filed under it. Bare `sounds` used to be listed here as a
+// catch-all for legacy pre-restructuring data, but it was never a REAL
+// selectable category (admin.html's own topCategorySelect always resolves
+// to one of the specific sounds/* children instead - see currentCategory()
+// there), so it only ever showed up here as a dead, permanently-empty tab
+// sitting right after Game Over. Reported directly: "the sounds button...
+// after game over... an additional option never asked for."
 const CATEGORY_LABELS = {
   maps: 'Maps',
   'characters/space_ships': 'Space Ships',
@@ -1493,14 +1501,13 @@ const CATEGORY_LABELS = {
   'sounds/building_destroyed': 'Building Destroyed',
   'sounds/home_under_attack': 'Home Base Under Attack',
   'sounds/endgame': 'Game Over',
-  sounds: 'Sounds',
 };
 const CATEGORY_ORDER = [
   'maps',
   'characters/space_ships', 'characters/navy_ships', 'characters/jets', 'characters/helicopters', 'characters/infantry', 'characters/artillery', 'characters/missiles', 'characters/tanks', 'characters/field_medics', 'characters/clerics', 'characters/mining_ships',
   'worlds', 'bases', 'resources', 'terrain',
   'structures/war_factory', 'structures/airport', 'structures/infantry_post', 'structures/helicopter_facility', 'structures/research_facility', 'structures/gun_turret', 'structures/missile_silo', 'structures/missile_battery', 'structures/navy_harbor', 'structures/field_hospital', 'structures/religious_institution',
-  'sounds/music', 'sounds/intro', 'sounds/attack', 'sounds/building_destroyed', 'sounds/home_under_attack', 'sounds/endgame', 'sounds',
+  'sounds/music', 'sounds/intro', 'sounds/attack', 'sounds/building_destroyed', 'sounds/home_under_attack', 'sounds/endgame',
 ];
 
 // Per-category cache (Firestore query results, not the whole library) so
@@ -1758,9 +1765,14 @@ async function renderCategory(cat, mediaType) {
   if (catItems.length === 0) {
     libraryGrid.hidden = true;
     libraryList.hidden = false;
+    // Deliberately never names admin.html here - this message is shown to
+    // every signed-in user, not just the admin, and the admin portal
+    // shouldn't be advertised to the public at all (its own link in the
+    // header is already the one place that's shown, and only ever to the
+    // admin's own signed-in account - see onAuthStateChanged above).
     libraryList.innerHTML = isPremium
-      ? '<p style="color:var(--text-dim); font-size:13px;">Nothing in the Premium Library yet for this category. The admin can add some at <code>admin.html</code>.</p>'
-      : '<p style="color:var(--text-dim); font-size:13px;">Nothing in the library yet for this category. The admin can add some at <code>admin.html</code> — or just close this and upload your own file below.</p>';
+      ? '<p style="color:var(--text-dim); font-size:13px;">Nothing here yet for this category - check back later.</p>'
+      : '<p style="color:var(--text-dim); font-size:13px;">Nothing in the library yet for this category - just close this and upload your own file below instead.</p>';
     return;
   }
   if (mediaType === 'image') {

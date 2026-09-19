@@ -557,6 +557,24 @@ fetch-everything-up-front approach could promise. A request already in
 flight for a tab the user has since clicked away from is discarded if
 it resolves late (`libraryRequestToken`), so a slow category never
 clobbers a faster, more recent click's results.
+`CATEGORY_ORDER`/`CATEGORY_LABELS` being the sole, authoritative source
+of tabs cut the other way once too, though - a leftover bare `sounds`
+id (a pre-restructuring catch-all, never actually a real selectable
+category in `admin.html` at all - its own top-level "Sounds" dropdown
+option always resolves to one of the real `sounds/*` children instead)
+used to still be listed here, so it showed up as a real, permanently-
+empty tab sitting right after Game Over. Reported directly ("the sounds
+button... after game over... an additional option never asked for") -
+removed from both lists entirely, same fate as any other id not in
+them any more.
+Both "nothing here yet" messages also no longer name `admin.html` at
+all, even though only the admin account can ever actually add anything
+- that message is shown to every signed-in user, not just the admin,
+and the admin portal shouldn't be advertised to the public regardless
+of the fact that its own real security is the `ADMIN_EMAIL` check, not
+obscurity. The one place `admin.html` is ever actually linked stays
+exactly as it was: a header link shown only to the admin's own signed-in
+account (see `onAuthStateChanged`).
 
 **💎 Premium Library** - every upload slot's **📚 Library** button now
 has a second, **💎 Premium** button right next to it, opening a second,
