@@ -9,8 +9,7 @@ server. Three pages, one Firebase project:
 - **`play.html`** — the actual game. Loads a saved map's data and runs a
   real, standalone skirmish: your own two-or-more factions only, nothing
   of the original inspiration game in it except the mechanics. Has its own
-  "Team A / Team B" pre-match screen, and a "Download as index.html"
-  button that packages everything into one offline-playable file.
+  "Team A / Team B" pre-match screen.
 - **`admin.html`** — lets one specific Google account (`adonai4you@gmail.com`)
   add art/sound to a shared library that shows up as a "📚 Library" picker
   next to every upload slot in `index.html`, so map-makers can pick
@@ -185,7 +184,16 @@ line. Only this page has the logo/title/footer treatment so far -
    saved map without anyone noticing until testing it. Purely visual and
    non-interactive (`renderReferenceMarkers`, `widgetKindAndLabel`) -
    clicking one does nothing; removing a point only ever happens on
-   whichever row actually owns it.
+   whichever row actually owns it. A ⚠️ warning right under the section's
+   own hint text calls out the one real remaining rough edge even with
+   `play.html`'s own pathfinding (see that bullet further down): a
+   solid, gapless wall of obstacles is still fully routable around, but
+   the detour can be a lot longer than a map-maker might expect,
+   especially for a wall that spans most of the map - added directly
+   alongside the placement UI itself (not buried in this doc) after a
+   long wall across the middle of a real map made computer-controlled
+   troops look stuck compared to the player's own, before pathfinding
+   was extended to cover AI movement too.
 4. **Air Base** (optional) — a building for planes/jets/spaceships/etc.
    Give it a name (defaults to "Air Base"), its own **art**, **HP**
    (1000-5000, same range/field as Home Base's), and a build cost, then
@@ -430,6 +438,25 @@ line. Only this page has the logo/title/footer treatment so far -
    art/sound URL it references, fetch `play.html`'s own source, inject
    the result via `window.GM_INLINE_CONFIG`) someone else can play with
    zero further Firebase cost, however many times, however many people.
+   This was `play.html`'s own in-game "⬇ Download as index.html" button
+   originally - removed from there (it served no purpose once nothing
+   in this app links to a live, playable `play.html` at all any more, so
+   the only way to ever reach that button in the first place was to have
+   already downloaded a copy - clicking it again just produced another
+   identical copy of what you already had) - this My Maps button is now
+   the sole surviving download path, and inherits that same
+   implementation's two real caveats: it depends on the Storage bucket
+   allowing cross-origin reads (CORS) from wherever this page is hosted
+   - without that, the fetch for a given asset fails and that one asset
+   is quietly left as a live URL instead (logged to console) rather than
+   breaking the whole download; and the downloaded file's own
+   `<script type="module">` still has static top-level `import`s of the
+   Firebase SDK itself from `gstatic.com`, which run unconditionally
+   before `loadConfig()` ever gets to check `window.GM_INLINE_CONFIG` -
+   so "zero network calls, period" isn't literally true for someone with
+   no internet access at all, just zero calls to this project's own
+   Firebase project (gstatic.com is a free, unrelated Google CDN, not
+   billed to this project).
    Clicking it spends one **download credit** - every account
    starts with 3, never refilled or reset (an admin-listed email starts
    with 50 instead, unaffected by this - see `admin.html`'s own section
@@ -848,7 +875,7 @@ entirely by one map's saved data:
   MAP_SIZE_INFO hint already documents: 1640/3320/5840/10880 for
   Tiny/Small/Medium/Large) instead of from faction positions at all.
 - **📊 Stats dropdown** - a small live scoreboard, opened from its own
-  button in the topbar next to Pause/Sound/Save/Load/Download. Lists every
+  button in the topbar next to Pause/Sound/Save/Load. Lists every
   faction (colored to match its HUD chip) with two running totals for the
   whole match, **⚔ Kills** and **☠ Losses**, incremented the instant
   something actually dies (`applyDamageToTarget`'s own death branch) -
@@ -1384,43 +1411,11 @@ entirely by one map's saved data:
   computer's own turn, and the Build/Research tabs show a "🤖 {name}'s
   turn" placeholder (with a reminder that ⏭ Skip Turn is still there if
   you don't want to wait it out) instead of live, clickable controls.
-- **⬇ Download as index.html** - packages the map's data inline into a
-  fully standalone copy of this page. This used to only bundle the map's
-  *data* (unit stats, names, etc.) while every image/sound field stayed a
-  live Firebase Storage URL - the downloaded file still needed internet
-  to actually render or play anything, which the claim here used to get
-  wrong. Now the button itself fetches every art/sound URL the map
-  actually uses (`inlineUrlsAsDataUris()` - recurses through the whole
-  config generically rather than a hand-written list of fields, so a
-  future field never needs adding here separately) and inlines each as a
-  base64 `data:` URI before packaging, so it's genuinely a zero-network-call
-  file once downloaded. The same URL reused across several units/turrets
-  (a shared library asset) is only ever fetched once. The button shows
-  "⬇ Preparing… N/M" while this runs (can take a few seconds for a map
-  with a lot of art) and disables itself meanwhile. This does depend on
-  the Storage bucket allowing cross-origin reads (CORS) from wherever
-  `index.html`/`play.html` are hosted - without that, the fetch for a
-  given asset fails and that one asset is quietly left as a live URL
-  instead (logged to the console) rather than breaking the whole
-  download, so a CORS gap degrades gracefully instead of blocking
-  Download entirely. One real gap this doesn't close: `play.html`'s own
-  `<script type="module">` still has static top-level `import`s of the
-  Firebase SDK itself from `gstatic.com` (`firebase-app.js`,
-  `firebase-firestore.js`) - those run unconditionally the instant the
-  module loads, before `loadConfig()` ever gets to check
-  `window.GM_INLINE_CONFIG`, so the downloaded file still needs *some*
-  connectivity to reach `gstatic.com` even though it never touches this
-  project's own Firebase project once open. That's a free, unrelated
-  Google CDN (not billed to this project, so it doesn't affect the cost
-  picture at all), but it does mean "zero network calls, period" isn't
-  literally true yet for someone with no internet access at all - closing
-  that gap would mean bundling the Firebase SDK itself into the
-  downloaded file too, not just the map's own art/sound.
 - **Titan Business Pros logo + hidden page** - a clickable logo in
   the top-left corner of the topbar (96&times;96px - 3&times; its
   original 32&times;32px size), present in every game this maker
   produces (it lives directly in `play.html`'s own markup, which is
-  exactly what "⬇ Download as index.html" packages, so it rides along
+  exactly what "⬇ Download My Game" packages, so it rides along
   into every exported standalone game with zero extra work). Clicking it
   opens a hidden overlay - reachable only from that click, linked nowhere
   else, built as an in-page overlay rather than a real second-file
@@ -1791,9 +1786,9 @@ Project: `game-maker-ed014`.
   gs://game-maker-ed014.firebasestorage.app --cors-file=cors.json` -
   Storage rules/`firebase deploy` don't cover this, it's a bucket-level
   GCS setting) allowing GET + `Content-Type` from
-  `https://titanbusinesspros.github.io` - added so `play.html`'s
-  "⬇ Download as index.html" button can actually `fetch()` art/sound
-  bytes cross-origin to inline them as base64 (see that bullet above);
+  `https://titanbusinesspros.github.io` - added so `index.html`'s own
+  "⬇ Download My Game" button can actually `fetch()` art/sound bytes
+  cross-origin to inline them as base64 (see My Maps above);
   without it every image/sound in Storage was already publicly
   viewable via `<img>`/`<audio>` (those don't need CORS), just not
   readable by JavaScript, which is what fetching-to-inline needs.
@@ -1891,7 +1886,7 @@ share one root cause and one separate CSS bug:
   zoom never competes with these custom handlers.
 - **Horizontal overflow at phone widths** - `document.body.scrollWidth`
   measured wider than the viewport at 375px, confirmed by finding
-  `#topbarActions` (the Pause/Sound/Save/Load/Download/Stats/☰ button
+  `#topbarActions` (the Pause/Sound/Save/Load/Stats/☰ button
   row) rendering wider than the screen itself. Root cause: `flex:none`
   disables shrinking, so the whole button cluster sized itself to its own
   unwrapped content width FIRST and only then would have decided whether

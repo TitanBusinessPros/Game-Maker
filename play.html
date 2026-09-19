@@ -376,7 +376,6 @@
       <label style="background:var(--panel2); border:1px solid var(--border); border-radius:6px; padding:6px 9px; font-size:11px; cursor:pointer;">
         📂 Load<input id="loadInput" type="file" accept=".json" style="display:none;">
       </label>
-      <button id="downloadBtn">⬇ index.html</button>
       <button id="statsBtn">📊 Stats</button>
       <button id="panelToggleBtn">☰</button>
     </div>
@@ -4626,78 +4625,6 @@ async function main() {
     document.getElementById('teamSelectScreen').classList.remove('show');
     renderBuildPanel(); renderResearchPanel();
   });
-  // Converts every http(s) URL string found anywhere inside a value
-  // (recursing through arrays/objects generically, rather than a
-  // hand-written list of every image/sound field - a future field never
-  // needs updating here separately) into a base64 data: URI, returning a
-  // brand-new structure (cfg itself is never mutated). Used only by the
-  // Download button below - this is what actually makes the downloaded
-  // file need zero network calls, which is the whole point of
-  // downloading it; before this, only the map's DATA was bundled, art
-  // and sound were still live Firebase Storage URLs. The same URL
-  // fetched from two different fields (a library asset reused across
-  // several units) is only ever downloaded once, via `cache`. A URL that
-  // can't be fetched (network hiccup, or the Storage bucket not yet
-  // allowing cross-origin reads) is left as-is rather than failing the
-  // whole export - that one asset just still needs internet to load,
-  // same as before this existed.
-  async function inlineUrlsAsDataUris(value, onProgress) {
-    const cache = new Map();
-    function collectUrls(v) {
-      if (typeof v === 'string' && /^https?:\/\//.test(v)) { if (!cache.has(v)) cache.set(v, null); }
-      else if (Array.isArray(v)) v.forEach(collectUrls);
-      else if (v && typeof v === 'object') Object.values(v).forEach(collectUrls);
-    }
-    collectUrls(value);
-    const urls = [...cache.keys()];
-    let done = 0;
-    await Promise.all(urls.map(async (url) => {
-      try {
-        const blob = await fetch(url).then((r) => r.blob());
-        const dataUri = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
-        cache.set(url, dataUri);
-      } catch (err) {
-        console.error('Could not inline for offline play (kept as a live URL, so it still needs internet to load):', url, err);
-        cache.set(url, url);
-      }
-      done++;
-      if (onProgress) onProgress(done, urls.length);
-    }));
-    function replace(v) {
-      if (typeof v === 'string') return cache.has(v) ? cache.get(v) : v;
-      if (Array.isArray(v)) return v.map(replace);
-      if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, vv]) => [k, replace(vv)]));
-      return v;
-    }
-    return replace(value);
-  }
-  document.getElementById('downloadBtn').addEventListener('click', async () => {
-    const btn = document.getElementById('downloadBtn');
-    const originalLabel = btn.textContent;
-    btn.disabled = true;
-    try {
-      const html = await fetch(location.pathname).then((r) => r.text());
-      const offlineCfg = await inlineUrlsAsDataUris(cfg, (done, total) => {
-        btn.textContent = total ? `⬇ Preparing… ${done}/${total}` : '⬇ Preparing…';
-      });
-      const inline = `<script>window.GM_INLINE_CONFIG = ${JSON.stringify(offlineCfg)};<\/script>\n`;
-      const withConfig = html.replace('<script type="module">', inline + '<script type="module">');
-      const blob = new Blob([withConfig], { type: 'text/html' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'index.html';
-      a.click();
-    } finally {
-      btn.disabled = false;
-      btn.textContent = originalLabel;
-    }
-  });
-
   // ---------------------------------------------------------------------
   // Team select screen - ALWAYS shown before the match starts, for every
   // map regardless of how many computer players it has. You're always
