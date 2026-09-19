@@ -1405,6 +1405,14 @@ const CATEGORY_LABELS = {
   worlds: 'Worlds',
   bases: 'Bases',
   resources: 'Resources',
+  // Both of these were already real admin.html categories (CATEGORY_TREE)
+  // that this list had simply never been updated to include - harmless
+  // under the old "discover categories from whatever's actually in the
+  // library" approach (a tab would still eventually appear, just
+  // unlabeled/sorted last), but load-per-category-on-demand below needs
+  // this list to be the complete, authoritative set of possible tabs, not
+  // just whatever happened to already have something uploaded.
+  terrain: 'Terrain & Obstacles',
   'structures/war_factory': 'War Factory',
   'structures/airport': 'Airport',
   'structures/infantry_post': 'Infantry Post',
@@ -1412,6 +1420,7 @@ const CATEGORY_LABELS = {
   'structures/research_facility': 'Research Facility',
   'structures/gun_turret': 'Gun Turret',
   'structures/missile_silo': 'Missile Silo',
+  'structures/missile_battery': 'Missile Battery',
   'structures/navy_harbor': 'Navy Harbor',
   'structures/field_hospital': 'Field Hospital',
   'structures/religious_institution': 'Religious Institution',
@@ -1426,21 +1435,36 @@ const CATEGORY_LABELS = {
 const CATEGORY_ORDER = [
   'maps',
   'characters/space_ships', 'characters/navy_ships', 'characters/jets', 'characters/helicopters', 'characters/infantry', 'characters/artillery', 'characters/missiles', 'characters/tanks',
-  'worlds', 'bases', 'resources',
-  'structures/war_factory', 'structures/airport', 'structures/infantry_post', 'structures/helicopter_facility', 'structures/research_facility', 'structures/gun_turret', 'structures/missile_silo', 'structures/navy_harbor', 'structures/field_hospital', 'structures/religious_institution',
+  'worlds', 'bases', 'resources', 'terrain',
+  'structures/war_factory', 'structures/airport', 'structures/infantry_post', 'structures/helicopter_facility', 'structures/research_facility', 'structures/gun_turret', 'structures/missile_silo', 'structures/missile_battery', 'structures/navy_harbor', 'structures/field_hospital', 'structures/religious_institution',
   'sounds/music', 'sounds/intro', 'sounds/attack', 'sounds/building_destroyed', 'sounds/home_under_attack', 'sounds/endgame', 'sounds',
 ];
 
-let libraryManifest = [];
-async function loadLibraryManifest() {
-  try {
-    const snap = await getDocs(collection(db, 'libraryItems'));
-    libraryManifest = snap.docs.map((d) => d.data());
-  } catch (err) {
-    console.error('Could not load the asset library list:', err);
-  }
+// Per-category cache (Firestore query results, not the whole library) so
+// re-opening a tab already viewed this session doesn't re-fetch it. Used
+// to eagerly pull down EVERY item in EVERY category the instant the page
+// loaded, just so one grid could later filter it client-side - meant
+// Firestore-billing (and downloading) the whole library on every single
+// visit to this page, even for someone who opens the picker once and
+// only ever looks at one category. Keyed by category id alone (not type
+// too) since a category is effectively one media type by convention
+// already - see isAudioCategory below.
+const libraryCategoryCache = {};
+function isAudioCategory(cat) { return cat === 'sounds' || cat.startsWith('sounds/'); }
+// Fetches (or returns the already-cached) items for exactly ONE category -
+// a single-field `where('category','==',cat)` query, answerable from
+// Firestore's own automatic per-field index (no manual composite index to
+// set up in the Firebase console, unlike combining category+type in one
+// query risks needing). `type` is still checked client-side on whatever
+// comes back, purely as a safety net in case something ever ends up filed
+// under the "wrong" category by mistake.
+async function loadLibraryCategory(cat) {
+  if (libraryCategoryCache[cat]) return libraryCategoryCache[cat];
+  const snap = await getDocs(query(collection(db, 'libraryItems'), where('category', '==', cat)));
+  const items = snap.docs.map((d) => d.data());
+  libraryCategoryCache[cat] = items;
+  return items;
 }
-loadLibraryManifest();
 
 const libraryModal = document.getElementById('libraryModal');
 const libraryGrid = document.getElementById('libraryGrid');
@@ -1515,79 +1539,92 @@ function defaultCategoryForSlot(slotKey) {
   return hit ? hit[1] : null;
 }
 
+// Guards against a slow fetch for a tab the user already clicked away
+// from resolving late and overwriting whatever a newer, faster click
+// already rendered - see renderCategory below.
+let libraryRequestToken = 0;
 function openLibraryPicker(slotKey, mediaType) {
   libraryActiveSlotKey = slotKey;
-  const items = libraryManifest.filter((it) => it.type === mediaType);
   libraryModal.hidden = false;
   libraryCategoryTabs.innerHTML = '';
-  if (items.length === 0) {
-    libraryGrid.hidden = true;
-    libraryList.hidden = false;
-    libraryList.innerHTML = '<p style="color:var(--text-dim); font-size:13px;">Nothing in the library yet for this type. The admin can add some at <code>admin.html</code> — or just close this and upload your own file below.</p>';
-    return;
-  }
-  const categories = [...new Set(items.map((it) => it.category))]
-    .sort((a, b) => {
-      const ia = CATEGORY_ORDER.indexOf(a), ib = CATEGORY_ORDER.indexOf(b);
-      if (ia === -1 && ib === -1) return a.localeCompare(b);
-      if (ia === -1) return 1;
-      if (ib === -1) return -1;
-      return ia - ib;
-    });
-  // Land on whatever category this specific slot is for, if the library
-  // actually has anything in it yet - otherwise fall back to the first
-  // available category, same as before this existed.
+  // Every possible category for this media type, from the same fixed
+  // list admin.html's own category tree defines - shown as tabs
+  // unconditionally now, since finding out ahead of time which
+  // categories actually have anything uploaded would itself require
+  // fetching them (the whole thing this change exists to avoid). A
+  // category with nothing in it yet just shows the ordinary empty-state
+  // message once clicked, scoped to that one category.
+  const categories = CATEGORY_ORDER.filter((cat) => isAudioCategory(cat) === (mediaType === 'audio'));
+  // Land on whatever category this specific slot is for - otherwise the
+  // first available one, same as before this existed.
   const hintedCategory = defaultCategoryForSlot(slotKey);
-  let activeCategory = (hintedCategory && categories.includes(hintedCategory)) ? hintedCategory : categories[0];
-  function renderCategory(cat) {
-    activeCategory = cat;
-    libraryCategoryTabs.querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.cat === cat));
-    const catItems = items.filter((it) => it.category === cat);
-    if (mediaType === 'image') {
-      libraryGrid.hidden = false;
-      libraryList.hidden = true;
-      libraryGrid.innerHTML = '';
-      libraryList.innerHTML = '';
-      catItems.forEach((it) => {
-        const el = document.createElement('div');
-        el.className = 'library-item';
-        // No visible name in the picker itself (alt text only, for
-        // screen readers - never shown on screen) - browsing the
-        // library is by thumbnail now, not by whatever the uploaded
-        // filename happened to be.
-        el.innerHTML = `<img src="${it.url}" loading="lazy" alt="${it.name}">`;
-        el.addEventListener('click', () => selectLibraryAsset(it));
-        libraryGrid.appendChild(el);
-      });
-    } else {
-      libraryGrid.hidden = true;
-      libraryList.hidden = false;
-      libraryGrid.innerHTML = '';
-      libraryList.innerHTML = '';
-      // No name shown here either - just "Sound 1", "Sound 2"... within
-      // whatever category tab is open, instead of the uploaded name.
-      // Audio has no thumbnail to browse by the way images do, so a
-      // fully blank/identical row per item isn't distinguishable at all
-      // - this keeps them pickable without exposing the real name.
-      catItems.forEach((it, i) => {
-        const el = document.createElement('div');
-        el.className = 'library-audio-item';
-        el.innerHTML = `<span>🎵 Sound ${i + 1}</span><span class="btn-secondary" style="font-size:11px;padding:4px 8px;">Use this</span>`;
-        el.addEventListener('click', () => selectLibraryAsset(it));
-        libraryList.appendChild(el);
-      });
-    }
-  }
+  const activeCategory = (hintedCategory && categories.includes(hintedCategory)) ? hintedCategory : categories[0];
   categories.forEach((cat) => {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.dataset.cat = cat;
     btn.textContent = CATEGORY_LABELS[cat] || cat;
-    btn.addEventListener('click', () => renderCategory(cat));
+    btn.addEventListener('click', () => renderCategory(cat, mediaType));
     libraryCategoryTabs.appendChild(btn);
   });
-  renderCategory(activeCategory);
-  libraryModal.hidden = false;
+  renderCategory(activeCategory, mediaType);
+}
+async function renderCategory(cat, mediaType) {
+  libraryCategoryTabs.querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.cat === cat));
+  const myToken = ++libraryRequestToken;
+  const loadingEl = mediaType === 'image' ? libraryGrid : libraryList;
+  libraryGrid.hidden = mediaType !== 'image';
+  libraryList.hidden = mediaType === 'image';
+  loadingEl.innerHTML = '<p style="color:var(--text-dim); font-size:13px;">Loading…</p>';
+  let catItems;
+  try {
+    catItems = (await loadLibraryCategory(cat)).filter((it) => it.type === mediaType);
+  } catch (err) {
+    console.error('Could not load this library category:', err);
+    catItems = [];
+  }
+  // A faster click on a different tab already landed while this fetch was
+  // still in flight - that render already reflects what's on screen now,
+  // so this stale one must not clobber it.
+  if (myToken !== libraryRequestToken) return;
+  if (catItems.length === 0) {
+    libraryGrid.hidden = true;
+    libraryList.hidden = false;
+    libraryList.innerHTML = '<p style="color:var(--text-dim); font-size:13px;">Nothing in the library yet for this category. The admin can add some at <code>admin.html</code> — or just close this and upload your own file below.</p>';
+    return;
+  }
+  if (mediaType === 'image') {
+    libraryGrid.hidden = false;
+    libraryList.hidden = true;
+    libraryGrid.innerHTML = '';
+    catItems.forEach((it) => {
+      const el = document.createElement('div');
+      el.className = 'library-item';
+      // No visible name in the picker itself (alt text only, for
+      // screen readers - never shown on screen) - browsing the
+      // library is by thumbnail now, not by whatever the uploaded
+      // filename happened to be.
+      el.innerHTML = `<img src="${it.url}" loading="lazy" alt="${it.name}">`;
+      el.addEventListener('click', () => selectLibraryAsset(it));
+      libraryGrid.appendChild(el);
+    });
+  } else {
+    libraryGrid.hidden = true;
+    libraryList.hidden = false;
+    libraryList.innerHTML = '';
+    // No name shown here either - just "Sound 1", "Sound 2"... within
+    // whatever category tab is open, instead of the uploaded name.
+    // Audio has no thumbnail to browse by the way images do, so a
+    // fully blank/identical row per item isn't distinguishable at all
+    // - this keeps them pickable without exposing the real name.
+    catItems.forEach((it, i) => {
+      const el = document.createElement('div');
+      el.className = 'library-audio-item';
+      el.innerHTML = `<span>🎵 Sound ${i + 1}</span><span class="btn-secondary" style="font-size:11px;padding:4px 8px;">Use this</span>`;
+      el.addEventListener('click', () => selectLibraryAsset(it));
+      libraryList.appendChild(el);
+    });
+  }
 }
 
 function selectLibraryAsset(item) {

@@ -481,10 +481,33 @@ Missile Silo launcher's own sprite opens to the Missile Silo structure
 category while that *same row's* separate missile-projectile art slot
 opens to the dedicated Missiles category, and so on
 (`defaultCategoryForSlot()`/`SLOT_CATEGORY_HINTS`/
-`SLOT_PREFIX_CATEGORY_HINTS` in `index.html`). Falls back to the old
-first-available-category behavior for the handful of slots with no clean
-matching admin.html category (Mining Ship art) or if the hinted category
-has nothing uploaded to it yet.
+`SLOT_PREFIX_CATEGORY_HINTS` in `index.html`). Falls back to the first
+tab in the list for the handful of slots with no clean matching
+admin.html category (Mining Ship art).
+
+**Only the one category tab actually being viewed is ever fetched from
+Firestore - never the whole library.** Originally, opening the picker
+pulled down every single item in every category up front (once per page
+load) just so the grid could filter it client-side afterward - harmless
+at small scale, but it meant Firestore-billing (and downloading) the
+*entire* library on every visit to this page, even for someone who
+opens the picker once and only ever looks at one category, and it would
+only get slower and more expensive as the library grew. `loadLibraryCategory()`
+now runs one `where('category','==',cat)` Firestore query per tab,
+result cached per category for the rest of the session so re-clicking
+an already-viewed tab costs nothing further. The category tab list
+itself no longer depends on what's actually been uploaded - it's every
+category from the same fixed list `admin.html`'s own category tree
+defines (`CATEGORY_ORDER`/`CATEGORY_LABELS`, now including `terrain` and
+`structures/missile_battery`, both real `admin.html` categories this
+list had simply never been updated to include), shown unconditionally;
+an empty category just shows the ordinary "nothing here yet" message
+once clicked, scoped to that one category, rather than every tab
+guaranteeing something's actually in it the way the old
+fetch-everything-up-front approach could promise. A request already in
+flight for a tab the user has since clicked away from is discarded if
+it resolves late (`libraryRequestToken`), so a slow category never
+clobbers a faster, more recent click's results.
 
 **Save Draft** works with anything filled in; **Finish & Save** requires
 the checklist items above and marks the map playable.
