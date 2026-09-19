@@ -374,20 +374,30 @@ line. Only this page has the logo/title/footer treatment so far -
    Turn-Based, once per round in Real-Time). A converted unit keeps its
    own current stats and just switches sides, fighting for its new owner
    from then on. **Mining Ships and other Clerics can never be
-   converted** - a home base and a gated building (a structure, not a
-   "unit") can't be either; every other unit type can, including Gun
-   Turrets, Missile Silo launchers, Missile Battery units, and Field
-   Hospital medics. A **"Clerics can also convert stationary Gun Turrets
-   & Missile Silo launchers (not just troops)"** checkbox, checked by
-   default, controls just the two truly stationary unit types (placed
-   once, speed 0, never move again) - unchecking it means a Cleric can
-   still convert any mobile unit (regular combat units, Missile Battery
-   units, Field Hospital medics) but a Gun Turret or Missile Silo
-   launcher is treated the same as a Mining Ship/home base/gated
-   building: not a valid convert target at all, clicking one with a
-   Cleric selected falls through to a plain move order instead. Defaults
-   checked so a map saved before this existed keeps the exact behavior
-   it already had. Leave its Cleric list empty and the whole feature is
+   converted**, and neither can a faction's actual Home Base - that one
+   is unconditional, no setting turns it on. A **"Clerics can also
+   convert stationary structures - Gun Turrets, Missile Silo launchers,
+   and any built building (Air Base, Research Facility, etc.) - not just
+   troops"** checkbox, checked by default, controls every OTHER
+   stationary thing an enemy faction owns: the two truly stationary unit
+   types (Gun Turrets/Missile Silo launchers - placed once, speed 0,
+   never move again) and every gated building (Air Base/War Factory/
+   Infantry Post/Helicopter Facility/Navy Harbor/Field Hospital/Research
+   Facility/Missile Silo/Missile Battery/Religious Institution itself -
+   whichever ones that faction has actually built). Converting a
+   building is a real capture, not just cosmetic - it flips who has that
+   building unlocked (the new owner can now build/queue whatever it
+   gates, the old owner can't any more, same bookkeeping a destroyed
+   building already updates) and clears whatever was mid-production in
+   its queue, same as destroying it would. Regular combat units, Missile
+   Battery units, and Field Hospital medics stay convertible either way,
+   unaffected by this checkbox - unchecking it only takes away
+   turrets/launchers/buildings as valid targets, clicking one with a
+   Cleric selected then falls through to a plain move order instead.
+   Defaults checked so a map saved before this existed keeps the exact
+   turret/launcher behavior it already had (gated buildings are a new
+   capability either way - there's no old behavior for them to
+   preserve). Leave its Cleric list empty and the whole feature is
    absent from the map, same as every other gated building.
 5. **Sounds** — background music, intro music, attack/building-destroyed/
    home-base-under-attack/game-over sfx. All optional, all `.mp3`.
@@ -1070,25 +1080,38 @@ entirely by one map's saved data:
   faction's research bonuses, and any standing order or live selection
   it held under its old owner is cancelled the moment it changes hands.
   Shows as a distinct purple pulse (like the medic's own green heal
-  pulse, neither reads as an attack). **Mining Ships and other Clerics
-  can never be converted** - clicking one while a Cleric is selected
-  just falls back to a plain move order instead, same as clicking empty
-  space would - nor can a home base or a gated building (structures,
-  not "units"); every other unit type is fair game by default, Gun
-  Turrets/Missile Silo launchers/Missile Battery units/Field Hospital
-  medics included - EXCEPT Gun Turrets and Missile Silo launchers
-  specifically (the only two truly stationary unit types - placed once,
-  speed 0, never move again) if the map-maker unchecked index.html's
-  Religious Institution "Clerics can also convert stationary Gun
-  Turrets & Missile Silo launchers" checkbox (`isConvertible()`,
-  `CLERICS_CONVERT_STATIONARY` from `cfg.religiousInstitution.
-  convertStationary`, defaults `!== false` so a map saved before this
-  checkbox existed keeps converting them same as always) - a mobile
-  Missile Battery unit is unaffected by this setting either way, only
-  the two stationary types are gated by it. An AI-controlled Cleric
-  picks its own target automatically - the nearest convertible enemy
-  unit in range - the same idea as a Gun Turret auto-acquiring the
-  nearest enemy or a medic auto-picking the nearest damaged ally.
+  pulse, neither reads as an attack). **Mining Ships, other Clerics, and
+  a faction's actual Home Base can never be converted** - the Home Base
+  exclusion is unconditional, no setting changes it. Every mobile unit
+  is fair game unconditionally too (regular combat units, Missile
+  Battery units, Field Hospital medics). A Gun Turret, a Missile Silo
+  launcher, or any gated building the enemy has actually built (Air
+  Base/Research Facility/etc.) is ALSO fair game by default, but only if
+  the map-maker left index.html's Religious Institution "Clerics can
+  also convert stationary structures" checkbox checked
+  (`isConvertible()`, `CLERICS_CONVERT_STRUCTURES` from
+  `cfg.religiousInstitution.convertStationary`, defaults `!== false` so
+  a map saved before this checkbox existed keeps converting turrets/
+  launchers the same as always - gated buildings are a new capability
+  the same setting now also covers, since there's no old behavior for
+  them to preserve). Converting a gated building
+  (`convertUnit()`'s own `isGatedBuilding` branch) is a real capture,
+  not cosmetic - the new owner's `fac.built[key]` flips true (whatever
+  that building gates becomes buildable) and the old owner's flips
+  false, exactly mirroring what `applyDamageToTarget`'s destruction
+  branch already does when the building is destroyed instead of
+  captured; both factions' production queue for that building key is
+  cleared (there's no clean way to hand off whatever was
+  mid-production). Reported directly: "it is not just gun turrets and
+  missile silos, it is structures and bases of the enemy" - structures
+  (every gated building) now included; a literal Home Base capture is
+  its own much bigger mechanic (what happens to a faction that loses
+  its base - eliminated? does the winner now have two?) intentionally
+  left out of this same checkbox pending a design answer, rather than
+  guessed at. An AI-controlled Cleric picks
+  its own target automatically - the nearest convertible enemy unit in
+  range - the same idea as a Gun Turret auto-acquiring the nearest enemy
+  or a medic auto-picking the nearest damaged ally.
 - **Research Facility** (mandatory, set on the map): same one-time-
   purchase build-panel row, same real attackable/destroyable entity, as
   the buildings above, but it gates the Research tab itself rather than

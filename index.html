@@ -799,7 +799,7 @@
         </div>
       </div>
       <label style="display:flex; align-items:center; gap:6px; font-size:13px; margin:4px 0 12px;">
-        <input type="checkbox" id="clericsConvertStationaryEnabled" checked style="width:auto;"> Clerics can also convert stationary Gun Turrets &amp; Missile Silo launchers (not just troops)
+        <input type="checkbox" id="clericsConvertStationaryEnabled" checked style="width:auto;"> Clerics can also convert stationary structures - Gun Turrets, Missile Silo launchers, and any built building (Air Base, Research Facility, etc.) - not just troops. A faction's actual Home Base still can't be converted.
       </label>
       <div id="clericUnitList"></div>
       <button type="button" class="btn-add" id="addClericUnitBtn">+ Add a Cleric</button>
@@ -3031,11 +3031,15 @@ async function buildMapDoc(status) {
       hp: clampHomeworldHp(document.getElementById('religiousInstitutionHp').value),
       cost: Number(document.getElementById('religiousInstitutionCost').value) || 150,
       image: uploadResults.religiousInstitutionImage,
-      // Whether a Cleric can convert a stationary Gun Turret/Missile Silo
-      // launcher, not just a mobile "troop" unit - defaults true (checked)
+      // Whether a Cleric can convert a stationary structure - a Gun
+      // Turret, a Missile Silo launcher, or any gated building (Air
+      // Base/Research Facility/etc, but never a faction's actual Home
+      // Base) - not just a mobile "troop" unit. Defaults true (checked)
       // so a map saved before this checkbox existed keeps exactly the
-      // behavior it already had (play.html's isConvertible() allowed
-      // turrets/launchers unconditionally before this existed at all).
+      // behavior it already had for turrets/launchers (play.html's
+      // isConvertible() allowed those two unconditionally before this
+      // setting existed - gated buildings are a new capability this same
+      // setting now also covers).
       convertStationary: document.getElementById('clericsConvertStationaryEnabled').checked,
     },
     clericUnits,

@@ -2193,16 +2193,24 @@ async function main() {
   // combat unit/medic are always fair game, same as a real enemy "unit"
   // reads in every other click-to-attack path in this file. A Gun
   // Turret/Missile Silo launcher (the only two STATIONARY unit types -
-  // placed once, speed 0, never move again) are fair game too UNLESS the
-  // map-maker unchecked index.html's Religious Institution "Clerics can
-  // also convert stationary Gun Turrets & Missile Silo launchers"
-  // checkbox - defaults to true (`!== false`) so a map saved before this
-  // setting existed keeps exactly the behavior it already had.
+  // placed once, speed 0, never move again) AND every gated building
+  // (Air Base, War Factory, Research Facility, Missile Silo itself,
+  // etc. - "structures", reported directly as missing: "it is not just
+  // gun turrets and missile silos, it is structures... of the enemy")
+  // are fair game too, UNLESS the map-maker unchecked index.html's
+  // Religious Institution "Clerics can also convert stationary
+  // structures" checkbox - defaults to true (`!== false`) so a map saved
+  // before this setting existed keeps exactly the behavior it already
+  // had for turrets/launchers (gated buildings were never convertible at
+  // all before this, so there's no old behavior to preserve for them -
+  // they simply join the same setting turrets/launchers already used).
+  // A faction's actual Home Base is deliberately NOT included here - see
+  // the isFactionHome exclusion below, unconditional either way.
   // ---------------------------------------------------------------------
-  const CLERICS_CONVERT_STATIONARY = cfg.religiousInstitution?.convertStationary !== false;
+  const CLERICS_CONVERT_STRUCTURES = cfg.religiousInstitution?.convertStationary !== false;
   function isConvertible(t) {
-    if (!t || t.alive === false || t.isFactionHome || t.isMiner || t.isCleric || t.isGatedBuilding) return false;
-    if (!CLERICS_CONVERT_STATIONARY && (t.isTurret || t.isMissileLauncher)) return false;
+    if (!t || t.alive === false || t.isFactionHome || t.isMiner || t.isCleric) return false;
+    if (!CLERICS_CONVERT_STRUCTURES && (t.isTurret || t.isMissileLauncher || t.isGatedBuilding)) return false;
     return true;
   }
   // AI-controlled Clerics pick their own target (a human just clicks one -
@@ -2233,10 +2241,30 @@ async function main() {
   // it doesn't get retroactively re-baked with the new owner's research
   // bonuses.
   function convertUnit(t, newFactionId) {
+    const oldFactionId = t.factionId;
     t.factionId = newFactionId;
     t.orderType = null; t.target = null; t.moveTarget = null; t.pathWaypoints = null;
     t.selected = false;
     t.attackedThisTurn = false; t.lockedUntilTurn = 0;
+    // A gated building's own unlock flag/production queue live on the
+    // FACTION object (fac.built[key]/fac.buildQueue[key]), not on this
+    // units-array entry - unlike every other convertible type, whose
+    // factionId alone is the complete story. Same two fields
+    // applyDamageToTarget's own destruction branch already clears on the
+    // OLD owner when a building is destroyed - conversion is "captured
+    // instead of destroyed," so it clears them there too, then grants a
+    // fresh (empty, not whatever was mid-production - there's no clean
+    // partial handoff, and every other capture already resets standing
+    // state the same way) unlock to the new owner.
+    if (t.isGatedBuilding) {
+      const oldOwner = factionOf(oldFactionId);
+      oldOwner.built[t.buildingKey] = false;
+      oldOwner.buildQueue[t.buildingKey] = [];
+      const newOwner = factionOf(newFactionId);
+      newOwner.built[t.buildingKey] = true;
+      newOwner.buildQueue[t.buildingKey] = [];
+      if (oldOwner === activeFaction || newOwner === activeFaction) { renderBuildPanel(); renderResearchPanel(); }
+    }
   }
   // A Cleric's own "attack" - walks into range of its target the same way
   // combatTick/healTick do, but converts instead of damaging or healing,
