@@ -1724,6 +1724,87 @@ from the Stripe webhook, and a new Firestore collection queuing a credit
 grant for an email that hasn't signed in yet, neither of which the
 original wording covered.
 
+## Mobile support & installing as an app (PWA)
+
+**`index.html`/`admin.html`/`producer.html`** (the tools people actually
+revisit, as opposed to `play.html` - see below) are installable as a
+home-screen app: `manifest.json` (name, `theme_color`/`background_color`
+matching this project's own dark theme, `icon-192.png`/`icon-512.png` -
+both generated from the same Titan Business Pros logo already embedded
+elsewhere in this project, just exported as real standalone files here
+since a manifest's icons need to be actual URLs, not `data:` URIs) plus
+`service-worker.js`, linked from all three pages' `<head>`
+(`<link rel="manifest">`, `<meta name="theme-color">`,
+`<link rel="apple-touch-icon">`). The service worker is deliberately its
+OWN small plain `<script>` at the very end of the body, never one more
+line tacked onto the big Firebase-dependent `<script type="module">`
+above it - that module's own top-level code doesn't necessarily finish
+quickly (or at all, on a bad connection) since it does real Firebase
+Auth/Firestore work, so anything appended after it wouldn't reliably
+register either. Network-first, not cache-first (`CACHE_NAME` in
+`service-worker.js`, bump it whenever the shell files change enough to
+matter offline) - this project's real functionality needs live Firebase
+access anyway, so a cached shell page is only ever a soft "you're
+offline" fallback, never something that would keep someone using a stale
+version while actually online. `play.html` intentionally does NOT link
+any of this - it's practically never opened directly any more (see "My
+Maps," `index.html`'s own `⬇ Download My Game`), and a downloaded,
+fully-inlined standalone copy of it is often opened straight from disk
+(`file://`), where service workers are blocked entirely and a
+manifest/theme-color would be meaningless anyway.
+
+**`play.html` itself (actual gameplay) works on phones/tablets now,
+touch included** - reported as three separate issues that turned out to
+share one root cause and one separate CSS bug:
+- **No touch support at all before this** - the canvas only ever listened
+  for mouse events (`mousedown`/`mousemove`/`mouseup`/`wheel`/`dblclick`),
+  so nothing (selecting units, issuing orders, panning, zooming) worked
+  via touch. Added a full parallel touch control scheme mirroring the
+  mouse one as closely as a single-pointer touchscreen allows: one finger
+  drags a box-select exactly like a left-drag (kept as the primary
+  gesture for commanding a group, rather than repurposing it for
+  panning), a one-finger tap with barely any movement is the same as a
+  click (`handleClick`), and a quick second tap near the first is the
+  same as a double-click (`handleDoubleClickAt` - pulled out of the old
+  anonymous `dblclick` listener so both entry points share one
+  implementation). Panning and zooming both need a second finger - a
+  two-finger touchmove pans by however much the pinch's own midpoint
+  moved AND zooms by however much the two fingers' distance apart
+  changed, together, the same combined pinch-to-zoom-and-pan gesture a
+  map app uses, centered on that same midpoint (the same cursor-anchor
+  math the scroll-wheel zoom handler already uses). `#canvas` also gets
+  `touch-action:none` so the browser's own native pinch-zoom/double-tap-
+  zoom never competes with these custom handlers.
+- **Horizontal overflow at phone widths** - `document.body.scrollWidth`
+  measured wider than the viewport at 375px, confirmed by finding
+  `#topbarActions` (the Pause/Sound/Save/Load/Download/Stats/☰ button
+  row) rendering wider than the screen itself. Root cause: `flex:none`
+  disables shrinking, so the whole button cluster sized itself to its own
+  unwrapped content width FIRST and only then would have decided whether
+  to wrap - on a phone-width screen that meant it stayed one long row
+  wider than the viewport, never actually reaching its own
+  `flex-wrap:wrap` rule at all. Fixed by adding `max-width:100%`, which
+  caps it at whatever room the topbar's own flex layout actually gives it
+  and lets its buttons reflow onto 2-3 lines on a narrow screen instead.
+- **The minimap almost entirely off-screen on a phone** - `#minimapWrap`'s
+  `right:330px` assumes the full 320px desktop side panel is always open
+  next to it; on a 375px-wide screen that left it with a negative X
+  position, mostly past the left edge of the viewport. Fixed by
+  defaulting the side panel to its already-existing `.collapsed` state on
+  load for any screen under 700px wide (the exact same manual toggle
+  state the ☰ button already produces, including the matching
+  `#minimapWrap.panel-collapsed` rule it already had) - the map fills
+  more of a small screen by default, and the ☰ button still opens the
+  panel on demand exactly like on desktop.
+Also bumped touch target sizes (topbar/build-panel button padding and
+font size) under a `max-width:700px` media query, since the desktop
+sizing is mouse-precision, not thumb-precision. `index.html`'s own
+checklist form needed no equivalent CSS work at all - its existing
+flexbox `.row`/`.field` layout was already confirmed (by directly
+measuring `document.body.scrollWidth` at a 375px viewport, not just
+eyeballing a screenshot) to reflow correctly with zero horizontal
+overflow anywhere on the page.
+
 ## Hosting
 
 Static site on GitHub Pages (source = `main`, path `/`). No build step.

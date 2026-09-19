@@ -77,7 +77,18 @@
      (right) - align-items:center on a column flex container centers
      each child's own width, not just the container itself. */
   #topbarCenter { flex:1 1 240px; min-width:0; display:flex; flex-direction:column; align-items:center; gap:4px; padding-top:4px; }
-  #topbarActions { flex:none; display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end; margin-left:auto; }
+  /* max-width:100% (not just flex:none's implicit "never shrink") is
+     what actually lets this wrap onto more lines on a narrow screen -
+     without it, `flex:none` (flex-shrink:0) let the whole button cluster
+     size itself to its own unwrapped content width first and only THEN
+     decide whether to wrap, which on a phone-width screen meant it
+     stayed one long row wider than the viewport itself (a real
+     horizontal-scroll bug, confirmed by measuring document.body.scrollWidth
+     at a 375px viewport) instead of ever reaching its own flex-wrap:wrap
+     below. Capping it at 100% of whatever room #topbar's own flex layout
+     actually gives it is what lets flex-wrap kick in and reflow the
+     buttons onto a second/third line instead. */
+  #topbarActions { flex:none; max-width:100%; display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end; margin-left:auto; }
   #hudRow { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; font-size:11px; }
   #turnLabel { font-size:11px; color:var(--dim); }
   /* The map's own name, dressed up as a small plaque/badge instead of
@@ -91,6 +102,14 @@
     box-shadow:0 2px 6px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.3);
   }
   canvas { display:block; background:#06121f; }
+  /* Tells the browser not to bother trying to recognize its OWN
+     pinch-zoom/pan/double-tap-zoom gestures on the main battlefield
+     canvas at all, so those never race against (or get grabbed by the
+     browser chrome before) the custom touchstart/touchmove/touchend
+     handlers below, which already call preventDefault() themselves -
+     this is the standard belt-and-suspenders pairing for a canvas that
+     implements its own touch gestures instead of relying on native ones. */
+  #canvas { touch-action:none; }
   #sidePanel {
     position:absolute; top:0; right:0; bottom:0; width:320px; max-width:88vw;
     background:rgba(11,14,20,0.95); border-left:1px solid var(--border); z-index:15;
@@ -292,6 +311,27 @@
   .pitchReply { display:none; margin-top:14px; text-align:center; font-size:13px; color:var(--good); }
   .pitchReply.show { display:block; }
   .pitchReply a { color:var(--accent); }
+
+  /* Phones/small tablets - bigger tap targets (the desktop 6px/9px
+     button padding and 11px text is mouse-precision-sized, too small to
+     reliably tap), and canvas.getBoundingClientRect()-based touch
+     controls need no CSS changes of their own (see the touchstart/
+     touchmove/touchend listeners), just usable buttons around them.
+     #sidePanel/#minimapWrap don't need anything here - both already
+     resize/reposition responsively (max-width:88vw, and the
+     .panel-collapsed default-collapsed-on-load JS below) without a
+     media query. */
+  @media (max-width: 700px) {
+    #topbar button, #topbar a { padding:9px 12px; font-size:13px; }
+    .buildRow button, .techRow button { padding:10px; font-size:13px; }
+    #deselectBtn { padding:9px; font-size:13px; }
+    #hudToggleBtn { padding:6px 20px; font-size:13px; }
+    /* The map name plaque, Skip Turn, and the whole topbarActions
+       cluster all wrap naturally already (see #topbarActions' own
+       max-width fix) - just needs a bit more line-height once things
+       start stacking onto 2-3 rows instead of 1. */
+    #topbar { row-gap:6px; }
+  }
 </style>
 </head>
 <body>
@@ -3715,20 +3755,134 @@ async function main() {
   // 'click' events before 'dblclick' (each already selecting just the
   // clicked unit via handleClick above), so this only needs to widen
   // that selection afterward, not replace any click-handling logic.
-  canvas.addEventListener('dblclick', (evt) => {
+  // Pulled out into its own named function (rather than staying an
+  // anonymous dblclick-only listener) so the touch controls below can
+  // reuse the exact same logic for a double-TAP, instead of duplicating
+  // it.
+  function handleDoubleClickAt(clientX, clientY) {
     if (gameOver || paused || !matchStarted || placingTurret || placingMissile) return;
-    // Same "not your turn" guard as mousedown above - dblclick is its own
-    // separate listener with no dependency on dragStart, so it needs its
-    // own check rather than inheriting mousedown's.
     if (turnMode && !activeFaction.isHuman) return;
     const r = canvas.getBoundingClientRect();
-    const p = toWorld(evt.clientX - r.left, evt.clientY - r.top);
+    const p = toWorld(clientX - r.left, clientY - r.top);
     const own = livingUnits(activeFaction.id).find((u) => Math.hypot(u.x - p.x, u.y - p.y) < (u.isGatedBuilding ? GATED_BUILDING_SIZE : UNIT_SIZE) / 2 + 8);
     if (!own) return;
     const matches = livingUnits(activeFaction.id).filter((u) => sameUnitType(u, own) && isOnScreen(u));
     livingUnits(activeFaction.id).forEach((u) => u.selected = false);
     matches.forEach((u) => u.selected = true);
     showUnitInfo(matches.length === 1 ? matches[0] : null, matches.length);
+  }
+  canvas.addEventListener('dblclick', (evt) => handleDoubleClickAt(evt.clientX, evt.clientY));
+
+  // ---------------------------------------------------------------------
+  // Touch controls (phones/tablets) - mirrors the mouse scheme above as
+  // closely as a single-pointer touchscreen allows: one finger drags a
+  // box-select exactly like a left-drag does (the primary way to command
+  // a group, so it keeps the desktop gesture rather than repurposing it
+  // for panning), a one-finger tap with barely any movement is the same
+  // as a click, and a quick second tap near the first is the same as a
+  // double-click. Panning and zooming both need a SECOND finger (there's
+  // no separate mouse button to borrow) - handled together off the same
+  // two-finger touchmove, like a map app's combined pinch-to-zoom-and-pan
+  // gesture: the pinch midpoint's own movement pans the camera, and the
+  // two fingers' distance apart changing zooms it, centered on that same
+  // midpoint (the same cursor-anchor math the wheel handler above uses).
+  // ---------------------------------------------------------------------
+  let touchMode = null; // 'select' | 'pan-zoom' | null
+  let touchStart = null, touchMoved = false, touchLast = null;
+  let pinchStartDist = 0, pinchLastMid = null;
+  let lastTapTime = 0, lastTapPos = null;
+  function touchDist(a, b) { return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY); }
+  function touchMid(a, b) { return { x: (a.clientX + b.clientX) / 2, y: (a.clientY + b.clientY) / 2 }; }
+  canvas.addEventListener('touchstart', (evt) => {
+    if (gameOver || paused || !matchStarted) return;
+    // Same "not your turn" guard every other input path above uses.
+    if (turnMode && !activeFaction.isHuman) return;
+    evt.preventDefault();
+    if (evt.touches.length === 1) {
+      touchMode = 'select';
+      touchStart = { x: evt.touches[0].clientX, y: evt.touches[0].clientY };
+      touchLast = touchStart;
+      touchMoved = false;
+    } else if (evt.touches.length >= 2) {
+      // A second finger landing mid-drag cancels any in-progress
+      // box-select (dragBox hidden, nothing gets selected from it) and
+      // switches straight to pan/zoom - there's no sensible way to
+      // "finish" a one-finger box-select once a second finger is down.
+      touchMode = 'pan-zoom';
+      dragBoxEl.style.display = 'none';
+      pinchStartDist = touchDist(evt.touches[0], evt.touches[1]);
+      pinchLastMid = touchMid(evt.touches[0], evt.touches[1]);
+    }
+  }, { passive: false });
+  canvas.addEventListener('touchmove', (evt) => {
+    if (!touchMode) return;
+    evt.preventDefault();
+    if (touchMode === 'select' && evt.touches.length === 1) {
+      const t = evt.touches[0];
+      touchLast = { x: t.clientX, y: t.clientY };
+      const dx = touchLast.x - touchStart.x, dy = touchLast.y - touchStart.y;
+      if (Math.hypot(dx, dy) > 6) touchMoved = true;
+      if (touchMoved) {
+        const x0 = Math.min(touchStart.x, touchLast.x), y0 = Math.min(touchStart.y, touchLast.y);
+        const w = Math.abs(dx), h = Math.abs(dy);
+        dragBoxEl.style.display = 'block';
+        dragBoxEl.style.left = x0 + 'px'; dragBoxEl.style.top = y0 + 'px';
+        dragBoxEl.style.width = w + 'px'; dragBoxEl.style.height = h + 'px';
+      }
+    } else if (touchMode === 'pan-zoom' && evt.touches.length >= 2) {
+      const mid = touchMid(evt.touches[0], evt.touches[1]);
+      const dist = touchDist(evt.touches[0], evt.touches[1]);
+      camera.x -= (mid.x - pinchLastMid.x) / camera.zoom;
+      camera.y -= (mid.y - pinchLastMid.y) / camera.zoom;
+      if (pinchStartDist > 10) {
+        const r = canvas.getBoundingClientRect();
+        const worldBefore = toWorld(mid.x - r.left, mid.y - r.top);
+        camera.zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, camera.zoom * (dist / pinchStartDist)));
+        const worldAfter = toWorld(mid.x - r.left, mid.y - r.top);
+        camera.x += worldBefore.x - worldAfter.x;
+        camera.y += worldBefore.y - worldAfter.y;
+      }
+      clampCamera();
+      pinchStartDist = dist;
+      pinchLastMid = mid;
+    }
+  }, { passive: false });
+  canvas.addEventListener('touchend', (evt) => {
+    if (!touchMode) return;
+    evt.preventDefault();
+    if (touchMode === 'select') {
+      dragBoxEl.style.display = 'none';
+      if (touchMoved) {
+        const r = canvas.getBoundingClientRect();
+        const x0 = Math.min(touchStart.x, touchLast.x) - r.left, x1 = Math.max(touchStart.x, touchLast.x) - r.left;
+        const y0 = Math.min(touchStart.y, touchLast.y) - r.top, y1 = Math.max(touchStart.y, touchLast.y) - r.top;
+        const w0 = toWorld(x0, y0), w1 = toWorld(x1, y1);
+        const picked = livingUnits(activeFaction.id).filter((u) => u.x >= w0.x && u.x <= w1.x && u.y >= w0.y && u.y <= w1.y);
+        if (picked.length) {
+          livingUnits(activeFaction.id).forEach((u) => u.selected = false);
+          picked.forEach((u) => u.selected = true);
+          showUnitInfo(picked.length === 1 ? picked[0] : null, picked.length);
+        }
+      } else {
+        // A quick second tap near the first, within the same window a
+        // desktop double-click would need, widens the selection to every
+        // on-screen unit of that same type - there's no separate
+        // "dblclick" touch event, so it's detected by hand here.
+        const now = performance.now();
+        if (lastTapPos && now - lastTapTime < 350 && Math.hypot(touchStart.x - lastTapPos.x, touchStart.y - lastTapPos.y) < 30) {
+          handleDoubleClickAt(touchStart.x, touchStart.y);
+          lastTapTime = 0; lastTapPos = null;
+        } else {
+          handleClick({ clientX: touchStart.x, clientY: touchStart.y });
+          lastTapTime = now; lastTapPos = touchStart;
+        }
+      }
+    }
+    touchMode = null; touchStart = null; touchLast = null; touchMoved = false;
+  }, { passive: false });
+  canvas.addEventListener('touchcancel', () => {
+    touchMode = null; touchStart = null; touchLast = null; touchMoved = false;
+    dragBoxEl.style.display = 'none';
   });
 
   function showUnitInfo(u, count) {
@@ -4284,6 +4438,21 @@ async function main() {
     document.getElementById('sidePanel').classList.toggle('collapsed');
     document.getElementById('minimapWrap').classList.toggle('panel-collapsed');
   });
+  // Phones/small tablets start with the Build/Research/Controls panel
+  // collapsed - #minimapWrap's own `right:330px` assumes the full 320px
+  // desktop panel is sitting open next to it, which on a narrow screen
+  // pushed most of the minimap off the LEFT edge of the viewport entirely
+  // (confirmed by measuring its rect at a 375px-wide viewport: x was
+  // negative). Collapsing the panel by default reuses the exact same
+  // `.panel-collapsed` rule (`right:10px`) a manual toggle already gets,
+  // rather than a separate narrow-screen-only CSS override - the ☰
+  // button still opens it on demand exactly like on desktop, this only
+  // changes the STARTING state. 700px comfortably covers phones and
+  // small tablets in portrait without affecting any real desktop window.
+  if (window.innerWidth < 700) {
+    document.getElementById('sidePanel').classList.add('collapsed');
+    document.getElementById('minimapWrap').classList.add('panel-collapsed');
+  }
   document.getElementById('restartBtn').addEventListener('click', () => location.reload());
 
   function serializeState() {
