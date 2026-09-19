@@ -4599,6 +4599,7 @@ async function main() {
   const startMatchBtn = document.getElementById('startMatchBtn');
   const teamErrorEl = document.getElementById('teamSelectError');
   const TEAM_LETTERS = Array.from({ length: factions.length }, (_, i) => String.fromCharCode(65 + i)); // 'A', 'B', ... one per faction that exists
+  const DIFFICULTY_LABELS = { easy: 'Easy', medium: 'Medium', hard: 'Hard', superhard: 'Super Hard' };
   const pickedTeam = {}; // factionId -> one of TEAM_LETTERS, for computer players only
   // factionId -> true if this computer player is left out of THIS match
   // entirely (a per-playthrough choice, made right here - the map still
@@ -4622,6 +4623,13 @@ async function main() {
   // for a group of people to just sit down and divide up the factions
   // themselves at play time.
   const pickedControl = {};
+  // factionId -> 'easy'|'medium'|'hard'|'superhard', for computer players
+  // only. Seeded from whatever index.html set at map-creation time, but -
+  // same reasoning as pickedControl above - this screen is the real, final
+  // say: beating a map on Easy no longer means editing the map itself to
+  // try it on Hard next time, just picking a different difficulty here on
+  // the next launch.
+  const pickedDifficulty = {};
 
   // Turn-Based only: explain the rotation, and let whoever's setting up
   // this match choose, per faction, who's actually going to sit down and
@@ -4661,13 +4669,21 @@ async function main() {
     pickedExcluded[fid] = false; // included by default - map-maker already chose to add this computer player
     const teamOptions = TEAM_LETTERS.map((letter) => `<option value="${letter}" ${pickedTeam[fid] === letter ? 'selected' : ''}>Team ${letter}</option>`).join('');
     const teamSelectStyle = 'background:var(--panel); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:6px 8px; font-size:12px; font-weight:600; cursor:pointer;';
+    // Seeded from whatever this faction's difficulty already is (set by
+    // index.html at map-creation time, or a previous launch's own pick -
+    // factions are rebuilt fresh per launch, but this reads the value
+    // addComputerRow/faction-init already resolved, same source
+    // pickedControl above seeds from). Picking a different one here is the
+    // real, final say for this one playthrough, same as team/control.
+    pickedDifficulty[fid] = AI_DIFFICULTY[factionOf(fid).difficulty] ? factionOf(fid).difficulty : 'medium';
+    const diffOptions = Object.keys(AI_DIFFICULTY).map((key) => `<option value="${key}" ${pickedDifficulty[fid] === key ? 'selected' : ''}>${DIFFICULTY_LABELS[key] || key}</option>`).join('');
     // "In match" - lets whoever's launching leave a given computer
     // player out of THIS playthrough entirely, without having to go
     // back into index.html and delete it from the map. Unchecking it
     // grays out and disables that row's other controls (nothing to pick
-    // a team/control for if it isn't playing) - re-checking restores
-    // them exactly as they were.
-    row.innerHTML = `<span class="swatch" style="background:${color}"></span><span class="name">${name}</span><label class="team-toggle" style="display:flex; align-items:center; gap:4px; font-weight:normal; cursor:pointer;"><input type="checkbox" class="include-check" data-fid="${fid}" checked style="width:auto;"> In match</label>${controlToggle}<select class="team-select" data-fid="${fid}" style="${teamSelectStyle}">${teamOptions}</select>`;
+    // a team/control/difficulty for if it isn't playing) - re-checking
+    // restores them exactly as they were.
+    row.innerHTML = `<span class="swatch" style="background:${color}"></span><span class="name">${name}</span><label class="team-toggle" style="display:flex; align-items:center; gap:4px; font-weight:normal; cursor:pointer;"><input type="checkbox" class="include-check" data-fid="${fid}" checked style="width:auto;"> In match</label>${controlToggle}<select class="team-difficulty" data-fid="${fid}" title="AI Difficulty" style="${teamSelectStyle}">${diffOptions}</select><select class="team-select" data-fid="${fid}" style="${teamSelectStyle}">${teamOptions}</select>`;
     allyListEl.appendChild(row);
   }
   renderTeamRow(player.name, player.color, player.id, true);
@@ -4676,13 +4692,15 @@ async function main() {
   allyListEl.addEventListener('change', (e) => {
     const sel = e.target.closest('select.team-select');
     if (sel) { pickedTeam[Number(sel.dataset.fid)] = sel.value; return; }
+    const diffSel = e.target.closest('select.team-difficulty');
+    if (diffSel) { pickedDifficulty[Number(diffSel.dataset.fid)] = diffSel.value; return; }
     const includeCb = e.target.closest('input.include-check');
     if (includeCb) {
       const fid = Number(includeCb.dataset.fid);
       pickedExcluded[fid] = !includeCb.checked;
       const row = includeCb.closest('.allyRow');
       row.classList.toggle('excluded-row', !includeCb.checked);
-      row.querySelectorAll('select.team-select, button[data-cfid]').forEach((el) => { el.disabled = !includeCb.checked; });
+      row.querySelectorAll('select.team-select, select.team-difficulty, button[data-cfid]').forEach((el) => { el.disabled = !includeCb.checked; });
     }
   });
   allyListEl.addEventListener('click', (e) => {
@@ -4726,6 +4744,11 @@ async function main() {
       // The real, final say on human-vs-AI - overrides whatever
       // index.html set as a default, per the note above.
       if (turnMode) f.isHuman = pickedControl[f.id] === 'human';
+      // The real, final say on AI difficulty too - overrides whatever
+      // index.html set as a default. Harmless to set even if this faction
+      // ends up human-controlled (turnMode) - difficulty is only ever read
+      // for factions that are actually !isHuman.
+      f.difficulty = pickedDifficulty[f.id];
     });
     teamScreenEl.classList.remove('show');
     matchStarted = true;

@@ -594,7 +594,18 @@ entirely by one map's saved data:
   one other faction on a different team" rule only counts factions
   that are actually still in the match - excluding everyone still
   correctly blocks Start Match with the same "nothing to fight" error,
-  it just doesn't count an excluded faction's team either way.
+  it just doesn't count an excluded faction's team either way. Every
+  computer player also gets its own **AI Difficulty** dropdown here
+  (Easy/Medium/Hard/Super Hard) - the same real, final-say pattern as the
+  🧑/🤖 control toggle above: seeded from whatever `index.html` set at
+  map-creation time, but changeable on every single launch, in either
+  game style (not gated to Turn-Based the way the control toggle is,
+  since Real-Time computer players are always AI and so always have a
+  difficulty that matters). Lets a map be beaten on Easy, then replayed
+  tougher later, without ever reopening the map in the builder - reported
+  directly as a missing feature ("I want to play a map on easy, then
+  later once I beat it play it on hard"). Grays out/disables along with
+  the rest of an excluded faction's row.
 - **Real player control**: left-drag a box to select multiple units,
   click to move or attack. Issuing an order deselects automatically -
   a unit doesn't stay glued to your next click the way it used to. A
