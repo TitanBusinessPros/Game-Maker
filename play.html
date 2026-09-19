@@ -169,9 +169,16 @@
   .allyRow {
     display:flex; align-items:center; gap:10px; background:var(--panel2); border:1px solid var(--border);
     border-radius:8px; padding:10px 12px; margin-bottom:8px;
+    /* Room for swatch + name + "In match" + control toggle + AI Difficulty
+       + team select all on one row ran out once AI Difficulty was added -
+       without wrap, the row just kept growing past #teamSelectPanel's own
+       max-width instead of breaking, so the last control (team select)
+       stuck out past the box's right edge. flex-wrap lets any control
+       that doesn't fit drop to its own line inside the row instead. */
+    flex-wrap: wrap;
   }
   .allyRow .swatch { width:16px; height:16px; border-radius:50%; flex:none; }
-  .allyRow .name { flex:1; }
+  .allyRow .name { flex:1 1 auto; min-width:80px; }
   .allyRow.excluded-row { opacity:0.45; }
   .team-toggle { display:flex; gap:4px; flex:none; }
   .team-toggle button {
