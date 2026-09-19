@@ -545,6 +545,43 @@ flight for a tab the user has since clicked away from is discarded if
 it resolves late (`libraryRequestToken`), so a slow category never
 clobbers a faster, more recent click's results.
 
+**💎 Premium Library** - every upload slot's **📚 Library** button now
+has a second, **💎 Premium** button right next to it, opening a second,
+separate picker over the exact same category tree (`admin.html`'s own
+Premium Library mode uploads into it - see that page's own section
+below). Every item in it starts **locked** for every account - clicking
+one prompts to spend **one download credit** to unlock it, permanently,
+for that account ("everything will be blocked... one credit equals one
+item getting unlocked... once unlocked it is unlocked forever"). Spends
+from the exact same balance downloading a finished game already uses -
+one currency, not two - so the existing "N credits left"/"Get 10
+credits for $5" system covers Premium Library unlocks for free, with no
+new purchase flow needed. A locked item still shows its real thumbnail
+(so a map-maker can see what they'd be unlocking before spending a
+credit on it) with a 🔒 badge; an already-unlocked one behaves exactly
+like a normal free-library item - click it, it's applied to the slot,
+no further prompt.
+Unlocking has to run server-side - `firestore.rules` already safely
+lets a client decrease its own credits balance directly (no Cloud
+Function needed for that half, same as a plain download), but there'd
+be no way to trust a client-side write of the *unlock record itself*
+(proving a specific item was actually paid for) without some check
+tying the two together, so a new Cloud Function,
+`unlockPremiumItem` (`functions/index.js`), does the decrement and the
+unlock record in one atomic transaction instead - `firestore.rules`
+denies every client write to the new `premiumUnlocks` collection
+outright, this function is the only writer, the exact same
+"increase/record only via the Admin SDK" shape `grantCredits` and the
+Stripe webhook already use elsewhere in this file. The admin account is
+fully exempt here too (same treatment as downloads) - it still gets a
+real unlock record (so its own UI reads "already unlocked" afterward)
+but is never actually charged. Which premium items exist is public
+(`premiumLibraryItems`, same public-read/admin-only-write shape as the
+free library); which ones a given account has unlocked is private,
+fetched once per session (`where('uid','==',...)` against
+`premiumUnlocks`) and cached client-side, so opening the picker again
+later doesn't re-fetch it.
+
 **Save Draft** works with anything filled in; **Finish & Save** requires
 the checklist items above and marks the map playable.
 
@@ -1478,6 +1515,30 @@ compresses them the same way `index.html` does, and writes to Firestore
 `libraryItems` + Storage `library/<category>/...`. Enforced server-side
 by the rules below (checked directly: an unauthorized session's write is
 actually rejected, not just hidden in the UI), not just a client check.
+Also manages the `topCategorySelect` dropdown includes **Terrain &
+Obstacles** now - it existed in `CATEGORY_TREE` already (added when
+`index.html`'s own picker was extended to cover it) but the raw
+`<select>`'s options were separate, hand-written HTML that was never
+updated to match, so an admin genuinely could not upload obstacle art
+here at all despite the category existing - found auditing this page
+for the Premium Library work just below.
+
+**💎 Premium Library** - this same page also manages a second, separate
+shared library (Firestore `premiumLibraryItems`, Storage
+`premium-library/<category>/...`) that `index.html`'s own Premium
+Library picker unlocks items from one download credit at a time (see
+that page's own section above). Switched by its own bookmarkable link,
+**`admin.html?premium=1`** (a **📚 Standard Library** / **💎 Premium
+Library** nav pair right under the page title makes this discoverable
+without having to know the URL by heart) - deliberately NOT a second
+login: it's still the exact same gated admin account either way, a
+second sign-in would just duplicate the same trust boundary for zero
+security benefit. `PREMIUM_MODE`/`LIBRARY_COLLECTION`/
+`LIBRARY_STORAGE_PREFIX` are the only three things that actually change
+between modes - the entire category tree, upload/compression pipeline,
+and "Current library" grouping/display are shared, unmodified code, so
+there's exactly one place (`CATEGORY_TREE`) to ever edit categories for
+both libraries at once.
 
 This account also manages the **50-credit download list** - its own
 section at the top of the page, a simple add/remove list of emails
@@ -1746,6 +1807,22 @@ folds this into the account's very first balance the moment it's
 actually created, then deletes the pending doc so it's never counted
 twice; see `firestore.rules`' matching `/users/{uid}` create rule change.
 
+`unlockPremiumItem` backs `index.html`'s 💎 Premium Library (see that
+page's own section above) - a callable function too, invoked by any
+signed-in user for themselves (not admin-gated - the admin's own
+`request.auth.token.email` check inside just exempts them from being
+charged). Given an `itemId`: confirms the item exists in
+`premiumLibraryItems`, and if `premiumUnlocks/{uid}_{itemId}` already
+exists, returns success without charging again (idempotent against a
+retried call after a flaky connection); otherwise checks the caller's
+own `/users/{uid}.credits` inside the same transaction and throws
+`failed-precondition` if it's below 1 (`index.html` shows the same "Get
+10 credits for $5" popup a failed download already shows), then
+decrements it by 1 and creates the unlock record together, atomically -
+the same "must happen together or not at all" reasoning
+`processedStripeSessions` + the credit increment share in the webhook
+above.
+
 `firebase-admin` v14 dropped the old `admin.firestore()`/`admin.initializeApp()`
 namespaced API in favor of modular imports
 (`require('firebase-admin/app')` / `require('firebase-admin/firestore')`)
@@ -1790,9 +1867,19 @@ Project: `game-maker-ed014`.
   since the `users/{uid}` create rule has to read its `amount` field the
   same way it already reads `bonusEmails`; no client write path at all -
   only the `grantCredits` Cloud Function, running under the Admin SDK,
-  is ever allowed to create or increase one).
+  is ever allowed to create or increase one). Two more back the 💎
+  Premium Library: `premiumLibraryItems/{id}` (same public-read/
+  admin-only-write shape as `libraryItems`) and `premiumUnlocks/{id}`
+  (doc id `{uid}_{itemId}`, proof a specific account actually paid a
+  credit to unlock a specific item - `allow write: if false` for every
+  client, period; only the `unlockPremiumItem` Cloud Function, running
+  under the Admin SDK, is ever allowed to write one, same shape as
+  `grantCredits`/the Stripe webhook above; a signed-in user can read
+  only their own).
 - **Storage** — `maps/{uid}/{mapId}/...` for map-specific uploads,
   `library/{category}/...` for the shared library,
+  `premium-library/{category}/...` for the 💎 Premium Library (same
+  public-read/admin-only-write shape as `library/`),
   `producer/{uid}/{draftId}/...` for Titan Game Producer's saved drafts
   (owner-read/write only, 50MB/file cap - higher than the other two,
   since a single stage's own game file can be several MB). Same general

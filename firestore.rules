@@ -24,6 +24,39 @@ service cloud.firestore {
                    && request.auth.token.email_verified == true;
     }
 
+    // Premium Library - a second, separate shared asset library
+    // (admin.html's own Premium Library mode, ?premium=1) where every
+    // item costs one download credit to unlock, permanently, per
+    // account - see index.html's openLibraryPicker/handlePremiumItemClick
+    // and functions/index.js's unlockPremiumItem. Same public-read/
+    // admin-only-write shape as libraryItems above - which items EXIST
+    // is public (a locked item still shows its own thumbnail so a
+    // map-maker can see what they'd be unlocking before spending a
+    // credit on it); which ones a given account has actually UNLOCKED is
+    // a separate, private thing - see premiumUnlocks below.
+    match /premiumLibraryItems/{itemId} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.auth.token.email == 'adonai4you@gmail.com'
+                   && request.auth.token.email_verified == true;
+    }
+
+    // One doc per (account, unlocked Premium Library item), doc id
+    // "{uid}_{itemId}" - proof a specific item was actually paid for with
+    // a real credit. Deliberately has NO client write path at all, same
+    // reasoning as pendingCreditGrants below: unlockPremiumItem (Cloud
+    // Function, Admin SDK) is the only writer, since it's the only thing
+    // that can also verify a credit was genuinely spent in the same
+    // transaction - a client-writable rule here could never tell "I paid
+    // for this" apart from "I just wrote myself a free unlock record."
+    // Read is scoped to the account that owns it (index.html's own
+    // picker fetches "everything uid=me has unlocked" once per session
+    // to know which items to show as unlocked instead of locked).
+    match /premiumUnlocks/{unlockId} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.uid;
+      allow write: if false;
+    }
+
     // Admin-managed bonus list for the download-credit system below -
     // doc id IS the lowercased email itself (index.html/admin.html both
     // lowercase before reading/writing this, so an exists() check here

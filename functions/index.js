@@ -187,3 +187,58 @@ exports.grantCredits = onCall(async (request) => {
   logger.info(`Queued ${amount} pending credits for ${email} (no account yet)`);
   return { status: 'pending', amount };
 });
+
+// index.html's Premium Library - a second, separate shared asset library
+// (Firestore `premiumLibraryItems`, Storage `premium-library/<category>/...`,
+// mirroring `libraryItems`/`library/...` exactly) where every item starts
+// LOCKED for every account and costs exactly one download credit to
+// unlock, permanently, per (account, item) pair - "one credit equals one
+// item unlocked... once unlocked it is unlocked forever." Spends from the
+// same /users/{uid} credits balance downloads already use - the
+// map-maker's own choice, one balance rather than a second currency.
+//
+// This has to run under the Admin SDK for the same reason grantCredits
+// does: firestore.rules already safely lets a client decrease its OWN
+// credits balance directly with no Cloud Function needed (see that
+// file's own /users/{uid} update rule) - but there'd be no way to trust
+// a client-side write of the *unlock record itself* (proving a specific
+// item was actually paid for) without some server-side check tying the
+// two together, so this function does both the decrement and the unlock
+// record in one atomic transaction instead. firestore.rules denies every
+// client write to `premiumUnlocks` outright - this function is the only
+// writer, the same "increase/record only via the Admin SDK" shape
+// grantCredits and the Stripe webhook above already use.
+exports.unlockPremiumItem = onCall(async (request) => {
+  const auth = request.auth;
+  if (!auth) throw new HttpsError('unauthenticated', 'Sign in first.');
+  const itemId = String(request.data?.itemId || '').trim();
+  if (!itemId) throw new HttpsError('invalid-argument', 'Missing itemId.');
+
+  const uid = auth.uid;
+  // The admin account is exempt from spending credits here too, same
+  // treatment index.html's download-credit system already gives it
+  // (unlimited, no balance to check) - it still gets a real unlock
+  // record though, so admin.html/index.html's own UI reads "already
+  // unlocked" consistently afterward instead of prompting to spend a
+  // credit the admin was never going to be charged anyway.
+  const isAdmin = auth.token.email === ADMIN_EMAIL;
+  const itemRef = db.collection('premiumLibraryItems').doc(itemId);
+  const unlockRef = db.collection('premiumUnlocks').doc(`${uid}_${itemId}`);
+  const userRef = db.collection('users').doc(uid);
+
+  return db.runTransaction(async (tx) => {
+    const [itemSnap, unlockSnap, userSnap] = await Promise.all([tx.get(itemRef), tx.get(unlockRef), tx.get(userRef)]);
+    if (!itemSnap.exists) throw new HttpsError('not-found', 'This item no longer exists.');
+    // Already unlocked (e.g. a retried call after a flaky connection, or
+    // just clicking an already-unlocked item again) - idempotent, never
+    // charge twice for the same item.
+    if (unlockSnap.exists) return { status: 'already-unlocked', credits: isAdmin ? null : (userSnap.data()?.credits ?? 0) };
+
+    const credits = userSnap.data()?.credits ?? 0;
+    if (!isAdmin && credits < 1) throw new HttpsError('failed-precondition', 'Not enough credits.');
+
+    tx.set(unlockRef, { uid, itemId, category: itemSnap.data().category, unlockedAt: FieldValue.serverTimestamp() });
+    if (!isAdmin) tx.set(userRef, { credits: FieldValue.increment(-1) }, { merge: true });
+    return { status: 'unlocked', credits: isAdmin ? null : credits - 1 };
+  });
+});

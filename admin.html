@@ -52,12 +52,17 @@
   .item-card .name { word-break: break-word; margin-bottom: 6px; }
   .category-heading { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .04em; margin: 18px 0 8px; }
   .category-heading:first-child { margin-top: 0; }
+  #libraryModeNav a.active { background: var(--accent); color: #06121f; border-color: var(--accent); font-weight: 600; }
 </style>
 </head>
 <body>
 <main>
-  <h1>Game Maker Admin</h1>
-  <p class="sub">Add art and sound to the shared library that every map creator can pick from.</p>
+  <h1 id="pageTitle">Game Maker Admin</h1>
+  <p class="sub" id="pageSub">Add art and sound to the shared library that every map creator can pick from.</p>
+  <div class="row" id="libraryModeNav" style="margin:-8px 0 16px; gap:8px;">
+    <a href="admin.html" id="modeLinkStandard" class="btn-secondary" style="text-decoration:none; display:inline-block; padding:8px 14px; font-size:12px;">📚 Standard Library</a>
+    <a href="admin.html?premium=1" id="modeLinkPremium" class="btn-secondary" style="text-decoration:none; display:inline-block; padding:8px 14px; font-size:12px;">💎 Premium Library</a>
+  </div>
 
   <div id="signedOutView" class="section">
     <p style="color:var(--text-dim); font-size:13px;">Sign in with the admin Google account to manage the library.</p>
@@ -103,7 +108,7 @@
     </div>
 
     <div class="section">
-      <h3 style="margin-top:0;">Add to library</h3>
+      <h3 style="margin-top:0;" id="addSectionTitle">Add to library</h3>
       <p style="color:var(--text-dim); font-size:12px; margin-top:-8px;">Pick a category and select one or more files (you can multi-select a whole folder). Each file's name becomes its display name.</p>
       <div class="row">
         <div class="field">
@@ -114,6 +119,7 @@
             <option value="worlds">Worlds</option>
             <option value="bases">Bases</option>
             <option value="resources">Resources</option>
+            <option value="terrain">Terrain &amp; Obstacles</option>
             <option value="structures">Structures</option>
             <option value="sounds">Sounds (mp3)</option>
           </select>
@@ -133,7 +139,7 @@
     </div>
 
     <div class="section">
-      <h3 style="margin-top:0;">Current library</h3>
+      <h3 style="margin-top:0;" id="currentSectionTitle">Current library</h3>
       <div id="currentLibrary"><p style="color:var(--text-dim); font-size:12px;">Loading&hellip;</p></div>
     </div>
   </div>
@@ -166,11 +172,33 @@ const firebaseConfig = {
 
 const ADMIN_EMAIL = 'adonai4you@gmail.com';
 
+// Premium Library: a second, separate shared library (its own Firestore
+// collection and Storage prefix, same category tree as the free one)
+// where every item costs index.html's map-makers one download credit to
+// unlock, permanently, per account - see index.html's own
+// openLibraryPicker/handlePremiumItemClick and functions/index.js's
+// unlockPremiumItem. This page manages BOTH libraries, switched by its
+// own bookmarkable link (?premium=1) rather than a second admin login -
+// it's still the exact same gated admin account either way, a second
+// sign-in would just duplicate the same trust boundary for no benefit.
+const PREMIUM_MODE = new URLSearchParams(location.search).get('premium') === '1';
+const LIBRARY_COLLECTION = PREMIUM_MODE ? 'premiumLibraryItems' : 'libraryItems';
+const LIBRARY_STORAGE_PREFIX = PREMIUM_MODE ? 'premium-library' : 'library';
+
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
 const functions = getFunctions(app);
+
+(PREMIUM_MODE ? document.getElementById('modeLinkPremium') : document.getElementById('modeLinkStandard')).classList.add('active');
+if (PREMIUM_MODE) {
+  document.getElementById('pageTitle').textContent = 'Game Maker Admin — Premium Library';
+  document.getElementById('pageSub').textContent = 'Add art and sound to the Premium Library - every item here costs a map-maker one download credit to unlock, permanently, before they can use it.';
+  document.title = 'Game Maker Admin — Premium Library';
+  document.getElementById('addSectionTitle').textContent = '💎 Add to Premium Library';
+  document.getElementById('currentSectionTitle').textContent = '💎 Current Premium Library';
+}
 
 const signedOutView = document.getElementById('signedOutView');
 const deniedView = document.getElementById('deniedView');
@@ -490,7 +518,7 @@ async function compressImageFile(file) {
 async function uploadOneFile(file, category) {
   file = await compressImageFile(file);
   const type = file.type.startsWith('audio') ? 'audio' : 'image';
-  const path = `library/${category}/${Date.now()}_${file.name}`;
+  const path = `${LIBRARY_STORAGE_PREFIX}/${category}/${Date.now()}_${file.name}`;
   const ref = storageRef(storage, path);
   const url = await Promise.race([
     // Date.now() in the path means nothing ever gets overwritten at the
@@ -507,7 +535,7 @@ async function uploadOneFile(file, category) {
       UPLOAD_TIMEOUT_MS
     )),
   ]);
-  const docRef = doc(collection(db, 'libraryItems'));
+  const docRef = doc(collection(db, LIBRARY_COLLECTION));
   await setDoc(docRef, { category, name: niceName(file.name), type, url, path, createdAt: serverTimestamp() });
 }
 
@@ -562,7 +590,7 @@ function renderItemGrid(container, items) {
     delBtn.textContent = 'Delete';
     delBtn.addEventListener('click', async () => {
       if (!confirm(`Remove "${item.name}" from the library? Maps already using it keep their own copy.`)) return;
-      await deleteDoc(doc(db, 'libraryItems', item.id));
+      await deleteDoc(doc(db, LIBRARY_COLLECTION, item.id));
       if (item.path) { try { await deleteObject(storageRef(storage, item.path)); } catch (e) {} }
       refreshLibrary();
     });
@@ -638,7 +666,7 @@ function renderLibraryInto(container, items) {
 }
 
 async function refreshLibrary() {
-  const snap = await getDocs(collection(db, 'libraryItems'));
+  const snap = await getDocs(collection(db, LIBRARY_COLLECTION));
   const items = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
   renderLibraryInto(document.getElementById('currentLibrary'), items);
 }

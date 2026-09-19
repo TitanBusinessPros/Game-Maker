@@ -25,6 +25,23 @@ service firebase.storage {
                    && request.resource.size < 20 * 1024 * 1024;
     }
 
+    // Premium Library (admin.html's own ?premium=1 mode) - same public-
+    // read/admin-only-write shape as library/ above. Reading the raw
+    // file itself is intentionally not gated on whether a given account
+    // has actually unlocked that item - the real enforcement is the
+    // Firestore premiumUnlocks record (see firestore.rules), which is
+    // what index.html actually checks before letting a map-maker USE an
+    // item in a map; a locked item's own thumbnail is still shown in the
+    // picker (see openLibraryPicker) so there'd be nothing meaningfully
+    // hidden by also locking the raw file down.
+    match /premium-library/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.auth.token.email == 'adonai4you@gmail.com'
+                   && request.auth.token.email_verified == true
+                   && request.resource.size < 20 * 1024 * 1024;
+    }
+
     // producer/{uid}/{draftId}/<file> - The Game Producer's own saved
     // drafts (producer.html). Owner-only read/write, unlike maps/library
     // above - a draft is a private in-progress project, not a published

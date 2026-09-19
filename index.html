@@ -268,12 +268,30 @@
   #libraryGrid[hidden], #libraryList[hidden] { display: none; }
   #libraryList { padding: 8px 16px 16px; overflow-y: auto; flex: 1 1 auto; min-height: 0; }
   .library-item {
+    position: relative;
     background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
     cursor: pointer; overflow: hidden; text-align: center; padding-bottom: 6px;
   }
   .library-item:hover { border-color: var(--accent); }
   .library-item img { width: 100%; height: 80px; object-fit: contain; background: #06121f; display: block; }
   .library-item .lname { font-size: 11px; padding: 6px 4px 0; word-break: break-word; }
+  /* Premium Library: a locked item still shows its real thumbnail (so a
+     map-maker can see what they'd be spending a credit on before
+     committing - same "preview before you buy" convention as everywhere
+     else this kind of unlock exists), just with a badge over it. Once
+     unlocked for this account it renders exactly like a free library
+     item - no badge, no special click handling. */
+  .library-item.locked img { filter: brightness(0.55); }
+  .library-item.locked .lock-badge {
+    position: absolute; top: 4px; right: 4px; background: rgba(11,14,20,0.85);
+    color: var(--warn); border: 1px solid var(--warn); border-radius: 6px;
+    padding: 2px 6px; font-size: 10px; font-weight: 700; pointer-events: none;
+  }
+  .library-audio-item.locked { opacity: 0.75; }
+  .library-audio-item .lock-badge {
+    color: var(--warn); font-size: 10px; font-weight: 700; border: 1px solid var(--warn);
+    border-radius: 6px; padding: 2px 6px; margin-right: 6px;
+  }
   .library-audio-item {
     display: flex; align-items: center; justify-content: space-between;
     background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
@@ -876,9 +894,11 @@
 <div id="libraryModal" hidden>
   <div id="libraryModalPanel">
     <div id="libraryModalHeader">
-      <h3>Choose from the library</h3>
+      <h3 id="libraryModalTitle">Choose from the library</h3>
+      <span id="libraryModalCredits" style="display:none; font-size:12px; color:var(--text-dim); margin-left:auto; margin-right:10px;"></span>
       <button type="button" class="btn-secondary" id="libraryCloseBtn">Close</button>
     </div>
+    <p id="libraryModalPremiumHint" class="hint" style="display:none; margin:0 16px 4px;">💎 Every item here starts locked. Click one to unlock it for 1 credit - once unlocked, it's yours to use in any map, forever.</p>
     <div id="libraryCategoryTabs"></div>
     <div id="libraryGrid"></div>
     <div id="libraryList" hidden></div>
@@ -906,6 +926,9 @@ import {
 import {
   getStorage, ref as storageRef, uploadBytes, getDownloadURL
 } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-storage.js";
+import {
+  getFunctions, httpsCallable
+} from "https://www.gstatic.com/firebasejs/10.13.2/firebase-functions.js";
 
 // Your web app's Firebase configuration (Game-Maker project)
 const firebaseConfig = {
@@ -922,6 +945,14 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
+const functions = getFunctions(app);
+// Premium Library unlock (see the section near openLibraryPicker below) -
+// spends one download credit to permanently unlock one premium item for
+// this account. Has to run server-side (same reasoning as admin.html's
+// grantCreditsFn) since firestore.rules can't trust a client-side write
+// of the unlock record itself without some way to verify a credit was
+// actually spent for it - see functions/index.js.
+const unlockPremiumItemFn = httpsCallable(functions, 'unlockPremiumItem');
 
 // Analytics can silently fail (ad blockers, non-https local file, etc.) -
 // never let it block the actual map-creation flow.
@@ -1161,18 +1192,24 @@ function wireUploadSlot(slot) {
   libraryBtn.type = 'button';
   libraryBtn.className = 'btn-library';
   libraryBtn.textContent = '📚 Library';
-  libraryBtn.addEventListener('click', () => openLibraryPicker(slot.dataset.slot, mediaType));
-  // The file input and Library button need to wrap onto their own line
+  libraryBtn.addEventListener('click', () => openLibraryPicker(slot.dataset.slot, mediaType, false));
+  const premiumBtn = document.createElement('button');
+  premiumBtn.type = 'button';
+  premiumBtn.className = 'btn-library btn-premium-library';
+  premiumBtn.textContent = '💎 Premium';
+  premiumBtn.addEventListener('click', () => openLibraryPicker(slot.dataset.slot, mediaType, true));
+  // The file input and Library buttons need to wrap onto their own line
   // together (not separately) when a slot sits in a narrow two-column row
   // (the sound section pairs two slots per row) - grouping them in one
   // wrapper is what makes that a clean single extra line instead of the
-  // native file-picker control and this button squeezing/overlapping the
-  // name/status text.
+  // native file-picker control and these buttons squeezing/overlapping
+  // the name/status text.
   const controls = document.createElement('div');
   controls.className = 'upload-slot-controls';
   input.insertAdjacentElement('afterend', controls);
   controls.appendChild(input);
   controls.appendChild(libraryBtn);
+  controls.appendChild(premiumBtn);
 }
 
 document.querySelectorAll('.upload-slot').forEach(wireUploadSlot);
@@ -1470,6 +1507,45 @@ async function loadLibraryCategory(cat) {
   return items;
 }
 
+// ---------------------------------------------------------------------
+// Premium Library - a second, separate shared asset library
+// (`premiumLibraryItems`/Storage `premium-library/<category>/...`,
+// uploaded from admin.html's own Premium Library mode - see that page)
+// where every item starts locked for every account and costs one
+// download credit to unlock, permanently, per (account, item) - "one
+// credit equals one item unlocked... once unlocked it is unlocked
+// forever." Same category tree as the free library (CATEGORY_ORDER/
+// CATEGORY_LABELS), same lazy per-category loading shape as
+// loadLibraryCategory above, just a different collection - and each
+// item's own Firestore doc id is kept (`{id: d.id, ...d.data()}`, unlike
+// the free library which never needed one) since that id is what a
+// `premiumUnlocks` record and unlockPremiumItemFn both key on.
+// ---------------------------------------------------------------------
+const premiumCategoryCache = {};
+async function loadPremiumLibraryCategory(cat) {
+  if (premiumCategoryCache[cat]) return premiumCategoryCache[cat];
+  const snap = await getDocs(query(collection(db, 'premiumLibraryItems'), where('category', '==', cat)));
+  const items = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  premiumCategoryCache[cat] = items;
+  return items;
+}
+// Which premium items THIS account has already unlocked - fetched once
+// per session (not per category: a single `where('uid','==',...)` query
+// across the whole `premiumUnlocks` collection is cheaper than one query
+// per category, and every category's grid needs this same Set anyway).
+// Firestore rules deny every client WRITE to this collection outright
+// (unlockPremiumItemFn/functions/index.js is the only writer) but do
+// allow a signed-in user to read their own records - see firestore.rules.
+let unlockedPremiumIdsPromise = null;
+function loadUnlockedPremiumIds() {
+  if (!unlockedPremiumIdsPromise) {
+    unlockedPremiumIdsPromise = getDocs(query(collection(db, 'premiumUnlocks'), where('uid', '==', currentUser.uid)))
+      .then((snap) => new Set(snap.docs.map((d) => d.data().itemId)))
+      .catch((err) => { console.error('Could not load unlocked Premium Library items:', err); unlockedPremiumIdsPromise = null; return new Set(); });
+  }
+  return unlockedPremiumIdsPromise;
+}
+
 const libraryModal = document.getElementById('libraryModal');
 const libraryGrid = document.getElementById('libraryGrid');
 const libraryList = document.getElementById('libraryList');
@@ -1556,9 +1632,18 @@ function defaultCategoryForSlot(slotKey) {
 // from resolving late and overwriting whatever a newer, faster click
 // already rendered - see renderCategory below.
 let libraryRequestToken = 0;
-function openLibraryPicker(slotKey, mediaType) {
+let libraryActiveIsPremium = false;
+const libraryModalTitle = document.getElementById('libraryModalTitle');
+const libraryModalCredits = document.getElementById('libraryModalCredits');
+const libraryModalPremiumHint = document.getElementById('libraryModalPremiumHint');
+function openLibraryPicker(slotKey, mediaType, isPremium) {
   libraryActiveSlotKey = slotKey;
+  libraryActiveIsPremium = isPremium;
   libraryModal.hidden = false;
+  libraryModalTitle.textContent = isPremium ? '💎 Premium Library' : 'Choose from the library';
+  libraryModalPremiumHint.style.display = isPremium ? '' : 'none';
+  libraryModalCredits.style.display = isPremium && currentUser?.email !== ADMIN_EMAIL ? '' : 'none';
+  if (isPremium) refreshLibraryModalCredits();
   libraryCategoryTabs.innerHTML = '';
   // Every possible category for this media type, from the same fixed
   // list admin.html's own category tree defines - shown as tabs
@@ -1582,28 +1667,45 @@ function openLibraryPicker(slotKey, mediaType) {
   });
   renderCategory(activeCategory, mediaType);
 }
+function refreshLibraryModalCredits() {
+  if (!currentUser || currentUser.email === ADMIN_EMAIL) return;
+  getDoc(doc(db, 'users', currentUser.uid)).then((snap) => {
+    const credits = snap.exists() ? (snap.data().credits ?? 0) : 0;
+    libraryModalCredits.textContent = `${credits} credit${credits === 1 ? '' : 's'} left`;
+  }).catch(() => {});
+}
 async function renderCategory(cat, mediaType) {
+  const isPremium = libraryActiveIsPremium;
   libraryCategoryTabs.querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.cat === cat));
   const myToken = ++libraryRequestToken;
   const loadingEl = mediaType === 'image' ? libraryGrid : libraryList;
   libraryGrid.hidden = mediaType !== 'image';
   libraryList.hidden = mediaType === 'image';
   loadingEl.innerHTML = '<p style="color:var(--text-dim); font-size:13px;">Loading…</p>';
-  let catItems;
+  let catItems, unlockedIds;
   try {
-    catItems = (await loadLibraryCategory(cat)).filter((it) => it.type === mediaType);
+    const [items, unlocked] = await Promise.all([
+      isPremium ? loadPremiumLibraryCategory(cat) : loadLibraryCategory(cat),
+      isPremium ? loadUnlockedPremiumIds() : Promise.resolve(null),
+    ]);
+    catItems = items.filter((it) => it.type === mediaType);
+    unlockedIds = unlocked;
   } catch (err) {
     console.error('Could not load this library category:', err);
     catItems = [];
+    unlockedIds = new Set();
   }
-  // A faster click on a different tab already landed while this fetch was
-  // still in flight - that render already reflects what's on screen now,
-  // so this stale one must not clobber it.
+  // A faster click on a different tab (or a switch between the free and
+  // Premium picker) already landed while this fetch was still in flight -
+  // that render already reflects what's on screen now, so this stale one
+  // must not clobber it.
   if (myToken !== libraryRequestToken) return;
   if (catItems.length === 0) {
     libraryGrid.hidden = true;
     libraryList.hidden = false;
-    libraryList.innerHTML = '<p style="color:var(--text-dim); font-size:13px;">Nothing in the library yet for this category. The admin can add some at <code>admin.html</code> — or just close this and upload your own file below.</p>';
+    libraryList.innerHTML = isPremium
+      ? '<p style="color:var(--text-dim); font-size:13px;">Nothing in the Premium Library yet for this category. The admin can add some at <code>admin.html</code>.</p>'
+      : '<p style="color:var(--text-dim); font-size:13px;">Nothing in the library yet for this category. The admin can add some at <code>admin.html</code> — or just close this and upload your own file below.</p>';
     return;
   }
   if (mediaType === 'image') {
@@ -1611,14 +1713,15 @@ async function renderCategory(cat, mediaType) {
     libraryList.hidden = true;
     libraryGrid.innerHTML = '';
     catItems.forEach((it) => {
+      const locked = isPremium && currentUser?.email !== ADMIN_EMAIL && !unlockedIds.has(it.id);
       const el = document.createElement('div');
-      el.className = 'library-item';
+      el.className = 'library-item' + (locked ? ' locked' : '');
       // No visible name in the picker itself (alt text only, for
       // screen readers - never shown on screen) - browsing the
       // library is by thumbnail now, not by whatever the uploaded
       // filename happened to be.
-      el.innerHTML = `<img src="${it.url}" loading="lazy" alt="${it.name}">`;
-      el.addEventListener('click', () => selectLibraryAsset(it));
+      el.innerHTML = `<img src="${it.url}" loading="lazy" alt="${it.name}">${locked ? '<span class="lock-badge">🔒 1 credit</span>' : ''}`;
+      el.addEventListener('click', () => (locked ? handlePremiumItemClick(it, unlockedIds, () => renderCategory(cat, mediaType)) : selectLibraryAsset(it)));
       libraryGrid.appendChild(el);
     });
   } else {
@@ -1631,12 +1734,43 @@ async function renderCategory(cat, mediaType) {
     // fully blank/identical row per item isn't distinguishable at all
     // - this keeps them pickable without exposing the real name.
     catItems.forEach((it, i) => {
+      const locked = isPremium && currentUser?.email !== ADMIN_EMAIL && !unlockedIds.has(it.id);
       const el = document.createElement('div');
-      el.className = 'library-audio-item';
-      el.innerHTML = `<span>🎵 Sound ${i + 1}</span><span class="btn-secondary" style="font-size:11px;padding:4px 8px;">Use this</span>`;
-      el.addEventListener('click', () => selectLibraryAsset(it));
+      el.className = 'library-audio-item' + (locked ? ' locked' : '');
+      el.innerHTML = `<span>🎵 Sound ${i + 1}</span>${locked ? '<span class="lock-badge">🔒 1 credit</span>' : '<span class="btn-secondary" style="font-size:11px;padding:4px 8px;">Use this</span>'}`;
+      el.addEventListener('click', () => (locked ? handlePremiumItemClick(it, unlockedIds, () => renderCategory(cat, mediaType)) : selectLibraryAsset(it)));
       libraryList.appendChild(el);
     });
+  }
+}
+
+// A locked Premium Library item's own click - confirm, spend one credit
+// to unlock it PERMANENTLY for this account (unlockPremiumItemFn runs
+// server-side under the Admin SDK, since firestore.rules can't trust a
+// client-side write of the unlock record itself - see functions/
+// index.js), then use it immediately, same as clicking an already-
+// unlocked item would. `onUnlocked` re-renders the current tab so the
+// grid reflects the new unlocked state if the map-maker opens this same
+// picker again without reloading the page.
+async function handlePremiumItemClick(item, unlockedIds, onUnlocked) {
+  if (currentUser?.email === ADMIN_EMAIL) { selectLibraryAsset(item); return; }
+  const label = item.name || 'this item';
+  if (!confirm(`Unlock "${label}" for 1 credit?\n\nThis is permanent - once unlocked, you can use it in any map from now on.`)) return;
+  try {
+    const result = await unlockPremiumItemFn({ itemId: item.id });
+    unlockedIds.add(item.id);
+    refreshCreditsDisplay();
+    refreshLibraryModalCredits();
+    if (onUnlocked) onUnlocked();
+    selectLibraryAsset(item);
+  } catch (err) {
+    if (err.code === 'functions/failed-precondition') {
+      libraryModal.hidden = true;
+      showBuyCreditsPopup();
+    } else {
+      console.error('Could not unlock this Premium Library item:', err);
+      alert('Could not unlock this item right now: ' + err.message);
+    }
   }
 }
 
