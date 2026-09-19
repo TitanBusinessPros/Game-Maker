@@ -513,6 +513,21 @@ entirely by one map's saved data:
   still loads and plays identically (its one flat `cost` number is read
   as a Gold cost, and its old single `goldPerRound` value becomes a
   Gold grant).
+- **Build panel stat previews are research-aware.** A unit/turret/Mining
+  Ship/Missile Silo launcher's HP, Range, and Speed shown in the Build
+  panel (`unitRowState`, and the Mining Ship/Gun Turret/Missile Silo
+  rows in `renderBuildPanel`) now run the map-maker's base stat through
+  the same research bonus (`effectiveStat()`) the unit actually gets the
+  moment it's really built/queued/placed - `previewHp`/`previewRange`/
+  `previewSpeed`, same formula, same faction. Previously these always
+  showed the raw un-researched base number even after Vessel Plating/
+  Warp Drive Calibration/Extended Range had actually finished - a
+  correctness audit of all 6 research topics found the underlying
+  mechanic already worked (a freshly built unit was genuinely stronger),
+  it just never showed anywhere a player would look *before* building,
+  reading as "research isn't doing anything." Missile Range and Rapid
+  Repair Crews (heal amount) were already live in the panel and are
+  unchanged.
 - **Two game styles**, picked at map-creation time:
   - **Real-Time** (default) - a 90-second cosmetic turn clock; a unit
     that attacks fires exactly once, then locks (can't take a new move
