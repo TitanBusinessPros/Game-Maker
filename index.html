@@ -928,6 +928,19 @@ const authBadge = document.getElementById('authBadge');
 const googleSignInBtn = document.getElementById('googleSignInBtn');
 const mainEl = document.querySelector('main');
 const saveBarEl = document.getElementById('saveBar');
+// #saveBar is position:fixed at the bottom of the viewport, so body needs
+// matching padding-bottom or its own last content (the footer's Terms &
+// Conditions/Privacy Policy line) ends up hidden underneath it. #saveBar's
+// real height isn't fixed, though - its warning text, status line, and 3
+// buttons each wrap onto their own row on a narrow phone instead of
+// staying on the single desktop-width line the CSS's flat 80px fallback
+// was sized for, so that fallback alone left the footer's last line
+// covered on mobile. Track the bar's actual rendered height instead of
+// guessing a pixel value for one breakpoint.
+function syncSaveBarPadding() {
+  document.body.style.paddingBottom = (saveBarEl.offsetHeight + 24) + 'px';
+}
+new ResizeObserver(syncSaveBarPadding).observe(saveBarEl);
 let currentUser = null;
 // Matches admin.html's own ADMIN_EMAIL constant - this page only uses it
 // to decide whether to show a link to admin.html at all. It's not a
@@ -964,6 +977,7 @@ onAuthStateChanged(auth, (user) => {
     authGate.style.display = 'none';
     mainEl.style.display = '';
     saveBarEl.style.display = '';
+    syncSaveBarPadding();
     const userBar = document.getElementById('userBar');
     userBar.style.display = 'block';
     userBar.innerHTML = `Signed in as ${user.email}` + (user.email === ADMIN_EMAIL
