@@ -359,6 +359,17 @@ const CATEGORY_TREE = [
     { id: 'characters/artillery', label: 'Artillery' },
     { id: 'characters/missiles', label: 'Missiles' },
     { id: 'characters/tanks', label: 'Tanks' },
+    // Field Hospital medics and Religious Institution Clerics used to
+    // have no category of their own at all - index.html's own slot hint
+    // (SLOT_PREFIX_CATEGORY_HINTS) silently lumped both into Infantry
+    // instead, even though neither is actually infantry. Reported
+    // directly: "Field Doctor is now needed in the subsection of units."
+    { id: 'characters/field_medics', label: 'Field Medics' },
+    { id: 'characters/clerics', label: 'Clerics' },
+    // Mining Ship art had NO matching category at all before this - the
+    // one slot index.html's own comments already called out by name as
+    // "the handful of slots with no clean matching admin.html category."
+    { id: 'characters/mining_ships', label: 'Mining Ships' },
   ] },
   { id: 'worlds', label: 'Worlds' },
   { id: 'bases', label: 'Bases' },

@@ -508,9 +508,18 @@ Missile Silo launcher's own sprite opens to the Missile Silo structure
 category while that *same row's* separate missile-projectile art slot
 opens to the dedicated Missiles category, and so on
 (`defaultCategoryForSlot()`/`SLOT_CATEGORY_HINTS`/
-`SLOT_PREFIX_CATEGORY_HINTS` in `index.html`). Falls back to the first
-tab in the list for the handful of slots with no clean matching
-admin.html category (Mining Ship art).
+`SLOT_PREFIX_CATEGORY_HINTS` in `index.html`). Three categories used to
+be missing entirely - a Field Hospital medic's and a Religious
+Institution Cleric's own art both silently fell into the Infantry
+category (neither one actually is infantry), and Mining Ship art had no
+matching category at all and fell all the way back to the first tab in
+the list. Reported directly ("Field Doctor is now needed in the
+subsection of units") and audited for any other unit/structure type in
+the same situation while at it - **Field Medics**, **Clerics**, and
+**Mining Ships** are now their own real `admin.html` categories
+(`characters/field_medics`, `characters/clerics`,
+`characters/mining_ships`), and every upload slot for those three now
+lands on its own dedicated tab instead of Infantry or the fallback.
 
 **Only the one category tab actually being viewed is ever fetched from
 Firestore - never the whole library.** Originally, opening the picker
@@ -1509,13 +1518,20 @@ items uploaded under the old flat `maps` category before this change
 still show up, just under "Other" rather than being sorted into a size -
 they were never tagged with one), **Characters** (sub-picker:
 **Space Ships**, **Navy Ships**, **Planes and Jets**, **Helicopters**,
-**Infantry**, **Artillery**, **Missiles**, **Tanks** - stored as
+**Infantry**, **Artillery**, **Missiles**, **Tanks**, **Field Medics**,
+**Clerics**, **Mining Ships** - stored as
 `characters/<type>` - **Army Men** removed as its own sub-category since it was redundant
 with Infantry; anything already uploaded under the old
 `characters/army_men` id still shows up, just under "Other" now instead
 of a named sub-category), giving the Missile Silo's own launcher/missile
 art uploads (index.html item 4f) a dedicated place in the shared library
-alongside every other character-art type
+alongside every other character-art type. Field Medics/Clerics/Mining
+Ships are the newest three - a Field Hospital medic's and a Religious
+Institution Cleric's own art both used to silently share Infantry
+(neither one actually is infantry), and Mining Ship art had no matching
+category at all; reported directly ("Field Doctor is now needed in the
+subsection of units") and audited for every other unit/structure type
+missing one at the same time
 Picking a Maps sub-category also shows a hint line with that size's
 recommended-art note (same "capped at 768px, stretched ~N× to cover the
 world" info as `index.html`'s own map-size hover tooltip, just phrased

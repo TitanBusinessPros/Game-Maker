@@ -1403,6 +1403,9 @@ const CATEGORY_LABELS = {
   'characters/artillery': 'Artillery',
   'characters/missiles': 'Missiles',
   'characters/tanks': 'Tanks',
+  'characters/field_medics': 'Field Medics',
+  'characters/clerics': 'Clerics',
+  'characters/mining_ships': 'Mining Ships',
   worlds: 'Worlds',
   bases: 'Bases',
   resources: 'Resources',
@@ -1435,7 +1438,7 @@ const CATEGORY_LABELS = {
 };
 const CATEGORY_ORDER = [
   'maps',
-  'characters/space_ships', 'characters/navy_ships', 'characters/jets', 'characters/helicopters', 'characters/infantry', 'characters/artillery', 'characters/missiles', 'characters/tanks',
+  'characters/space_ships', 'characters/navy_ships', 'characters/jets', 'characters/helicopters', 'characters/infantry', 'characters/artillery', 'characters/missiles', 'characters/tanks', 'characters/field_medics', 'characters/clerics', 'characters/mining_ships',
   'worlds', 'bases', 'resources', 'terrain',
   'structures/war_factory', 'structures/airport', 'structures/infantry_post', 'structures/helicopter_facility', 'structures/research_facility', 'structures/gun_turret', 'structures/missile_silo', 'structures/missile_battery', 'structures/navy_harbor', 'structures/field_hospital', 'structures/religious_institution',
   'sounds/music', 'sounds/intro', 'sounds/attack', 'sounds/building_destroyed', 'sounds/home_under_attack', 'sounds/endgame', 'sounds',
@@ -1498,6 +1501,10 @@ const SLOT_CATEGORY_HINTS = {
   missileSiloImage: 'structures/missile_silo',
   missileBatteryImage: 'structures/missile_battery',
   religiousInstitutionImage: 'structures/religious_institution',
+  // No admin.html category matched this one at all before - it fell
+  // through to the old first-available-category behavior. Reported
+  // directly, alongside the medic/cleric gap below.
+  miningUnitImage: 'characters/mining_ships',
   soundMusic: 'sounds/music',
   soundIntro: 'sounds/intro',
   soundAttack: 'sounds/attack',
@@ -1513,8 +1520,13 @@ const SLOT_PREFIX_CATEGORY_HINTS = [
   [/^infunit_/, 'characters/infantry'],
   [/^heliunit_/, 'characters/helicopters'],
   [/^navyunit_/, 'characters/navy_ships'],
-  [/^medic_/, 'characters/infantry'],
-  [/^cleric_/, 'characters/infantry'],
+  // Both of these used to fall through to Infantry - neither a Field
+  // Hospital medic nor a Religious Institution Cleric actually IS
+  // infantry, they're both support units, and lumping their art in with
+  // Infantry made it hard to find. Reported directly: "Field Doctor is
+  // now needed in the subsection of units."
+  [/^medic_/, 'characters/field_medics'],
+  [/^cleric_/, 'characters/clerics'],
   [/^turret_/, 'structures/gun_turret'],
   // Missile Silo rows have two upload slots each - the launcher's own
   // sprite (missile_N) and a second, separate one for the projectile
