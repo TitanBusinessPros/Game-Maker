@@ -162,6 +162,17 @@
   }
   #teamSelectScreen {
     position:absolute; inset:0; z-index:50; background:#06121f; display:none; align-items:center; justify-content:center; padding:20px;
+    /* This screen never scrolled at all - fine while every row fit in one
+       line, but making each row wrap onto 2 lines (the flex-wrap fix just
+       above, for the AI Difficulty overflow) made the panel taller, and
+       with several computer players (or a short/mobile viewport) its
+       total height can now exceed the screen with no way to reach
+       whatever's cut off - including Start Match itself. overflow-y:auto
+       here, not on #teamSelectPanel, since #teamSelectPanel has no fixed
+       height of its own to overflow - #teamSelectScreen is the one fixed
+       to the viewport (inset:0).
+    */
+    overflow-y:auto;
   }
   #teamSelectScreen.show { display:flex; }
   #teamSelectPanel { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:24px; max-width:520px; width:100%; }
