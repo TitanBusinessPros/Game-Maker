@@ -574,6 +574,21 @@ new purchase flow needed. A locked item still shows its real thumbnail
 credit on it) with a 🔒 badge; an already-unlocked one behaves exactly
 like a normal free-library item - click it, it's applied to the slot,
 no further prompt.
+
+**Sound preview** - every sound row, in both libraries, gets its own
+small **▶ button** (`toggleAudioPreview()`) that plays that exact
+uploaded file straight through, click a second time (or let it finish
+naturally) to stop - not a truncated clip, the complete sound, since
+there's no separate preview asset, just the real file itself.
+Deliberately works on a **locked** Premium Library sound too, without
+spending a credit or triggering the unlock prompt (`e.stopPropagation()`
+on the button's own click keeps it from also bubbling to the row's
+select/unlock handler) - same "hear/see what you'd be getting before
+you commit" reasoning a locked item's own visible thumbnail already
+follows. Only one preview plays at a time (starting a new one stops
+whatever was already playing); switching category tabs, picking an
+item, or closing the picker entirely all stop it too, so a sound never
+keeps playing in the background with no visible button left to stop it.
 Unlocking has to run server-side - `firestore.rules` already safely
 lets a client decrease its own credits balance directly (no Cloud
 Function needed for that half, same as a plain download), but there'd
