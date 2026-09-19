@@ -26,10 +26,23 @@ const ADMIN_EMAIL = 'adonai4you@gmail.com';
 // index.html/admin.html/play.html already embed.
 const stripeWebhookSecret = defineSecret('STRIPE_WEBHOOK_SECRET');
 
-// index.html's popup and this function both need to agree on what "buy
-// more credits" actually grants - kept as one constant here rather than
-// hardcoding "10" separately in two places that could drift apart.
-const CREDITS_PER_PURCHASE = 10;
+// index.html's buy-credits popup offers two fixed Stripe Payment Links
+// (same URL for every buyer, no dynamically created Checkout Session -
+// see showBuyCreditsPopup) - this is how the webhook tells which one a
+// given payment actually was, since a Payment Link's own Checkout
+// Session doesn't otherwise carry a product/plan id this function reads
+// without an extra Stripe API call to expand line_items (and this
+// function deliberately never calls the real Stripe API - see
+// STRIPE_KEY_PLACEHOLDER below). `amountTotal` is in the currency's
+// smallest unit (cents for USD), matching `session.amount_total`
+// exactly as Stripe reports it. Keep this in sync with index.html's own
+// STRIPE_BUY_CREDITS_LINK/STRIPE_BUY_50_CREDITS_LINK (and their prices
+// in the Stripe Dashboard) if either bundle's price or credit count
+// ever changes.
+const CREDIT_PACKAGES = [
+  { amountTotal: 500, credits: 10 },  // $5 -> 10 credits
+  { amountTotal: 2000, credits: 50 }, // $20 -> 50 credits
+];
 
 // This function only ever calls stripe.webhooks.constructEvent() (a
 // local signature check against STRIPE_WEBHOOK_SECRET - no outbound
@@ -96,10 +109,26 @@ exports.stripeWebhook = onRequest({ secrets: [stripeWebhookSecret], cors: false 
     return;
   }
 
+  // Which bundle this actually was - if the amount doesn't match either
+  // known package (a price changed in the Stripe Dashboard without this
+  // list being updated to match, or a payment that didn't come through
+  // one of these two links at all), this deliberately does NOT guess: no
+  // credits are granted automatically rather than risking granting the
+  // wrong amount for real money paid, and it's logged for manual
+  // follow-up instead.
+  const pkg = CREDIT_PACKAGES.find((p) => p.amountTotal === session.amount_total);
+  if (!pkg) {
+    logger.error('checkout.session.completed with an amount that matches no known credit package - needs manual review, no credits granted automatically', {
+      sessionId: session.id, uid, amountTotal: session.amount_total, currency: session.currency,
+    });
+    res.status(200).send('unrecognized amount'); // ack (stops retries) - needs manual follow-up
+    return;
+  }
+
   // Idempotency: Stripe redelivers events it didn't get a fast 2xx for,
   // and can occasionally deliver the same completed session more than
-  // once even without an error - without this, a retry would grant 10
-  // credits twice for one $5 payment. Keyed by the Checkout Session id
+  // once even without an error - without this, a retry would grant
+  // credits twice for one payment. Keyed by the Checkout Session id
   // (stable per purchase), not the event id (a redelivery of the same
   // event gets its own new event id).
   const processedRef = db.collection('processedStripeSessions').doc(session.id);
@@ -110,17 +139,18 @@ exports.stripeWebhook = onRequest({ secrets: [stripeWebhookSecret], cors: false 
       uid,
       amountTotal: session.amount_total,
       currency: session.currency,
+      creditsGranted: pkg.credits,
       processedAt: FieldValue.serverTimestamp(),
     });
     // merge:true + increment also handles the (unlikely) case where this
     // account's own credits doc doesn't exist yet - it creates one
     // rather than failing outright.
-    tx.set(db.collection('users').doc(uid), { credits: FieldValue.increment(CREDITS_PER_PURCHASE) }, { merge: true });
+    tx.set(db.collection('users').doc(uid), { credits: FieldValue.increment(pkg.credits) }, { merge: true });
     return true;
   });
 
   logger.info(granted
-    ? `Granted ${CREDITS_PER_PURCHASE} credits to uid ${uid} for session ${session.id}`
+    ? `Granted ${pkg.credits} credits to uid ${uid} for session ${session.id} ($${(session.amount_total / 100).toFixed(2)})`
     : `Session ${session.id} already processed - skipped duplicate delivery`);
   res.status(200).send('ok');
 });

@@ -477,20 +477,33 @@ line. Only this page has the logo/title/footer treatment so far -
    check, no limit at all, checked the same way every other admin-only
    action in this project is (`request.auth.token.email` against the one
    hardcoded admin address, not a client-side flag).
-   Hitting 0 shows a popup instead of just an error - **"Get 10 credits
-   for $5"**, a Stripe Payment Link
-   (`buy.stripe.com/4gM5kE6Br7wscm6efJ7AI0Y`), with `?client_reference_id=<your
-   Firebase uid>` appended so the purchase can be tied back to your
-   account. That's the one thing this project's Firestore rules
-   deliberately *can't* do on their own - rules have no channel to
-   Stripe, so they can't tell "a real payment happened" apart from
-   "someone set their own credits field" no matter how they're written.
-   Actually granting the 10 credits needs something that isn't a rule at
-   all: this project's first real backend, a Cloud Function (see
-   `functions/`, below) that Stripe calls directly once a payment
-   completes, verifies the payment is genuine, and writes the credit
-   grant with the Admin SDK (which bypasses these rules entirely, since
-   it's inherently trusted).
+   Hitting 0 shows a popup instead of just an error, now offering **two**
+   bundles - **"Get 10 credits for $5"** and **"Get 50 credits for
+   $20"** - each its own Stripe Payment Link
+   (`buy.stripe.com/4gM5kE6Br7wscm6efJ7AI0Y` and
+   `buy.stripe.com/4gM00k7FvcQMfyi9Zt7AI0Z`), with `?client_reference_id=<your
+   Firebase uid>` appended to whichever one is clicked so the purchase
+   can be tied back to your account. A **💳 Buy Credits** button next to
+   the credits count itself (in the header, right after "Signed in as
+   &lt;email&gt;") opens this exact same popup proactively, any time -
+   it used to be reachable only by actually running out first. That's
+   the one thing this project's Firestore rules deliberately *can't* do
+   on their own - rules have no channel to Stripe, so they can't tell "a
+   real payment happened" apart from "someone set their own credits
+   field" no matter how they're written. Actually granting credits needs
+   something that isn't a rule at all: this project's first real
+   backend, a Cloud Function (see `functions/`, below) that Stripe calls
+   directly once a payment completes, verifies the payment is genuine,
+   and writes the credit grant with the Admin SDK (which bypasses these
+   rules entirely, since it's inherently trusted) - since both bundles
+   are the same fixed-price Payment Link shape (no dynamically created
+   Checkout Session this project's own code controls), that function
+   tells which one a given payment was by its own `amount_total` (500
+   cents -> 10 credits, 2000 cents -> 50 credits) rather than a
+   product/plan id, and deliberately grants nothing at all (just logs
+   for manual review) if a payment's amount doesn't match either known
+   bundle, rather than ever risking granting the wrong amount for real
+   money paid.
 
 Every upload slot has a **📚 Library** button next to it, pulling from
 whatever the admin has added via `admin.html` (Firestore `libraryItems`
@@ -1748,18 +1761,28 @@ trying to host or email it anywhere with its own size limit.
 ## `functions/` — the Stripe webhook and admin credit grants
 
 The only backend code in this project (everything else is static
-HTML/JS/Firebase rules) - two Cloud Functions, both allowed to *increase*
-a `/users/{uid}` credits balance specifically because they run under the
-Admin SDK, which is the only thing that can bypass `firestore.rules`' own
-"a client can only ever decrease its own balance" rule.
+HTML/JS/Firebase rules) - three Cloud Functions. Two (`stripeWebhook`,
+`grantCredits`) are allowed to *increase* a `/users/{uid}` credits
+balance specifically because they run under the Admin SDK, the only
+thing that can bypass `firestore.rules`' own "a client can only ever
+decrease its own balance" rule; the third (`unlockPremiumItem`, see the
+💎 Premium Library section above) only ever decreases that same balance
+(same as a plain download already can do client-side) but ALSO writes a
+`premiumUnlocks` record no client is ever allowed to write directly, so
+it needs the Admin SDK for that half even though the credit spend alone
+wouldn't have required it.
 
-`stripeWebhook` grants 10 download credits after a real $5 Stripe
-payment. Deployed via `firebase deploy --only functions`; live at
+`stripeWebhook` grants download credits after a real Stripe payment -
+**10** for $5, or **50** for $20 (two separate Payment Links, see
+"My Maps" above; not a discount tier or a single link with a price
+picker - each is its own fixed Stripe Payment Link with its own URL).
+Deployed via `firebase deploy --only functions`; live at
 `https://us-central1-game-maker-ed014.cloudfunctions.net/stripeWebhook`
 (2nd-gen functions also get a `*.run.app` URL - both resolve to the same
 function; the `cloudfunctions.net` one is what's registered in Stripe),
-registered in the Stripe Dashboard as this Payment Link's webhook
-endpoint, listening for **two** events: `checkout.session.completed`
+registered in the Stripe Dashboard as **both** Payment Links' webhook
+endpoint (one webhook endpoint, shared - Stripe doesn't register a
+separate one per Payment Link), listening for **two** events: `checkout.session.completed`
 *and* `checkout.session.async_payment_succeeded`. Both are needed, not
 just the first - instant payment methods (cards) are already `paid` by
 the time `completed` fires, but delayed-confirmation methods (bank
@@ -1782,13 +1805,21 @@ reads `session.client_reference_id` (the Firebase uid `index.html`'s
 buy-credits popup appends to the payment link) to know which account to
 credit - if it's missing, the event is acknowledged but logged for
 manual follow-up rather than silently dropped or endlessly retried; (4)
-checks a `processedStripeSessions/{sessionId}` doc inside a transaction
-before granting anything, so a Stripe retry of the same event (which
-does happen) can't double-grant credits for one payment; (5) increments
-`users/{uid}.credits` by exactly 10 using the Admin SDK (`FieldValue.increment`,
-inside the same transaction) - `firestore.rules` can't (and shouldn't)
-trust a client to report its own payment, so this has to bypass those
-rules entirely by design.
+looks up which bundle this was purely from `session.amount_total`
+(`CREDIT_PACKAGES`: 500 cents -> 10 credits, 2000 cents -> 50 credits) -
+not a product/plan id, since a Payment Link's Checkout Session doesn't
+otherwise carry one this function reads without an extra Stripe API
+call, and this function deliberately never calls the real Stripe API
+(see `STRIPE_KEY_PLACEHOLDER`) - if the amount matches neither, nothing
+is granted at all and it's logged for manual review instead of ever
+risking the wrong amount for real money paid; (5) checks a
+`processedStripeSessions/{sessionId}` doc inside a transaction before
+granting anything, so a Stripe retry of the same event (which does
+happen) can't double-grant credits for one payment; (6) increments
+`users/{uid}.credits` by that bundle's own credit count using the Admin
+SDK (`FieldValue.increment`, inside the same transaction) -
+`firestore.rules` can't (and shouldn't) trust a client to report its
+own payment, so this has to bypass those rules entirely by design.
 
 `grantCredits` backs `admin.html`'s "Grant download credits" action - a
 callable function (`onCall`, not an HTTP endpoint like the webhook above,

@@ -384,9 +384,10 @@
 
 <div id="buyCreditsModal" hidden>
   <div style="background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:24px; max-width:360px; text-align:center;">
-    <h3 style="margin:0 0 8px;">Out of download credits</h3>
-    <p style="color:var(--text-dim); font-size:13px; margin:0 0 18px;">Every account starts with 3 free download credits, and they don't refill. Get 10 more for $5.</p>
-    <a id="buyCreditsLink" href="#" target="_blank" rel="noopener" class="btn-primary" style="display:inline-block; text-decoration:none; padding:10px 22px; border-radius:6px; font-weight:600;">Get 10 credits for $5</a>
+    <h3 id="buyCreditsHeading" style="margin:0 0 8px;">Buy download credits</h3>
+    <p style="color:var(--text-dim); font-size:13px; margin:0 0 18px;">Every account starts with 3 free download credits, and they don't refill.</p>
+    <a id="buyCreditsLink" href="#" target="_blank" rel="noopener" class="btn-primary" style="display:block; text-decoration:none; padding:10px 22px; border-radius:6px; font-weight:600;">Get 10 credits for $5</a>
+    <a id="buyCreditsLink50" href="#" target="_blank" rel="noopener" class="btn-primary" style="display:block; text-decoration:none; padding:10px 22px; border-radius:6px; font-weight:600; margin-top:10px;">Get 50 credits for $20</a>
     <button type="button" id="closeBuyCreditsModal" class="btn-secondary" style="display:block; margin:14px auto 0; padding:8px 16px;">Not now</button>
   </div>
 </div>
@@ -1017,7 +1018,13 @@ onAuthStateChanged(auth, (user) => {
     userBar.style.display = 'block';
     userBar.innerHTML = `Signed in as ${user.email}` + (user.email === ADMIN_EMAIL
       ? ` &middot; <a href="admin.html" style="color:var(--accent);">&#9881;&#65039; Admin: manage the shared library</a>`
-      : ` &middot; <span id="creditsBadge"></span>`);
+      : ` &middot; <span id="creditsBadge"></span> &middot; <button type="button" id="buyCreditsBtn" class="btn-secondary" style="font-size:11px; padding:4px 10px;">&#128179; Buy Credits</button>`);
+    // Reported directly: no visible way to buy credits at all until you
+    // actually ran out mid-download - the popup only ever showed up
+    // reactively (spendDownloadCredit/unlockPremiumItem's own
+    // out-of-credits branches below). This button opens the exact same
+    // popup on purpose, any time, proactively.
+    document.getElementById('buyCreditsBtn')?.addEventListener('click', showBuyCreditsPopup);
     refreshMyMaps();
     if (user.email !== ADMIN_EMAIL) ensureUserCreditsDoc(user).then(refreshCreditsDisplay);
   } else {
@@ -1082,15 +1089,21 @@ async function refreshCreditsDisplay() {
   const credits = snap.exists() ? (snap.data().credits ?? 0) : 0;
   el.textContent = `${credits} download credit${credits === 1 ? '' : 's'} left`;
 }
-// "Get 10 credits for $5" - a plain Stripe Payment Link, the same URL
-// for every buyer. client_reference_id is what ties a specific purchase
-// back to a specific Firebase account: functions/index.js's webhook
-// reads it straight off the completed Checkout Session to know whose
+// Two plain Stripe Payment Links, same URL for every buyer either way.
+// client_reference_id is what ties a specific purchase back to a
+// specific Firebase account: functions/index.js's webhook reads it
+// straight off the completed Checkout Session to know whose
 // /users/{uid} doc to credit - without it Stripe would have no way to
-// tell which of your accounts just paid.
+// tell which of your accounts just paid. Which bundle a given purchase
+// was is told apart server-side by the Checkout Session's own
+// amount_total (500 -> 10 credits, 2000 -> 50 credits) - see
+// CREDIT_PACKAGES in functions/index.js, which has to be kept in sync
+// with these two amounts/credit counts if either ever changes.
 const STRIPE_BUY_CREDITS_LINK = 'https://buy.stripe.com/4gM5kE6Br7wscm6efJ7AI0Y';
+const STRIPE_BUY_50_CREDITS_LINK = 'https://buy.stripe.com/4gM00k7FvcQMfyi9Zt7AI0Z';
 function showBuyCreditsPopup() {
   document.getElementById('buyCreditsLink').href = `${STRIPE_BUY_CREDITS_LINK}?client_reference_id=${encodeURIComponent(currentUser.uid)}`;
+  document.getElementById('buyCreditsLink50').href = `${STRIPE_BUY_50_CREDITS_LINK}?client_reference_id=${encodeURIComponent(currentUser.uid)}`;
   document.getElementById('buyCreditsModal').hidden = false;
 }
 document.getElementById('closeBuyCreditsModal').addEventListener('click', () => {
