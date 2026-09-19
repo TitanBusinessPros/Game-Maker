@@ -1426,6 +1426,51 @@ async function main() {
     u.pathWaypoints = obstacles.length ? findPathAround(u.x, u.y, tx, ty) : [{ x: tx, y: ty }];
     u.pathIndex = 0;
   }
+  // combatTick/healTick/convertTick's own "close distance with the
+  // target" step used pure reactive local steering (moveTowardWithAvoidance)
+  // the whole way, no matter how far off the target actually was - fine
+  // for a human player, who typically covers real distance with an actual
+  // MOVE order first (pathfinding-protected, see issueMoveOrder above) and
+  // only ends up chasing a target that's already nearby. An AI-controlled
+  // unit has no such luxury: the per-unit update() loop's own
+  // `!fac.isHuman` branch NEVER issues a real move order at all - it
+  // picks a target and lets combatTick chase it from wherever it happens
+  // to be, possibly clear across the map. Reactive-only steering has a
+  // hard ceiling against a genuinely gapless obstacle wall (it can only
+  // react to whichever single obstacle is nearest right now, never "go
+  // check the far end instead") - reported directly: "computer troops are
+  // getting stuck on [a wall going across the middle]... my troops go
+  // around the wall like normal," which is exactly this asymmetry (a
+  // human's own units mostly dodge the bug by clicking destinations
+  // instead of distant enemies; an AI never gets that option).
+  // Reuses the exact same graph findPathAround/issueMoveOrder already
+  // build, cached per-unit and only re-planned when it's actually stale
+  // (exhausted, or the target has drifted far enough that the old route
+  // might not even end near it any more) rather than every tick - a
+  // moving combat target doesn't need a brand new route every frame, just
+  // one that's still roughly heading the right way. Falls straight
+  // through to the cheap no-obstacles path (same as issueMoveOrder) on a
+  // map that doesn't use Terrain Obstacles at all.
+  const CHASE_REPLAN_DIST = 80;
+  function chaseTowardTarget(u, tx, ty, sp, dt) {
+    if (!obstacles.length) { moveTowardWithAvoidance(u, tx, ty, sp, dt); return; }
+    const stale = !u._chaseWaypoints || !u._chaseWaypoints.length
+      || u._chaseIndex >= u._chaseWaypoints.length
+      || Math.hypot(tx - (u._chaseForX ?? Infinity), ty - (u._chaseForY ?? Infinity)) > CHASE_REPLAN_DIST;
+    if (stale) {
+      u._chaseWaypoints = findPathAround(u.x, u.y, tx, ty);
+      u._chaseIndex = 0;
+      u._chaseForX = tx; u._chaseForY = ty;
+    }
+    const wp = u._chaseWaypoints[u._chaseIndex];
+    const dx = wp.x - u.x, dy = wp.y - u.y, dist = Math.hypot(dx, dy);
+    if (dist < 4) { u._chaseIndex++; return; }
+    // Capped at `dist`, same reasoning runMoveOrder's own step uses - a
+    // fast unit could otherwise overshoot a waypoint and ping-pong across
+    // it forever instead of ever landing inside the arrival window.
+    const step = Math.min(sp * dt, dist);
+    u.x += (dx / dist) * step; u.y += (dy / dist) * step;
+  }
 
   const units = [];
   let nextUnitId = 1;
@@ -2094,7 +2139,7 @@ async function main() {
       // problem since it already dropped its target here.
       if (u.isMissileLauncher || u.isTurret) { u.target = null; return; }
       const sp = u.speed * MOVE_PX_PER_SPEED;
-      moveTowardWithAvoidance(u, t.x, t.y, sp, dt);
+      chaseTowardTarget(u, t.x, t.y, sp, dt);
       clampToWorld(u);
       pushOutOfObstacles(u);
       u._isMoving = true;
@@ -2154,7 +2199,7 @@ async function main() {
     u.facingAngle = facingToward(u, t.x, t.y);
     if (dist > u.range) {
       const sp = u.speed * MOVE_PX_PER_SPEED;
-      moveTowardWithAvoidance(u, t.x, t.y, sp, dt);
+      chaseTowardTarget(u, t.x, t.y, sp, dt);
       clampToWorld(u);
       pushOutOfObstacles(u);
       u._isMoving = true;
@@ -2284,7 +2329,7 @@ async function main() {
     u.facingAngle = facingToward(u, t.x, t.y);
     if (dist > u.range) {
       const sp = u.speed * MOVE_PX_PER_SPEED;
-      moveTowardWithAvoidance(u, t.x, t.y, sp, dt);
+      chaseTowardTarget(u, t.x, t.y, sp, dt);
       clampToWorld(u);
       pushOutOfObstacles(u);
       u._isMoving = true;

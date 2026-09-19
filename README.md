@@ -878,14 +878,37 @@ entirely by one map's saved data:
   essentially never trigger, given the graph's own real margin. A
   straight line that's already clear skips pathfinding entirely (the
   common case - a map with no obstacles nearby pays nothing beyond the
-  one check), and combat/heal units closing distance on a target
-  (`combatTick`/`healTick`) still use the original lighter-weight
-  reactive local steering (`moveTowardWithAvoidance`/
-  `steerAroundObstacles`) rather than full pathfinding, since a combat
-  target's position can change every tick and re-planning a whole route
-  that often isn't worth the cost - a target usually isn't hidden behind
-  a deliberate obstacle wall the way a resource deposit or a manually
-  clicked destination can be.
+  one check).
+  **Combat/heal/convert units closing distance on a target
+  (`combatTick`/`healTick`/`convertTick`, via the shared
+  `chaseTowardTarget` helper) now use the same pathfinding a real MOVE
+  order does, not just reactive local steering** - originally left on
+  reactive-only steering deliberately (a combat target's position can
+  change every tick, and re-planning a whole route that often felt not
+  worth the cost since "a target usually isn't hidden behind a
+  deliberate obstacle wall the way a manually clicked destination can
+  be"). That assumption broke down for an AI-controlled faction
+  specifically: an AI unit never issues a real MOVE order at all (see
+  the Two Game Styles bullet below and `aiThink`'s own per-unit update()
+  branch) - literally every bit of its movement, across the whole map,
+  goes through this exact chase step from the instant it picks a target,
+  unlike a human player who typically repositions with a real,
+  pathfinding-protected move order first and only ends up chasing
+  something already close by. Reported directly: "computer troops are
+  getting stuck on [a wall going across the middle]... my troops go
+  around the wall like normal" - reactive-only steering has the same
+  hard ceiling against a genuinely gapless wall documented below
+  regardless of who's controlling the unit, but only the AI was ever
+  exposed to it at real, map-spanning distances.
+  `chaseTowardTarget` reuses the exact same `findPathAround` graph move
+  orders already build, caching the planned route per-unit and only
+  re-planning when it's actually gone stale (exhausted, or the target
+  has drifted more than 80px from where the route was planned) rather
+  than every single tick - a moving combat target doesn't need a brand
+  new route every frame, just one that's still roughly heading the
+  right way. Falls straight through to the cheap no-obstacles path on
+  any map that doesn't use Terrain Obstacles at all, same as a real
+  move order does.
   Three real bugs surfaced building this, all instructive about why a
   visibility graph over circles needs real care: (1) the very first
   version skipped checking a segment against whichever obstacle either of
