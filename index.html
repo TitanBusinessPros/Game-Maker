@@ -1481,7 +1481,20 @@ document.querySelectorAll('.upload-slot input[type=file]').forEach((input) => {
 // sitting right after Game Over. Reported directly: "the sounds button...
 // after game over... an additional option never asked for."
 const CATEGORY_LABELS = {
-  maps: 'Maps',
+  // Bare `maps` was never a real, directly-selectable category (same
+  // "parent with children always resolves to one of them instead"
+  // situation the removed bare `sounds` entry was in - see that fix's
+  // own comment) - the four real ones (matching admin.html's own
+  // maps/<size> sub-picker) were simply never added here at all when
+  // this list was first built, so every one of them was completely
+  // missing as a picker tab, for every map size, since that day.
+  // Reported directly on real production data: 18 real, correctly-
+  // categorized maps/medium items existed in Firestore the whole time
+  // but were invisible to every single map-maker regardless of what
+  // size they were building, since none of maps/tiny, maps/small,
+  // maps/medium, maps/large were ever in this list for openLibraryPicker
+  // to build a tab from.
+  'maps/tiny': 'Tiny', 'maps/small': 'Small', 'maps/medium': 'Medium', 'maps/large': 'Large',
   'characters/space_ships': 'Space Ships',
   'characters/navy_ships': 'Navy Ships',
   'characters/jets': 'Planes and Jets',
@@ -1523,7 +1536,7 @@ const CATEGORY_LABELS = {
   'sounds/endgame': 'Game Over',
 };
 const CATEGORY_ORDER = [
-  'maps',
+  'maps/tiny', 'maps/small', 'maps/medium', 'maps/large',
   'characters/space_ships', 'characters/navy_ships', 'characters/jets', 'characters/helicopters', 'characters/infantry', 'characters/artillery', 'characters/missiles', 'characters/tanks', 'characters/field_medics', 'characters/clerics', 'characters/mining_ships',
   'worlds', 'bases', 'resources', 'terrain',
   'structures/war_factory', 'structures/airport', 'structures/infantry_post', 'structures/helicopter_facility', 'structures/research_facility', 'structures/gun_turret', 'structures/missile_silo', 'structures/missile_battery', 'structures/navy_harbor', 'structures/field_hospital', 'structures/religious_institution',
@@ -1774,8 +1787,24 @@ function openLibraryPicker(slotKey, mediaType, isPremium) {
     btn.addEventListener('click', () => renderCategory(cat, mediaType));
     libraryCategoryTabs.appendChild(btn);
   });
-  renderCategory(activeCategory, mediaType);
+  renderCategory(activeCategory, mediaType, true);
 }
+// Map background art is filed by size (maps/tiny, maps/small,
+// maps/medium, maps/large) purely for admin.html's own organizational
+// purposes - it's not actually restricted to matching sizes at play
+// time (any image works at any map size, index.html's own "recommended
+// sizes" hint says as much - it just gets stretched more the bigger the
+// map is). Before per-category lazy-loading existed, opening this
+// picker already fetched the WHOLE library, so landing on an empty
+// hinted size automatically fell back to whichever category actually
+// had real items - lazy-loading dropped that fallback (there was
+// nothing left to fall back to without fetching more than one category)
+// and just showed the exact-size tab as empty, MEDIUM_FIRST below tries
+// in order. Reported directly, on real production data: 18 real,
+// correctly-categorized maps/medium items existed the whole time, but
+// they'd become invisible by default to anyone building anything other
+// than a Medium map.
+const MAP_SIZE_FALLBACK_ORDER = ['maps/medium', 'maps/small', 'maps/large', 'maps/tiny'];
 function refreshLibraryModalCredits() {
   if (!currentUser || currentUser.email === ADMIN_EMAIL) return;
   getDoc(doc(db, 'users', currentUser.uid)).then((snap) => {
@@ -1783,7 +1812,7 @@ function refreshLibraryModalCredits() {
     libraryModalCredits.textContent = `${credits} credit${credits === 1 ? '' : 's'} left`;
   }).catch(() => {});
 }
-async function renderCategory(cat, mediaType) {
+async function renderCategory(cat, mediaType, isInitialLanding = false) {
   const isPremium = libraryActiveIsPremium;
   stopAudioPreview(); // switching tabs/categories replaces these DOM nodes - don't leave a sound playing with no visible button left to stop it
   hideImagePreview(); // same reasoning - the hovered item's own DOM node is about to be replaced
@@ -1811,6 +1840,21 @@ async function renderCategory(cat, mediaType) {
   // that render already reflects what's on screen now, so this stale one
   // must not clobber it.
   if (myToken !== libraryRequestToken) return;
+  // Only on the picker's own initial landing (never after someone
+  // manually clicks a specific size tab themselves - they get the exact,
+  // honest state of the tab they actually chose to look at) - if the
+  // hinted size is empty, try the other three in a sensible order before
+  // ever showing "nothing here" for content that's really just one tab
+  // over. loadLibraryCategory() is cached per category, so trying a
+  // sibling costs nothing if it's already been fetched this session.
+  if (catItems.length === 0 && isInitialLanding && !isPremium && cat.startsWith('maps/')) {
+    for (const fallbackCat of MAP_SIZE_FALLBACK_ORDER) {
+      if (fallbackCat === cat) continue;
+      const fallbackItems = (await loadLibraryCategory(fallbackCat)).filter((it) => it.type === mediaType);
+      if (myToken !== libraryRequestToken) return;
+      if (fallbackItems.length > 0) { renderCategory(fallbackCat, mediaType); return; }
+    }
+  }
   if (catItems.length === 0) {
     libraryGrid.hidden = true;
     libraryList.hidden = false;
