@@ -730,6 +730,36 @@ entirely by one map's saved data:
   reading as "research isn't doing anything." Missile Range and Rapid
   Repair Crews (heal amount) were already live in the panel and are
   unchanged.
+- **Research percentages default sanely on a map with nothing configured.**
+  `getResearchPercents()` used to return `[]` for any topic missing from a
+  map's saved `cfg.research` (any map saved before the Research Tree
+  section existed, or a topic whose Level %s were never touched), which
+  made every level's bonus compute to +0% forever - research completed,
+  the tab said "Done," but the underlying stat never actually changed.
+  Now falls back per level to the same 5/10/15% `index.html`'s own editor
+  already displays for an unset topic (`RESEARCH_DEFAULT_PERCENTS`,
+  mirrored into `play.html`), so an old/untouched map behaves the way the
+  editor already implied instead of silently doing nothing. Separately,
+  the Research tab (`renderResearchPanel`) now always shows a short
+  notice explaining *when* research applies: HP/speed/range/heal-amount
+  bonuses are baked into a unit once at spawn (see the Field Hospital
+  medic bullet above), so they only benefit units built *after* research
+  finishes, never ones already on the field - Mining Rate and Missile
+  Range are the exception, read live every tick/shot, so those two do
+  boost what you already have. Reported as "none of my research works,"
+  which live-map inspection traced to two separate, unrelated causes at
+  once: a specific map's Mining Rate topic had Level 1 and Level 2 both
+  set to the same percentage (so Level 2 genuinely changed nothing), and
+  the retroactivity distinction above wasn't explained anywhere in-game.
+- **Unit/turret Range no longer shows floating-point noise like
+  `459.99999999999994`.** `effectiveStat()` multiplying a base Range by a
+  research percentage (e.g. &times;1.15) can land on a value like that
+  instead of a clean `460` - HP already guarded against this with
+  `Math.round`, but Range never did, whether at spawn (`spawnUnit`/
+  `spawnTurret`) or in the build-panel preview (`previewRange`). Range is
+  now rounded the same place HP already is, fixing it everywhere it's
+  shown (build panel, in-game unit info) - most visibly reported on the
+  mobile Missile Battery unit's own RNG stat.
 - **Two game styles**, picked at map-creation time:
   - **Real-Time** (default) - a 90-second cosmetic turn clock; a unit
     that attacks fires exactly once, then locks (can't take a new move
@@ -2044,6 +2074,17 @@ update and had to be added afterward: a second Cloud Function distinct
 from the Stripe webhook, and a new Firestore collection queuing a credit
 grant for an email that hasn't signed in yet, neither of which the
 original wording covered.
+
+A from-scratch audit (not just "what changed since the last review")
+found two more features that had shipped earlier but were never reflected
+here at all: **Titan Game Producer** (`producer.html` - its `producerDrafts`
+collection, and its per-stage download-credit spend on compile) and the
+**Premium Library** (`premiumLibraryItems`/`premiumUnlocks` collections,
+its per-item credit unlock, and a third Cloud Function,
+`unlockPremiumItem`, that `privacy.html`'s Cloud Functions count had
+simply never included - it said "two functions" when there were three).
+Both pages now cover them, plus a short note on the PWA service worker's
+local-only file caching.
 
 ## Mobile support & installing as an app (PWA)
 
