@@ -1573,10 +1573,12 @@ async function main() {
   // panel is currently showing (always activeFaction - the only faction
   // this panel is ever rendered for), formatted the same way an
   // already-spawned unit's own info line already shows it (see
-  // showUnitInfo further down: Math.round for HP, unrounded for range,
-  // one decimal for speed).
+  // showUnitInfo further down: Math.round for HP and range - a percentage
+  // research bonus multiplying a base stat can land on a float like
+  // 459.99999999999994 instead of a clean 460, same reason toFixed(1)
+  // below exists for speed - one decimal for speed).
   function previewHp(base) { return Math.round(effectiveStat(activeFaction, base, 'hp')); }
-  function previewRange(base) { return effectiveStat(activeFaction, base, 'range'); }
+  function previewRange(base) { return Math.round(effectiveStat(activeFaction, base, 'range')); }
   function previewSpeed(base) { return effectiveStat(activeFaction, base, 'speed').toFixed(1); }
   function spawnUnit(factionId, defIndex, x, y) {
     const fac = factionOf(factionId);
@@ -1584,7 +1586,7 @@ async function main() {
     const u = {
       id: nextUnitId++, factionId, defIndex, isMiner: false,
       hp: Math.round(effectiveStat(fac, def.hp, 'hp')), maxHp: Math.round(effectiveStat(fac, def.hp, 'hp')),
-      attack: def.attack, range: effectiveStat(fac, def.range, 'range'), speed: effectiveStat(fac, def.speed, 'speed'),
+      attack: def.attack, range: Math.round(effectiveStat(fac, def.range, 'range')), speed: effectiveStat(fac, def.speed, 'speed'),
       img: unitImages[defIndex], x, y, alive: true, selected: false,
       orderType: null, moveTarget: null, target: null,
       lockedUntilTurn: 0, facingAngle: 0, weapon: def.weapon || 'laser',
@@ -1647,7 +1649,7 @@ async function main() {
     const u = {
       id: nextUnitId++, factionId, defIndex, isMiner: false, isTurret: true,
       hp: Math.round(effectiveStat(fac, def.hp, 'hp')), maxHp: Math.round(effectiveStat(fac, def.hp, 'hp')),
-      attack: def.attack, range: effectiveStat(fac, def.range, 'range'), speed: 0,
+      attack: def.attack, range: Math.round(effectiveStat(fac, def.range, 'range')), speed: 0,
       img: turretImages[defIndex], x, y, alive: true, selected: false,
       orderType: null, moveTarget: null, target: null,
       // A turret's single static image doesn't hold up rotated to face an
