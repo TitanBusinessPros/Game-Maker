@@ -1488,9 +1488,19 @@ async function main() {
   // A map saved before per-topic renaming existed stored this topic as a
   // plain [pct1, pct2, pct3] array - both shapes are handled here so an
   // old map keeps working without needing its own migration step.
+  // A map saved before this Research Tree section existed (or not
+  // re-saved since) has no cfg.research[topicId] at all - falling back to
+  // [] here used to mean every level's percentage read as 0 forever, so
+  // research completed but silently did nothing. index.html's own editor
+  // pre-fills unset levels with these same defaults (RESEARCH_DEFAULT_
+  // PERCENTS), so falling back per-level here instead keeps play.html in
+  // sync with what a map-maker would see/expect even if they never
+  // touched this section.
+  const RESEARCH_DEFAULT_PERCENTS = [5, 10, 15];
   function getResearchPercents(topicId) {
     const topicCfg = cfg.research && cfg.research[topicId];
-    return Array.isArray(topicCfg) ? topicCfg : (topicCfg && topicCfg.percents) || [];
+    const saved = Array.isArray(topicCfg) ? topicCfg : (topicCfg && topicCfg.percents);
+    return RESEARCH_DEFAULT_PERCENTS.map((def, i) => (saved && saved[i] !== undefined && saved[i] !== null && saved[i] !== '') ? Number(saved[i]) : def);
   }
   function researchPercent(fac, topicId) {
     const level = researchLevel(fac, topicId);
