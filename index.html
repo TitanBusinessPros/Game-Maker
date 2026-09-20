@@ -189,6 +189,23 @@
     z-index: 100; display: flex; align-items: center; justify-content: center;
     padding: 16px;
   }
+  /* Hovering a library thumbnail shows it 3x larger here - reported
+     directly ("we need the image to enlarge times 3 so people can
+     see it"), since an 80px-tall grid thumbnail is too small to judge
+     real art by. This is a separate, `position:fixed` element (sibling
+     of #libraryModal, not a child of it) on purpose - #libraryGrid
+     itself has overflow-y:auto (needed for its own real scrolling, see
+     that rule's own comment), which would clip a same-in-place CSS
+     transform:scale() on the image the instant it grew past the
+     thumbnail's own tiny box, so a floating preview positioned by JS
+     (showImagePreview/hideImagePreview) is the only way to actually
+     show it larger rather than mostly clipped away. */
+  #libraryImagePreview {
+    position: fixed; z-index: 200; display: none; pointer-events: none;
+    background: #06121f; border: 2px solid var(--accent); border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.6); padding: 8px;
+  }
+  #libraryImagePreview img { display: block; width: 240px; height: 240px; object-fit: contain; }
   #libraryModal[hidden] { display: none; }
   /* Same fix as libraryModal above, for the same reason: this div's own
      inline style="display:flex" (previously here directly on the element)
@@ -916,6 +933,7 @@
     <div id="libraryList" hidden></div>
   </div>
 </div>
+<div id="libraryImagePreview"><img alt=""></div>
 
 <div id="saveBar" style="display:none;">
   <div id="saveWarning">&#9201;&#65039; Saving uploads your files 5 at a time &mdash; the more images/sounds on this map, the longer it takes. Keep this tab open until it says done.</div>
@@ -1659,6 +1677,34 @@ function defaultCategoryForSlot(slotKey) {
   return hit ? hit[1] : null;
 }
 
+// Image preview - hovering a library thumbnail (free or Premium, locked
+// or unlocked - same "see what you'd be getting" reasoning the sound
+// preview and a locked item's own visible thumbnail already follow)
+// shows it 3x larger in a floating box that follows whichever item is
+// hovered, since an 80px-tall grid thumbnail is too small to actually
+// judge real art by. One shared element (#libraryImagePreview, a
+// `position:fixed` sibling of #libraryModal - see its own CSS comment
+// for why it can't just be a CSS transform:scale() in place) reused for
+// every item rather than building a new one per hover.
+const libraryImagePreviewEl = document.getElementById('libraryImagePreview');
+const libraryImagePreviewImg = libraryImagePreviewEl.querySelector('img');
+function showImagePreview(url, anchorEl) {
+  libraryImagePreviewImg.src = url;
+  const rect = anchorEl.getBoundingClientRect();
+  const size = 240 + 16; // image size + the box's own 8px padding each side
+  // Centered on the hovered thumbnail, clamped so it never runs off the
+  // edge of the actual browser viewport (this is position:fixed, so it's
+  // the viewport it has to stay inside, not the modal).
+  let left = rect.left + rect.width / 2 - size / 2;
+  let top = rect.top + rect.height / 2 - size / 2;
+  left = Math.max(8, Math.min(left, window.innerWidth - size - 8));
+  top = Math.max(8, Math.min(top, window.innerHeight - size - 8));
+  libraryImagePreviewEl.style.left = left + 'px';
+  libraryImagePreviewEl.style.top = top + 'px';
+  libraryImagePreviewEl.style.display = 'block';
+}
+function hideImagePreview() { libraryImagePreviewEl.style.display = 'none'; }
+
 // Sound preview - lets someone listen to a library sound (free or
 // Premium, locked or unlocked - see the audio branch of renderCategory
 // below) before picking it, playing the file straight through to the
@@ -1740,6 +1786,7 @@ function refreshLibraryModalCredits() {
 async function renderCategory(cat, mediaType) {
   const isPremium = libraryActiveIsPremium;
   stopAudioPreview(); // switching tabs/categories replaces these DOM nodes - don't leave a sound playing with no visible button left to stop it
+  hideImagePreview(); // same reasoning - the hovered item's own DOM node is about to be replaced
   libraryCategoryTabs.querySelectorAll('button').forEach((b) => b.classList.toggle('active', b.dataset.cat === cat));
   const myToken = ++libraryRequestToken;
   const loadingEl = mediaType === 'image' ? libraryGrid : libraryList;
@@ -1791,6 +1838,8 @@ async function renderCategory(cat, mediaType) {
       // filename happened to be.
       el.innerHTML = `<img src="${it.url}" loading="lazy" alt="${it.name}">${locked ? '<span class="lock-badge">🔒 1 credit</span>' : ''}`;
       el.addEventListener('click', () => (locked ? handlePremiumItemClick(it, unlockedIds, () => renderCategory(cat, mediaType)) : selectLibraryAsset(it)));
+      el.addEventListener('mouseenter', () => showImagePreview(it.url, el));
+      el.addEventListener('mouseleave', hideImagePreview);
       libraryGrid.appendChild(el);
     });
   } else {
@@ -1871,11 +1920,12 @@ function selectLibraryAsset(item) {
   existingAssetUrls[slotKey] = item.url;
   refreshAllPlacementPreviews();
   stopAudioPreview();
+  hideImagePreview();
   libraryModal.hidden = true;
 }
 
-document.getElementById('libraryCloseBtn').addEventListener('click', () => { stopAudioPreview(); libraryModal.hidden = true; });
-libraryModal.addEventListener('click', (e) => { if (e.target === libraryModal) { stopAudioPreview(); libraryModal.hidden = true; } });
+document.getElementById('libraryCloseBtn').addEventListener('click', () => { stopAudioPreview(); hideImagePreview(); libraryModal.hidden = true; });
+libraryModal.addEventListener('click', (e) => { if (e.target === libraryModal) { stopAudioPreview(); hideImagePreview(); libraryModal.hidden = true; } });
 
 function showExistingAsset(slotKey, url) {
   existingAssetUrls[slotKey] = url;

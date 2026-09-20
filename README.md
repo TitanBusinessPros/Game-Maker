@@ -596,6 +596,24 @@ that covered part of the actual art; an already-unlocked item behaves
 exactly like a normal free-library item - click it, it's applied to the
 slot, no further prompt.
 
+**Image preview** - hovering any thumbnail, in either library, shows it
+3x larger (240x240) in a floating box that follows the cursor's target
+- reported directly ("we need the image to enlarge times 3 so people
+can see it"), since an 80px-tall grid thumbnail is too small to judge
+real art by. `showImagePreview()`/`hideImagePreview()` - a `position:
+fixed` element (`#libraryImagePreview`) kept as a sibling of the modal
+itself, not a child inside `#libraryGrid`, since that grid has its own
+`overflow-y:auto` (needed for the real scrolling fix documented on that
+rule) which would have clipped an in-place CSS `transform:scale()` the
+instant it grew past the thumbnail's own tiny box - a floating,
+JS-positioned element was the only way to actually show it larger
+rather than mostly clipped away. Positioned centered on whichever
+thumbnail is hovered, clamped so it never runs off the actual browser
+viewport; hides again on mouseleave, and also whenever the underlying
+grid content is about to change out from under it (switching tabs,
+picking an item, closing the picker) so it never keeps floating over
+stale content.
+
 **Sound preview** - every sound row, in both libraries, gets its own
 small **▶ button** (`toggleAudioPreview()`) that plays that exact
 uploaded file straight through, click a second time (or let it finish
