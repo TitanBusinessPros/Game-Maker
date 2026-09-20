@@ -1819,9 +1819,17 @@ async function renderCategory(cat, mediaType) {
     // shouldn't be advertised to the public at all (its own link in the
     // header is already the one place that's shown, and only ever to the
     // admin's own signed-in account - see onAuthStateChanged above).
-    libraryList.innerHTML = isPremium
-      ? '<p style="color:var(--text-dim); font-size:13px;">Nothing here yet for this category - check back later.</p>'
-      : '<p style="color:var(--text-dim); font-size:13px;">Nothing in the library yet for this category - just close this and upload your own file below instead.</p>';
+    if (isPremium) {
+      libraryList.innerHTML = '<p style="color:var(--text-dim); font-size:13px;">Nothing here yet for this category - check back later.</p>';
+    } else {
+      // A category empty in the free library might still have something
+      // in the Premium Library - this button reopens the picker on the
+      // exact same slot/category, just in Premium mode, instead of
+      // making someone close this, find the separate 💎 Premium button
+      // on the slot, and re-navigate to the same category by hand.
+      libraryList.innerHTML = '<p style="color:var(--text-dim); font-size:13px;">Nothing in the library yet for this category - check the <button type="button" id="checkPremiumFromEmptyBtn" class="btn-secondary" style="font-size:12px; padding:3px 8px; margin:0 2px; vertical-align:middle;">💎 Premium Library</button>, or just close this and upload your own file below instead.</p>';
+      document.getElementById('checkPremiumFromEmptyBtn').addEventListener('click', () => openLibraryPicker(libraryActiveSlotKey, mediaType, true));
+    }
     return;
   }
   if (mediaType === 'image') {
