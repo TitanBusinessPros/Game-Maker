@@ -478,8 +478,13 @@
           <input type="checkbox" id="fogOfWarEnabled" style="width:auto;"> &#127787;&#65039; Fog of war
         </label>
       </div>
+      <div class="field narrow" style="display:flex; align-items:flex-end; padding-bottom:9px;">
+        <label style="display:flex; align-items:center; gap:6px; font-weight:normal; margin:0;">
+          <input type="checkbox" id="unitBobbingEnabled" checked style="width:auto;"> &#128694; Units bob up/down while moving
+        </label>
+      </div>
     </div>
-    <p class="hint">Off by default. When on, the minimap only reveals area within a short radius of a player's own units and Home Base - a fixed setting for the whole match, not something a player can turn on or off once playing.</p>
+    <p class="hint">Fog of war: off by default. When on, the minimap only reveals area within a short radius of a player's own units and Home Base - a fixed setting for the whole match, not something a player can turn on or off once playing. Unit bobbing: on by default - a small up/down bounce and sway while a unit is actually walking, so it doesn't slide across the map as a rigid, motionless sprite. Turn it off for art that looks wrong bouncing (very flat/blocky sprites, or ones meant to read as gliding/hovering).</p>
     <div class="field">
       <label>Map background art (optional)</label>
       <div class="upload-slot" data-slot="backgroundImage">
@@ -3264,6 +3269,10 @@ async function buildMapDoc(status) {
     // can flip on/off once playing (see play.html's fogOn, now seeded
     // from this instead of a topbar button).
     fogOfWar: document.getElementById('fogOfWarEnabled').checked,
+    // Defaults true (checked) so a map saved before this checkbox
+    // existed keeps the exact bobbing behavior play.html already always
+    // had unconditionally - see that page's own drawUnit().
+    unitBobbing: document.getElementById('unitBobbingEnabled').checked,
     // Extra named resources beyond Gold - each with its own passive
     // income/hour and deposit art (see collectExtraResources) - and
     // which ones (Gold included) hand out a free amount each round -
@@ -3691,6 +3700,11 @@ async function loadExistingMap() {
   document.getElementById('gameStyle').value = m.gameStyle || 'realtime';
   document.getElementById('turnTimerSeconds').value = m.turnTimerSeconds || 30;
   document.getElementById('fogOfWarEnabled').checked = !!m.fogOfWar;
+  // A map saved before this checkbox existed has no m.unitBobbing field
+  // at all - defaults to checked (true) either way, matching the
+  // unconditional bobbing play.html already had before this setting
+  // existed.
+  document.getElementById('unitBobbingEnabled').checked = m.unitBobbing !== false;
   // Must happen before any unit/turret row gets added below - each row's
   // cost checkboxes are built from whatever allResources() returns at
   // that moment (see makeUnitRow/addTurretRow), so extraResources needs

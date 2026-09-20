@@ -74,6 +74,17 @@ line. Only this page has the logo/title/footer treatment so far -
    property of the map now, decided here at map-creation time - moved
    down from a topbar button in `play.html` that let a player flip it
    on/off mid-match, which no longer exists.
+2c. **Units bob up/down while moving** (optional, on by default) — a
+   checkbox next to Fog of War. `play.html` has always given a moving
+   unit a small vertical bounce and sway so it doesn't slide across the
+   map as a rigid, motionless sprite (`drawUnit()`'s own `BOB_PX`/
+   `SWAY_RAD`) - this was previously unconditional, with no way to turn
+   it off for art that looks wrong bouncing (very flat/blocky sprites,
+   or ones meant to read as gliding/hovering). Reported directly as a
+   wanted toggle. Unchecking it only skips the bounce/sway itself - a
+   unit's real x/y, its facing rotation, and everything else about
+   movement are unaffected either way. Defaults checked so a map saved
+   before this existed keeps the exact bobbing it already always had.
 3. **Resource & mining** — the deposit every home base gets nearby (name,
    size, art - a real "mine" image, separate from the vessel that works
    it) and the mining unit that drains it (name, income/hour, art).
@@ -1647,19 +1658,24 @@ still show up, just under "Other" rather than being sorted into a size -
 they were never tagged with one), **Characters** (sub-picker:
 **Space Ships**, **Navy Ships**, **Planes and Jets**, **Helicopters**,
 **Infantry**, **Artillery**, **Missiles**, **Tanks**, **Field Medics**,
-**Clerics**, **Mining Ships** - stored as
+**Clerics**, **Mining** (id stays `characters/mining_ships`, only the
+label changed per direct request - "remove ships off the character
+Mining Ships and just leave Mining"), **Missile Battery** - stored as
 `characters/<type>` - **Army Men** removed as its own sub-category since it was redundant
 with Infantry; anything already uploaded under the old
 `characters/army_men` id still shows up, just under "Other" now instead
 of a named sub-category), giving the Missile Silo's own launcher/missile
 art uploads (index.html item 4f) a dedicated place in the shared library
-alongside every other character-art type. Field Medics/Clerics/Mining
-Ships are the newest three - a Field Hospital medic's and a Religious
-Institution Cleric's own art both used to silently share Infantry
-(neither one actually is infantry), and Mining Ship art had no matching
-category at all; reported directly ("Field Doctor is now needed in the
-subsection of units") and audited for every other unit/structure type
-missing one at the same time
+alongside every other character-art type. Field Medics/Clerics/Mining/
+Missile Battery are the newest four - a Field Hospital medic's and a
+Religious Institution Cleric's own art both used to silently share
+Infantry (neither one actually is infantry), Mining Ship art had no
+matching category at all, and Missile Battery's own mobile unit body
+art (not the building - see Structures below) used to just reuse
+Artillery; reported directly ("Field Doctor is now needed in the
+subsection of units", later "no missile battery units selection... for
+characters") and audited for every other unit/structure type missing
+one at the same time
 Picking a Maps sub-category also shows a hint line with that size's
 recommended-art note (same "capped at 768px, stretched ~N× to cover the
 world" info as `index.html`'s own map-size hover tooltip, just phrased

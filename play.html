@@ -689,6 +689,12 @@ async function main() {
   // behaves exactly as before this mode existed.
   const turnMode = cfg.gameStyle === 'turnbased';
   const TURN_TIMER_SECONDS = Math.max(10, Math.min(60, Number(cfg.turnTimerSeconds) || 30));
+  // index.html's "Units bob up/down while moving" checkbox (under Game
+  // Style, next to Fog of War) - defaults true (`!== false`) so a map
+  // saved before this checkbox existed keeps the exact unconditional
+  // bobbing this file already always had - see drawUnit()'s own use of
+  // this. Reported directly as a wanted toggle.
+  const UNIT_BOBBING_ENABLED = cfg.unitBobbing !== false;
 
   const canvas = document.getElementById('canvas');
   const ctx = canvas.getContext('2d');
@@ -3025,7 +3031,7 @@ async function main() {
     // position, not the bounce.
     const BOB_PX = 3, BOB_SPEED = 9, SWAY_RAD = 0.09;
     let bobY = 0, swayAngle = 0;
-    if (u._isMoving) {
+    if (u._isMoving && UNIT_BOBBING_ENABLED) {
       const phase = performance.now() / 1000 * BOB_SPEED + u.id * 0.9;
       bobY = Math.sin(phase) * BOB_PX * camera.zoom;
       swayAngle = Math.cos(phase) * SWAY_RAD;
