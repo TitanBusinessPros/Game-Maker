@@ -278,14 +278,16 @@
   /* Premium Library: a locked item still shows its real thumbnail (so a
      map-maker can see what they'd be spending a credit on before
      committing - same "preview before you buy" convention as everywhere
-     else this kind of unlock exists), just with a badge over it. Once
-     unlocked for this account it renders exactly like a free library
-     item - no badge, no special click handling. */
+     else this kind of unlock exists), with a badge below it - not
+     overlaid on top, which used to cover part of the actual art.
+     Reported directly: "the 1-credit lock is blocking the image from
+     being viewed." Once unlocked for this account it renders exactly
+     like a free library item - no badge, no special click handling. */
   .library-item.locked img { filter: brightness(0.55); }
-  .library-item.locked .lock-badge {
-    position: absolute; top: 4px; right: 4px; background: rgba(11,14,20,0.85);
-    color: var(--warn); border: 1px solid var(--warn); border-radius: 6px;
-    padding: 2px 6px; font-size: 10px; font-weight: 700; pointer-events: none;
+  .library-item .lock-badge {
+    display: block; width: fit-content; margin: 6px auto 0;
+    background: rgba(11,14,20,0.85); color: var(--warn); border: 1px solid var(--warn);
+    border-radius: 6px; padding: 2px 6px; font-size: 10px; font-weight: 700;
   }
   .library-audio-item.locked { opacity: 0.75; }
   .library-audio-item .lock-badge {

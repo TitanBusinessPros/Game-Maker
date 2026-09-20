@@ -589,9 +589,12 @@ one currency, not two - so the existing "N credits left"/"Get 10
 credits for $5" system covers Premium Library unlocks for free, with no
 new purchase flow needed. A locked item still shows its real thumbnail
 (so a map-maker can see what they'd be unlocking before spending a
-credit on it) with a 🔒 badge; an already-unlocked one behaves exactly
-like a normal free-library item - click it, it's applied to the slot,
-no further prompt.
+credit on it) with a 🔒 badge below the image, not overlaid on top of
+it - reported directly ("the 1-credit lock is blocking the image from
+being viewed"), it used to be an absolutely-positioned corner badge
+that covered part of the actual art; an already-unlocked item behaves
+exactly like a normal free-library item - click it, it's applied to the
+slot, no further prompt.
 
 **Sound preview** - every sound row, in both libraries, gets its own
 small **▶ button** (`toggleAudioPreview()`) that plays that exact
