@@ -397,7 +397,13 @@ const CATEGORY_TREE = [
     // Mining Ship art had NO matching category at all before this - the
     // one slot index.html's own comments already called out by name as
     // "the handful of slots with no clean matching admin.html category."
-    { id: 'characters/mining_ships', label: 'Mining Ships' },
+    { id: 'characters/mining_ships', label: 'Mining' },
+    // Missile Battery's own mobile UNIT body art (not the building - see
+    // structures/missile_battery below) used to just reuse Artillery
+    // instead of having its own category. Reported directly: "there is
+    // no missile battery units selection under admin library upload for
+    // characters."
+    { id: 'characters/missile_battery', label: 'Missile Battery' },
   ] },
   { id: 'worlds', label: 'Worlds' },
   { id: 'bases', label: 'Bases' },

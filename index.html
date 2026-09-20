@@ -1505,7 +1505,12 @@ const CATEGORY_LABELS = {
   'characters/tanks': 'Tanks',
   'characters/field_medics': 'Field Medics',
   'characters/clerics': 'Clerics',
-  'characters/mining_ships': 'Mining Ships',
+  'characters/mining_ships': 'Mining',
+  // Missile Battery's own mobile unit body art (not the building - see
+  // structures/missile_battery) used to just reuse Artillery instead of
+  // having its own category. Reported directly: "no missile battery
+  // units selection under admin library upload for characters."
+  'characters/missile_battery': 'Missile Battery',
   worlds: 'Worlds',
   bases: 'Bases',
   resources: 'Resources',
@@ -1537,7 +1542,7 @@ const CATEGORY_LABELS = {
 };
 const CATEGORY_ORDER = [
   'maps/tiny', 'maps/small', 'maps/medium', 'maps/large',
-  'characters/space_ships', 'characters/navy_ships', 'characters/jets', 'characters/helicopters', 'characters/infantry', 'characters/artillery', 'characters/missiles', 'characters/tanks', 'characters/field_medics', 'characters/clerics', 'characters/mining_ships',
+  'characters/space_ships', 'characters/navy_ships', 'characters/jets', 'characters/helicopters', 'characters/infantry', 'characters/artillery', 'characters/missiles', 'characters/tanks', 'characters/field_medics', 'characters/clerics', 'characters/mining_ships', 'characters/missile_battery',
   'worlds', 'bases', 'resources', 'terrain',
   'structures/war_factory', 'structures/airport', 'structures/infantry_post', 'structures/helicopter_facility', 'structures/research_facility', 'structures/gun_turret', 'structures/missile_silo', 'structures/missile_battery', 'structures/navy_harbor', 'structures/field_hospital', 'structures/religious_institution',
   'sounds/music', 'sounds/intro', 'sounds/attack', 'sounds/building_destroyed', 'sounds/home_under_attack', 'sounds/endgame',
@@ -1673,9 +1678,11 @@ const SLOT_PREFIX_CATEGORY_HINTS = [
   [/^missile_\d+_missile$/, 'characters/missiles'],
   [/^missile_\d+$/, 'structures/missile_silo'],
   // Missile Battery rows have the same two-upload-slots-per-row shape as
-  // Missile Silo above (unit body + separate missile projectile art).
+  // Missile Silo above (unit body + separate missile projectile art) -
+  // the body used to just reuse Artillery instead of having its own
+  // category. Reported directly.
   [/^missilebattery_\d+_missile$/, 'characters/missiles'],
-  [/^missilebattery_\d+$/, 'characters/artillery'],
+  [/^missilebattery_\d+$/, 'characters/missile_battery'],
   [/^obstacle_/, 'terrain'],
 ];
 function defaultCategoryForSlot(slotKey) {
