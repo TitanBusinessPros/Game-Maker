@@ -4370,6 +4370,18 @@ async function main() {
     if (renderWaitingForComputerIfNeeded('tab-research', 'Research is unavailable to you until it’s your turn again')) return;
     const el = document.getElementById('tab-research');
     el.innerHTML = '';
+    // Research bonuses (Vessel Plating/Warp Drive/Extended Range/Rapid
+    // Repair) are baked into a unit at spawnUnit() time only - see that
+    // function's own comments - so they never retroactively improve a
+    // unit already on the field, only ones built after research finishes.
+    // Mining Rate/Missile Range are the exception (read live off cfg.research
+    // every tick/shot instead - see miningRate()/missileRange() above), so
+    // those two do boost what's already built. Shown every time this panel
+    // renders, not just once, since it's easy to miss otherwise.
+    const retroNotice = document.createElement('div');
+    retroNotice.className = 'techRow';
+    retroNotice.innerHTML = `<div class="name">ℹ️ How research applies</div><div class="desc">Research only boosts units built after it finishes - it doesn't retroactively upgrade units already on the field. (Mining Rate and Missile Range are the exception: those apply immediately to Mining Ships/Missile Silos you already have.)</div>`;
+    el.appendChild(retroNotice);
     const researchFacility = buildingCfgByKey.researchFacility;
     const hasResearchFacility = activeFaction.built.researchFacility;
     if (!hasResearchFacility) {
