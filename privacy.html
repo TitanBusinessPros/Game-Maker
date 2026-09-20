@@ -52,18 +52,24 @@
 <main>
   <a class="back-link" href="index.html">&larr; Back to Game Maker</a>
   <h1>Privacy Policy</h1>
-  <p class="updated">Titan Game Maker &middot; Last updated September 18, 2026</p>
+  <p class="updated">Titan Game Maker &middot; Last updated September 20, 2026</p>
 
   <div class="section">
     <h2>1. Overview</h2>
     <p>This Privacy Policy explains what information Titan Game Maker
     (<code>index.html</code>, <code>play.html</code>, <code>admin.html</code>,
-    and any map or game you create or download using them &mdash; the
-    "Service") collects, how it's used, and where it's stored. The Service is
-    operated by Titan Business Pros LLC. It has no dedicated backend server
-    of its own beyond a single small Cloud Function described below &mdash;
-    it runs on Google's Firebase platform and is hosted as a static site on
-    GitHub Pages.</p>
+    <code>producer.html</code>, and any map or game you create or download
+    using them &mdash; the "Service") collects, how it's used, and where
+    it's stored. The Service is operated by Titan Business Pros LLC. It has
+    no dedicated backend server of its own beyond a few small Cloud
+    Functions described below &mdash; it runs on Google's Firebase platform
+    and is hosted as a static site on GitHub Pages.</p>
+    <p><code>index.html</code>/<code>admin.html</code>/<code>producer.html</code>
+    can also be installed as a home-screen app on a phone or desktop. This
+    uses your browser's own service worker feature to cache the Service's
+    static app files locally on your device (for a basic offline fallback
+    screen only); that cache lives entirely in your browser, is never
+    transmitted to us, and collects no additional information.</p>
   </div>
 
   <div class="section">
@@ -91,6 +97,12 @@
       receives extra download credits automatically the first time it signs
       in</td><td>If our admin account grants credits to an email that hasn't
       signed in yet (see Section&nbsp;5's Cloud Functions bullet)</td></tr>
+      <tr><td>Titan Game Producer draft data (project title, ending message,
+      each stage's name/order, and Storage links to your uploaded stage game
+      files/cover art)</td><td>Whenever you save a draft in
+      <code>producer.html</code></td></tr>
+      <tr><td>Which Premium Library items your account has unlocked</td>
+      <td>Automatically, when you spend a download credit to unlock one</td></tr>
     </table>
     <p>We do not operate any tracking cookies, analytics scripts, or
     advertising pixels of our own inside the Service. Google's own
@@ -110,7 +122,11 @@
       credit per download, granting 10 more after a verified Stripe
       payment).</li>
       <li>To operate the shared asset library (for our one admin account
-      only).</li>
+      only) and the Premium Library, including tracking which Premium items
+      your account has unlocked.</li>
+      <li>To let you save and resume in-progress Titan Game Producer
+      projects, and to combine your downloaded maps into one compiled
+      game.</li>
       <li>To send you our newsletter and other emails about the Service,
       new features, or Titan Business Pros &mdash; see Section&nbsp;4 below.</li>
       <li>We do not sell your information, and we do not use it for
@@ -135,20 +151,25 @@
     <p>All Service data is stored on Google's Firebase platform (project
     <code>game-maker-ed014</code>), specifically:</p>
     <ul>
-      <li><strong>Firestore</strong> &mdash; your map data, the shared
-      library's item list, the admin's bonus-credit email list, a queue of
-      pending credit grants for emails that haven't signed in yet, and your
-      download-credit balance.</li>
+      <li><strong>Firestore</strong> &mdash; your map data, the free and
+      Premium Library item lists, the admin's bonus-credit email list, a
+      queue of pending credit grants for emails that haven't signed in yet,
+      your download-credit balance, your saved Titan Game Producer drafts,
+      and which Premium Library items your account has unlocked.</li>
       <li><strong>Cloud Storage</strong> &mdash; the art/sound files you or
-      the admin upload.</li>
-      <li><strong>Cloud Functions</strong> &mdash; two functions. One
+      the admin upload, your saved Titan Game Producer stage files/cover
+      art, and Premium Library assets.</li>
+      <li><strong>Cloud Functions</strong> &mdash; three functions. One
       receives Stripe's payment-confirmation webhook and grants download
       credits after a purchase; it verifies Stripe's signature before doing
       anything and does not otherwise process or store payment details
-      itself. The other lets only our admin account manually add download
+      itself. The second lets only our admin account manually add download
       credits to a specific account (or queue them for an email that hasn't
       signed in yet) &mdash; for example, as a promotion or in response to a
-      support request &mdash; independent of any Stripe payment.</li>
+      support request &mdash; independent of any Stripe payment. The third
+      spends one of your download credits to permanently unlock a Premium
+      Library item for your account, recording the unlock in the same
+      atomic step as the credit deduction.</li>
     </ul>
     <p>Access to your own map data and account is restricted by Firestore
     and Storage security rules to your signed-in Google account (or, for
@@ -156,17 +177,21 @@
 
     <h2>6. Public Nature of Map and Library Data</h2>
     <p>To keep the Service simple and serverless, saved maps
-    (<code>maps/&lbrace;mapId&rbrace;</code>) and shared-library items are stored
-    with <strong>public read access</strong> at the database/storage level
-    &mdash; the same setting that lets your downloaded standalone game load
-    its own art and sound with no sign-in required. This means the raw data
-    and file URLs for a map or library asset can technically be read by
-    anyone who has or discovers their address, even though the Service's own
-    interface never publishes a public browsing page for them and search
-    engines are not directed to index them. Only your account's write access
-    (creating, editing, or deleting your own maps) and your download-credit
-    balance are restricted to you specifically. Do not upload or enter
-    anything into a map that must be kept confidential.</p>
+    (<code>maps/&lbrace;mapId&rbrace;</code>) and free and Premium
+    Library items are stored with <strong>public read access</strong> at the
+    database/storage level &mdash; the same setting that lets your
+    downloaded standalone game load its own art and sound with no sign-in
+    required, and that lets a locked Premium item still show its real
+    thumbnail before you unlock it. This means the raw data and file URLs
+    for a map or library asset (including a Premium item's) can technically
+    be read by anyone who has or discovers their address, even though the
+    Service's own interface never publishes a public browsing page for them
+    and search engines are not directed to index them. Your Titan Game
+    Producer drafts, which Premium items your account has unlocked, your
+    account's write access (creating, editing, or deleting your own maps or
+    drafts), and your download-credit balance are all restricted to you
+    specifically, not public. Do not upload or enter anything into a map or
+    draft that must be kept confidential.</p>
   </div>
 
   <div class="section">
