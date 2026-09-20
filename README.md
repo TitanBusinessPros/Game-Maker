@@ -181,7 +181,15 @@ line. Only this page has the logo/title/footer treatment so far -
    map mode. Click the map as many times as you like to place that many
    copies of the same obstacle; click a placed one to remove just that
    one. Nothing here is required to Finish & Save - a row with no points
-   placed just contributes nothing. See `play.html`'s own obstacles/
+   placed just contributes nothing. Because the fallback mountain marker
+   above is easy to trigger by accident (e.g. clicking "+ Add obstacle"
+   a second time and placing a point on it without noticing it's a
+   separate, art-less row from the one you meant to use), a row's own
+   placement widget shows a live ⚠️ warning right on that row the moment
+   it has any point placed with no art uploaded, and hides again the
+   instant art is added or the point is removed - it can't go unnoticed
+   in the builder and then only show up as a surprise in an actual match.
+   See `play.html`'s own obstacles/
    pathfinding bullet further down for how units actually navigate around
    what gets placed.
    Every placement-map preview (Gold's, any Additional Resource's, and

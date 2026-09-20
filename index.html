@@ -1419,6 +1419,20 @@ function wirePlacementWidget(root) {
     wrap.style.backgroundImage = url ? `url(${url})` : 'none';
     renderMarkers();
     renderReferenceMarkers(root, wrap);
+    // Obstacles are the one placement type that silently falls back to a
+    // generic mountain marker in-game when a row has no art (see play.html's
+    // drawObstacle) - flag that right here instead of it only showing up
+    // as a surprise in an actual match.
+    const obstacleRow = root.closest('.obstacle-row');
+    if (obstacleRow) {
+      const warnEl = obstacleRow.querySelector('.obstacle-art-warning');
+      if (warnEl) {
+        const obstacleId = obstacleRow.dataset.obstacleId;
+        const fileInput = obstacleRow.querySelector('.upload-slot input[type=file]');
+        const hasImage = !!(existingAssetUrls[obstacleId] || (fileInput && fileInput.files[0]));
+        warnEl.style.display = (getPoints().length > 0 && !hasImage) ? '' : 'none';
+      }
+    }
   }
 
   // Every mutation below refreshes ALL open placement widgets (not just
@@ -2761,6 +2775,7 @@ function addObstacleRow(o) {
       <div class="meta"><div class="name">No file chosen</div><div class="status">optional - shows a generic mountain marker if left blank</div></div>
       <input type="file" accept="image/*" style="width:auto">
     </div>
+    <p class="hint obstacle-art-warning" style="display:none; color:var(--warn);">⚠️ This row has points placed on the map below but no image uploaded - those points will show as a generic mountain marker in the game, not your own art. Upload or pick an image above, or remove the points if you didn't mean to place them.</p>
     ${obstaclePlacementWidgetHTML(o.id, o.placement)}
   `;
   row.querySelector('.obstacle-remove').addEventListener('click', () => {
@@ -2775,6 +2790,7 @@ function addObstacleRow(o) {
   const syncPlacement = wirePlacementWidget(row.querySelector('.placement-widget'));
   document.getElementById('obstaclesList').appendChild(row);
   if (o.image) showExistingAsset(o.id, o.image);
+  refreshAllPlacementPreviews();
   return row;
 }
 document.getElementById('addObstacleBtn').addEventListener('click', () => {
