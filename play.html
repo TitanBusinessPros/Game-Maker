@@ -161,7 +161,7 @@
     border:1px solid var(--border); border-radius:6px; padding:8px 10px; font-size:12px; max-width:240px; display:none;
   }
   #teamSelectScreen {
-    position:absolute; inset:0; z-index:50; background:#06121f; display:none; align-items:center; justify-content:center; padding:20px;
+    position:absolute; inset:0; z-index:50; background:#06121f; display:none; justify-content:center; padding:20px;
     /* This screen never scrolled at all - fine while every row fit in one
        line, but making each row wrap onto 2 lines (the flex-wrap fix just
        above, for the AI Difficulty overflow) made the panel taller, and
@@ -171,11 +171,21 @@
        here, not on #teamSelectPanel, since #teamSelectPanel has no fixed
        height of its own to overflow - #teamSelectScreen is the one fixed
        to the viewport (inset:0).
-    */
+       No align-items:center here any more (was fine for the common
+       2-4-player case, but with a nearly-full 11-faction roster the panel
+       is taller than the screen, and a centered flex item taller than its
+       container gets clipped equally on both ends with no way to scroll
+       UP past that clipped top portion - a well-known flexbox+overflow
+       trap, reported as "max teams runs off screen." #teamSelectPanel's
+       own `margin:auto 0` below reproduces the same "center it if it
+       fits" look for the small-roster case, but correctly falls back to
+       0 (starting flush at the top, scrollable all the way down) once the
+       panel no longer fits - the one combination that centers when short
+       and stays fully reachable when tall. */
     overflow-y:auto;
   }
   #teamSelectScreen.show { display:flex; }
-  #teamSelectPanel { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:24px; max-width:520px; width:100%; }
+  #teamSelectPanel { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:24px; max-width:520px; width:100%; margin:auto 0; }
   #teamSelectPanel h2 { margin-top:0; }
   .allyRow {
     display:flex; align-items:center; gap:10px; background:var(--panel2); border:1px solid var(--border);
