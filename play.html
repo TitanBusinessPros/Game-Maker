@@ -2411,6 +2411,16 @@ async function main() {
     };
   }
 
+  // How many factions actually take a turn in one round - living ones
+  // only, so an excluded faction (team-select's "In match" unchecked,
+  // hp:0 same as a real elimination) or one defeated mid-match doesn't
+  // count toward "how many turns make up a round." Both round
+  // calculations below used to divide by factions.length instead (the
+  // full original roster, excluded or not), so picking 11 factions and
+  // excluding 5 still needed 11 Skip Turns - not 6 - for gold to land at
+  // the end of a round.
+  function activeFactionCount() { return factions.filter((f) => f.hp > 0).length || 1; }
+
   // Turn-Based mode only: rotate control to the next living faction,
   // wrapping around, and reset everything that's specific to "whose turn
   // is it" - the hot-seat timer, the camera (so whoever's picking up the
@@ -2444,7 +2454,7 @@ async function main() {
     // Same "Round N" the top-bar label already computes from
     // moveNumber - fires applyResourceGrants() exactly once each time
     // that number goes up, not once per individual move.
-    const round = Math.ceil(moveNumber / factions.length);
+    const round = Math.ceil(moveNumber / activeFactionCount());
     if (round > lastGoldRound) { lastGoldRound = round; applyResourceGrants(); }
     const center = factionViewCenter(activeFaction);
     camera.x = center.x; camera.y = center.y;
@@ -3579,7 +3589,7 @@ async function main() {
     }).join(' ');
     if (turnMode) {
       const secs = Math.max(0, Math.ceil(hotseatTimer));
-      const round = Math.ceil(moveNumber / factions.length);
+      const round = Math.ceil(moveNumber / activeFactionCount());
       document.getElementById('turnLabel').textContent = `🔄 Round ${round} · Move ${moveNumber} · ${activeFaction.name}'s turn · ${secs}s left`;
     } else {
       const mins = Math.floor(Math.max(0, turnTimer) / 60), secs = Math.floor(Math.max(0, turnTimer) % 60);
