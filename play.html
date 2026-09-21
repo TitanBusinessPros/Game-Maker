@@ -1534,10 +1534,15 @@ async function main() {
     const base = researchTopicName(t.topic);
     return t.level === 1 ? base : `${base} ${t.level === 2 ? 'II' : 'III'}`;
   }
-  // Gold's (and every Additional Resource's) base mining rate - a flat
-  // percentage on top, same pattern every other topic below uses.
+  // Gold's (and every Additional Resource's) base mining rate -
+  // index.html's own "Mining Rate" field (cfg.miningUnit.ratePerHour),
+  // falling back to 600 for a map saved before that field existed - this
+  // used to ignore that field entirely and always use a hardcoded 600, so
+  // a map-maker's own configured rate silently had no effect. A flat
+  // research percentage on top, same pattern every other topic below
+  // uses.
   function miningRate(fac) {
-    return 600 * (1 + researchPercent(fac, 'mining') / 100);
+    return (cfg.miningUnit?.ratePerHour || 600) * (1 + researchPercent(fac, 'mining') / 100);
   }
   // Missile Silo launchers' range isn't a map-maker-set field at all
   // (unlike Gun Turrets' Range) - it's a fixed 500 base plus whatever
