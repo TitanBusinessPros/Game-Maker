@@ -3567,7 +3567,13 @@ async function main() {
     // Turn-Based mode: no fixed "you" to show a 🤝 relative to, so name
     // each faction's team instead - true regardless of viewpoint - and
     // point at whoever's turn it currently is.
-    row.innerHTML = factions.map((f) => {
+    // hp<=0 covers a faction excluded on the team-select screen (see
+    // startMatchBtn - excluded gets hp:0, same "already defeated" state a
+    // real elimination uses) as well as an actually-defeated one -
+    // drawFactionHome/renderMinimap already skip these, this row didn't,
+    // so an excluded faction still showed up here even though it never
+    // takes a turn. Reported as "I unchecked 5 of 11 but it shows all 11."
+    row.innerHTML = factions.filter((f) => f.hp > 0).map((f) => {
       const resourceText = ALL_RESOURCE_IDS.map((id) => `${id === 'gold' ? '🪙' : '🔹'} ${Math.round(f.resources[id] || 0)} ${RESOURCE_NAMES[id]}`).join(' · ');
       return `<span style="color:${f.color}">${turnMode && f.id === activeIdx ? '👉 ' : ''}${f.name}: ${Math.round(f.hp)} HP · ${resourceText}${turnMode ? ` [Team ${f.team}]` : (f.team === player.team ? ' 🤝' : '')}</span>`;
     }).join(' ');
@@ -3593,7 +3599,7 @@ async function main() {
   const statsDropdownEl = document.getElementById('statsDropdown');
   function renderStatsDropdown() {
     if (statsDropdownEl.hidden) return;
-    statsDropdownEl.innerHTML = '<h4>📊 Match Stats</h4>' + factions.map((f) => {
+    statsDropdownEl.innerHTML = '<h4>📊 Match Stats</h4>' + factions.filter((f) => f.hp > 0).map((f) => {
       const label = turnMode ? `Team ${f.team ?? '?'}` : (f.team === player.team ? '🤝' : '');
       return `<div class="statsRow"><span class="statsName" style="color:${f.color}">${f.name}${label ? ' ' + label : ''}</span><span class="statsNums">⚔ ${f.stats.kills} · ☠ ${f.stats.losses}</span></div>`;
     }).join('');
