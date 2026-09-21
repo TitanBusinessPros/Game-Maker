@@ -4257,6 +4257,34 @@ async function main() {
       const locked = !activeFaction.built.researchFacility || !activeFaction.built.missileSilo;
       btnEl.disabled = locked || (!isPlacingThis && !canAffordCosts(activeFaction, getCosts(def)));
     });
+    // Same staleness problem as every row above, for the Research tab -
+    // renderResearchPanel() also only redraws on discrete events (a
+    // research finishing, a turn change, building the Research Facility),
+    // so a Research button could sit there showing "Research" (clickable)
+    // from an earlier moment when it genuinely was affordable, even after
+    // gold has since dropped below its cost - spending gold on a unit or
+    // building elsewhere refreshes the Build tab but never this one.
+    // Reported directly: "it shows the user that they can do research
+    // before they even have the gold." Also keeps the "researching… Ns
+    // left" countdown live instead of frozen at whatever it read when
+    // this panel last actually rendered, same reasoning the build
+    // queue's own countdown already gets this treatment for.
+    Object.entries(TECH_TREE).forEach(([id, t]) => {
+      const descEl = document.getElementById(`techDesc-${id}`);
+      const btnEl = document.getElementById(`techBtn-${id}`);
+      if (!descEl && !btnEl) return; // Research tab hasn't been rendered this session yet
+      const hasRFNow = activeFaction.built.researchFacility;
+      const done = activeFaction.research.researched.has(id);
+      const active = activeFaction.research.active && activeFaction.research.active.id === id;
+      const lockedByPrereq = t.prereq && !activeFaction.research.researched.has(t.prereq);
+      if (descEl) {
+        descEl.textContent = `Cost ${t.cost} · ${t.timeSeconds}s${lockedByPrereq ? ' · requires ' + techDisplayName(t.prereq) : ''}${active ? ' · researching… ' + Math.ceil(activeFaction.research.active.remaining) + 's left' : ''}`;
+      }
+      if (btnEl) {
+        btnEl.textContent = !hasRFNow ? 'Locked' : (done ? 'Done' : (active ? 'In progress' : 'Research'));
+        btnEl.disabled = !hasRFNow || done || !!activeFaction.research.active || lockedByPrereq || !canAffordGold(activeFaction, t.cost);
+      }
+    });
     unitDefs.forEach((def, i) => {
       const statsEl = document.getElementById(`unitStats-${i}`);
       if (!statsEl) return; // Build tab hasn't been rendered this session yet, or this unit isn't in it
@@ -4446,8 +4474,9 @@ async function main() {
       // into this file - show both right on the row so a player actually
       // knows what researching this specific level is called and does.
       const pctLabel = t.topic ? ` (+${Number(getResearchPercents(t.topic)[t.level - 1]) || 0}%)` : '';
-      row.innerHTML = `<div class="name">${techDisplayName(id)}${pctLabel}</div><div class="desc">Cost ${t.cost} · ${t.timeSeconds}s${lockedByPrereq ? ' · requires ' + techDisplayName(t.prereq) : ''}${active ? ' · researching… ' + Math.ceil(activeFaction.research.active.remaining) + 's left' : ''}</div>`;
+      row.innerHTML = `<div class="name">${techDisplayName(id)}${pctLabel}</div><div class="desc" id="techDesc-${id}">Cost ${t.cost} · ${t.timeSeconds}s${lockedByPrereq ? ' · requires ' + techDisplayName(t.prereq) : ''}${active ? ' · researching… ' + Math.ceil(activeFaction.research.active.remaining) + 's left' : ''}</div>`;
       const btn = document.createElement('button');
+      btn.id = `techBtn-${id}`;
       btn.textContent = !hasResearchFacility ? 'Locked' : (done ? 'Done' : (active ? 'In progress' : 'Research'));
       btn.disabled = !hasResearchFacility || done || !!activeFaction.research.active || lockedByPrereq || !canAffordGold(activeFaction, t.cost);
       btn.onclick = () => { startResearch(activeFaction, id); renderResearchPanel(); };
