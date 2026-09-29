@@ -157,7 +157,7 @@
     <div class="upload-slot" data-role="intro">
       <div class="thumb">&#127916;</div>
       <div class="meta"><div class="name">No cover art chosen</div><div class="status">optional - shown behind the title on the opening screen</div></div>
-      <input type="file" accept="image/*" style="width:auto">
+      <input type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" style="width:auto">
     </div>
   </section>
 
@@ -189,7 +189,7 @@
     <div class="upload-slot" data-role="outro">
       <div class="thumb">&#127942;</div>
       <div class="meta"><div class="name">No cover art chosen</div><div class="status">optional - shown behind your ending message</div></div>
-      <input type="file" accept="image/*" style="width:auto">
+      <input type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" style="width:auto">
     </div>
   </section>
 
@@ -455,6 +455,16 @@ async function compressImageFile(file) {
   }
 }
 
+async function validateCoverImage(file) {
+  if (!/\.(png|jpe?g)$/i.test(file.name) || (file.type && !['image/png', 'image/jpeg'].includes(file.type))) {
+    throw new Error(`"${file.name}" must be a PNG or JPEG image.`);
+  }
+  const bytes = new Uint8Array(await file.slice(0, 8).arrayBuffer());
+  const png = bytes.length >= 8 && [137,80,78,71,13,10,26,10].every((value, i) => bytes[i] === value);
+  const jpeg = bytes.length >= 3 && bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255;
+  if (!(/\.png$/i.test(file.name) ? png : jpeg)) throw new Error(`"${file.name}" is not a valid PNG or JPEG image.`);
+}
+
 function wireImageSlot(slot, existingUrl) {
   const input = slot.querySelector('input[type=file]');
   const thumb = slot.querySelector('.thumb');
@@ -475,6 +485,15 @@ function wireImageSlot(slot, existingUrl) {
       slot._file = null;
       if (slot._url) { nameEl.textContent = 'Saved cover art'; statusEl.textContent = 'already uploaded ✓'; thumb.style.backgroundImage = `url(${slot._url})`; }
       else { nameEl.textContent = 'No cover art chosen'; statusEl.textContent = defaultStatus; thumb.style.backgroundImage = ''; thumb.textContent = thumb.dataset.emoji || ''; }
+      return;
+    }
+    if (!/\.(png|jpe?g)$/i.test(file.name) || (file.type && !['image/png', 'image/jpeg'].includes(file.type))) {
+      input.value = '';
+      slot._file = null;
+      nameEl.textContent = slot._url ? 'Saved cover art' : 'No cover art chosen';
+      thumb.style.backgroundImage = slot._url ? `url(${slot._url})` : '';
+      thumb.textContent = slot._url ? '' : thumb.dataset.emoji || '';
+      statusEl.textContent = 'Choose a PNG or JPEG image.';
       return;
     }
     slot._file = file;
@@ -534,7 +553,7 @@ function addStageRow(data = {}) {
     <div class="upload-slot" data-role="cover">
       <div class="thumb">&#128444;&#65039;</div>
       <div class="meta"><div class="name">No cover art chosen</div><div class="status">optional - shown on this stage's "Start Stage" screen</div></div>
-      <input type="file" accept="image/*" style="width:auto">
+      <input type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" style="width:auto">
     </div>
   `;
 
@@ -629,7 +648,10 @@ let saveInProgress = false;
 async function uploadIfChanged(kind, file, existingUrl, pathHint) {
   if (!file) return existingUrl || null;
   let toUpload = file;
-  if (kind === 'cover' || kind === 'art') toUpload = await compressImageFile(file);
+  if (kind === 'cover' || kind === 'art') {
+    await validateCoverImage(file);
+    toUpload = await compressImageFile(file);
+  }
   const path = `producer/${currentUser.uid}/${currentDraftId}/${pathHint}_${Date.now()}_${toUpload.name}`;
   const ref = storageRef(storage, path);
   await uploadBytes(ref, toUpload, { cacheControl: 'public, max-age=31536000, immutable' });

@@ -1,0 +1,26 @@
+{
+  "private": true,
+  "scripts": {
+    "test:audio": "node tests/audio-controls.cjs",
+    "test:audio-stress": "node tests/audio-stress.cjs",
+    "test:structures": "node tests/structures-production.cjs",
+    "test:movement": "node tests/troop-movement.cjs",
+    "test:resources": "node tests/resource-placement.cjs",
+    "test:defenders": "node tests/area-defender-builder.cjs && node tests/area-defenders.cjs",
+    "test:base-free": "node tests/base-free-factions.cjs",
+    "test:placements": "node tests/placed-structures-builder.cjs && node tests/placement-preview.cjs && node tests/placed-structures-game.cjs",
+    "test:render": "node tests/render-performance.cjs",
+    "test:fog": "node tests/fog-of-war.cjs",
+    "test:map-motion": "node tests/map-motion.cjs",
+    "test:uploads": "node tests/builder-uploads.cjs",
+    "build:gif": "node scripts/build-gif-player.cjs",
+    "test:gif": "node tests/gif-playback.cjs",
+    "test:export": "node tests/export-assets.cjs",
+    "test:browsers": "node tests/browser-matrix.cjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.10",
+    "gifuct-js": "2.1.2",
+    "playwright": "1.55.1"
+  }
+}

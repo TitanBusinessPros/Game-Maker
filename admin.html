@@ -44,10 +44,14 @@
   #deniedView p { color: var(--bad); }
   .item-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
   .item-card {
+    position: relative;
     background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
     padding: 8px; text-align: center; font-size: 11px;
   }
   .item-card img { width: 100%; height: 70px; object-fit: contain; background: #06121f; border-radius: 4px; margin-bottom: 6px; }
+  .item-card canvas.sprite-thumb { width: 100%; height: 70px; object-fit: contain; background: #06121f; border-radius: 4px; margin-bottom: 6px; }
+  .item-card .sprite-mark { display:block; width:24px; margin:0 auto 6px; padding:2px 0; border-radius:4px; background:var(--accent); color:#06121f; font-weight:800; font-size:12px; }
+  .item-card .gif-mark { position:absolute; top:12px; right:12px; display:grid; place-items:center; width:24px; height:24px; border:2px solid var(--accent); border-radius:50%; background:#06121f; color:var(--accent); font-size:13px; font-weight:800; line-height:1; }
   .item-card .audio-icon { width: 100%; height: 70px; display: flex; align-items: center; justify-content: center; background: #06121f; border-radius: 4px; margin-bottom: 6px; font-size: 24px; }
   .item-card .name { word-break: break-word; margin-bottom: 6px; }
   .category-heading { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .04em; margin: 18px 0 8px; }
@@ -60,6 +64,7 @@
   <h1 id="pageTitle">Game Maker Admin</h1>
   <p class="sub" id="pageSub">Add art and sound to the shared library that every map creator can pick from.</p>
   <div class="row" id="libraryModeNav" style="margin:-8px 0 16px; gap:8px;">
+    <a href="index.html" id="backToEditorLink" class="btn-secondary" style="text-decoration:none; display:inline-block; padding:8px 14px; font-size:12px;">Back to Game Maker</a>
     <a href="admin.html" id="modeLinkStandard" class="btn-secondary" style="text-decoration:none; display:inline-block; padding:8px 14px; font-size:12px;">📚 Standard Library</a>
     <a href="admin.html?premium=1" id="modeLinkPremium" class="btn-secondary" style="text-decoration:none; display:inline-block; padding:8px 14px; font-size:12px;">💎 Premium Library</a>
   </div>
@@ -132,9 +137,12 @@
       <p id="mapSizeHint" style="display:none; color:var(--text-dim); font-size:12px; margin-top:-8px;"></p>
       <div class="field" style="margin-bottom:14px;">
         <label for="filesInput">Files</label>
-        <input type="file" id="filesInput" multiple accept="image/*,audio/*">
+        <input type="file" id="filesInput" multiple accept=".png,.jpg,.jpeg,.gif,image/png,image/jpeg,image/gif,audio/*">
       </div>
-      <button type="button" class="btn-primary" id="uploadBtn">Add to Library</button>
+      <div class="row" style="align-items:center; gap:8px;">
+        <button type="button" class="btn-primary" id="uploadBtn">Add to Library</button>
+      </div>
+      <p class="hint" style="margin:8px 0 0;">For characters, upload one character image or an animated GIF. Sprite-sheet import is not supported.</p>
       <div id="uploadStatus" style="font-size:12px; color:var(--text-dim); margin-top:10px;"></div>
     </div>
 
@@ -426,6 +434,7 @@ const CATEGORY_TREE = [
     { id: 'sounds/music', label: 'Background Music' },
     { id: 'sounds/intro', label: 'Intro Music' },
     { id: 'sounds/attack', label: 'Attack' },
+    { id: 'sounds/weapons', label: 'Unit Weapon & Ability Effects' },
     { id: 'sounds/building_destroyed', label: 'Building Destroyed' },
     { id: 'sounds/home_under_attack', label: 'Home Base Under Attack' },
     { id: 'sounds/endgame', label: 'Game Over' },
@@ -444,6 +453,8 @@ const topCategorySelect = document.getElementById('topCategorySelect');
 const subCategoryField = document.getElementById('subCategoryField');
 const subCategorySelect = document.getElementById('subCategorySelect');
 const subCategoryLabel = document.getElementById('subCategoryLabel');
+const MOVING_CHARACTER_CATEGORIES = CATEGORY_TREE.find((top) => top.id === 'characters').children
+  .filter((child) => child.id !== 'characters/missiles');
 
 const mapSizeHintEl = document.getElementById('mapSizeHint');
 function updateMapSizeHint() {
@@ -497,7 +508,7 @@ const MAX_IMAGE_DIMENSION = 768;
 const IMAGE_QUALITY = 0.85;
 
 async function compressImageFile(file) {
-  if (!file.type.startsWith('image/') || file.type === 'image/gif') return file;
+  if (!file.type.startsWith('image/') || file.type === 'image/gif' || /\.gif$/i.test(file.name)) return file;
   try {
     const bitmap = await createImageBitmap(file);
     const scale = Math.min(1, MAX_IMAGE_DIMENSION / Math.max(bitmap.width, bitmap.height));
@@ -522,6 +533,8 @@ async function compressImageFile(file) {
 }
 
 async function uploadOneFile(file, category) {
+  const displayName = niceName(file.name);
+  const isGif = file.type === 'image/gif' || /\.gif$/i.test(file.name);
   file = await compressImageFile(file);
   const type = file.type.startsWith('audio') ? 'audio' : 'image';
   const path = `${LIBRARY_STORAGE_PREFIX}/${category}/${Date.now()}_${file.name}`;
@@ -535,23 +548,26 @@ async function uploadOneFile(file, category) {
     // visitor, on every single play/edit session, forever - the whole
     // point of a shared library (reuse) got none of the bandwidth
     // benefit that should come with it.
-    (async () => { await uploadBytes(ref, file, { cacheControl: 'public, max-age=31536000, immutable' }); return getDownloadURL(ref); })(),
+    (async () => { await uploadBytes(ref, file, { cacheControl: 'public, max-age=31536000, immutable', ...(isGif ? { contentType: 'image/gif' } : {}) }); return getDownloadURL(ref); })(),
     new Promise((_, reject) => setTimeout(
       () => reject(new Error(`"${file.name}" timed out after ${UPLOAD_TIMEOUT_MS / 1000}s`)),
       UPLOAD_TIMEOUT_MS
     )),
   ]);
   const docRef = doc(collection(db, LIBRARY_COLLECTION));
-  await setDoc(docRef, { category, name: niceName(file.name), type, url, path, createdAt: serverTimestamp() });
+  await setDoc(docRef, {
+    category, name: displayName, type, url, path, fileName: file.name,
+    mimeType: isGif ? 'image/gif' : file.type, createdAt: serverTimestamp(),
+  });
 }
 
-uploadBtn.addEventListener('click', async () => {
+async function uploadSelectedFiles() {
   const files = Array.from(document.getElementById('filesInput').files);
   if (files.length === 0) { uploadStatusEl.textContent = 'Choose at least one file first.'; return; }
   const category = currentCategory();
   uploadBtn.disabled = true;
   let done = 0;
-  uploadStatusEl.textContent = `Uploading (5 at a time)… 0/${files.length} done. Keep this tab open.`;
+  uploadStatusEl.textContent = `Uploading files (5 at a time)… 0/${files.length} done. Keep this tab open.`;
   let nextIndex = 0;
   const errors = [];
   async function worker() {
@@ -563,7 +579,7 @@ uploadBtn.addEventListener('click', async () => {
       } catch (err) {
         errors.push(`${file.name}: ${err.message}`);
       }
-      uploadStatusEl.textContent = `Uploading (5 at a time)… ${done}/${files.length} done. Keep this tab open.`;
+      uploadStatusEl.textContent = `Uploading files… ${done}/${files.length} done. Keep this tab open.`;
     }
   }
   await Promise.all(Array.from({ length: Math.min(MAX_CONCURRENT, files.length) }, worker));
@@ -573,7 +589,8 @@ uploadBtn.addEventListener('click', async () => {
     ? `Done with errors: ${done}/${files.length} added. ${errors.join(' | ')}`
     : `✓ Added ${done}/${files.length} file(s) to the library.`;
   refreshLibrary();
-});
+}
+uploadBtn.addEventListener('click', () => uploadSelectedFiles());
 
 // ---------------------------------------------------------------------
 // Current library listing + delete
@@ -584,13 +601,50 @@ function renderItemGrid(container, items) {
   items.forEach((item) => {
     const card = document.createElement('div');
     card.className = 'item-card';
-    card.innerHTML = item.type === 'image'
+    card.innerHTML = item.spriteSheet
+      ? '<canvas class="sprite-thumb" width="140" height="70"></canvas>'
+      : item.type === 'image'
       ? `<img src="${item.url}" loading="lazy" alt="${item.name}">`
       : `<div class="audio-icon">🎵</div>`;
+    if (item.type === 'image' && (item.mimeType === 'image/gif' || /\.gif$/i.test(item.fileName || '') || /\.gif(?:\?|$)/i.test(decodeURIComponent((item.path || item.url || '').split('?')[0])))) {
+      const mark = document.createElement('span');
+      mark.className = 'gif-mark';
+      mark.textContent = 'G';
+      mark.title = 'Animated GIF';
+      mark.setAttribute('aria-label', 'Animated GIF');
+      card.appendChild(mark);
+    }
+    if (item.spriteSheet) {
+      const image = new Image();
+      image.onload = () => {
+        const canvas = card.querySelector('canvas');
+        if (!canvas) return;
+        const rows = item.spriteSheet.directions.split(',');
+        const row = Math.max(0, rows.indexOf('down'));
+        const frameW = image.naturalWidth / item.spriteSheet.columns;
+        const frameH = image.naturalHeight / rows.length;
+        const scale = Math.min(canvas.width / frameW, canvas.height / frameH);
+        const width = frameW * scale, height = frameH * scale;
+        canvas.getContext('2d').drawImage(image, 0, row * frameH, frameW, frameH,
+          (canvas.width - width) / 2, (canvas.height - height) / 2, width, height);
+      };
+      image.src = item.url;
+      const mark = document.createElement('span');
+      mark.className = 'sprite-mark';
+      mark.textContent = 'S';
+      mark.title = 'Moving sprite-sheet character';
+      card.appendChild(mark);
+    }
     const nameEl = document.createElement('div');
     nameEl.className = 'name';
     nameEl.textContent = item.name;
     card.appendChild(nameEl);
+    if (item.spriteSheet) {
+      const details = document.createElement('div');
+      details.style.cssText = 'font-size:11px;color:var(--accent);padding:0 6px 6px;';
+      details.textContent = 'Legacy sprite sheet ? unavailable in the builder library.';
+      card.appendChild(details);
+    }
     const delBtn = document.createElement('button');
     delBtn.className = 'btn-danger';
     delBtn.textContent = 'Delete';

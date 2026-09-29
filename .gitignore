@@ -2,3 +2,16 @@ functions/node_modules/
 functions/.env
 functions/.env.*
 .DS_Store
+/node_modules/
+/.edge-cdp2/
+/.edge-cdp4/
+/.edge-test/
+/.local-previews/
+/V-2-9-26/
+/V3-9-27/
+/V-4-9-29/
+/MEMORY.md
+/play-test.html
+/.tmp-cdp.ps1
+/tests/browser-results*.json
+*.log

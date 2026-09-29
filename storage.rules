@@ -10,7 +10,8 @@ service firebase.storage {
       allow read: if true;
       allow write: if request.auth != null
                    && request.auth.uid == uid
-                   && request.resource.size < 15 * 1024 * 1024;
+                   && request.resource.size < 15 * 1024 * 1024
+                   && request.resource.contentType.matches('image/(png|jpeg|webp)|audio/.*');
     }
 
     // Shared asset library (existing After Earth art/sound plus whatever
@@ -54,7 +55,9 @@ service firebase.storage {
       allow read: if request.auth != null && request.auth.uid == uid;
       allow write: if request.auth != null
                    && request.auth.uid == uid
-                   && request.resource.size < 50 * 1024 * 1024;
+                   && request.resource.size < 50 * 1024 * 1024
+                   && (!request.resource.contentType.matches('image/.*') ||
+                       request.resource.contentType.matches('image/(png|jpeg|webp)'));
     }
   }
 }

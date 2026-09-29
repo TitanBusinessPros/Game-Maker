@@ -9,7 +9,7 @@
 // Bump CACHE_NAME any time the shell files themselves change enough to
 // matter offline - it's what actually invalidates the old cache entries,
 // since there's no build step here to hash filenames automatically.
-const CACHE_NAME = 'gm-shell-v1';
+const CACHE_NAME = 'gm-shell-v20';
 const SHELL_FILES = [
   './index.html',
   './admin.html',

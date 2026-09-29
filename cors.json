@@ -1,6 +1,6 @@
 [
   {
-    "origin": ["https://titanbusinesspros.github.io"],
+    "origin": ["https://titanbusinesspros.github.io", "http://localhost:8765", "http://127.0.0.1:8765"],
     "method": ["GET"],
     "responseHeader": ["Content-Type"],
     "maxAgeSeconds": 3600

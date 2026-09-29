@@ -91,6 +91,11 @@
   #topbarActions { flex:none; max-width:100%; display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end; margin-left:auto; }
   #hudRow { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; font-size:11px; }
   #turnLabel { font-size:11px; color:var(--dim); }
+  #objectivesBar { flex:0 0 100%; display:flex; align-items:flex-start; gap:10px; border-top:1px solid var(--border); padding-top:7px; max-height:100px; overflow-y:auto; }
+  #objectivesBar[hidden] { display:none; }
+  #objectivesBar strong { flex:none; color:var(--accent); font-size:11px; padding-top:4px; }
+  #objectivesList { display:flex; flex-wrap:wrap; gap:5px 8px; list-style:none; margin:0; padding:0; }
+  #objectivesList li { background:var(--panel2); border:1px solid var(--border); border-radius:5px; padding:3px 7px; font-size:11px; max-width:280px; overflow-wrap:anywhere; }
   /* The map's own name, dressed up as a small plaque/badge instead of
      plain bold text, so it actually reads as "the name of this game"
      rather than blending into the rest of the topbar. */
@@ -381,7 +386,8 @@
     </div>
     <div id="topbarActions">
       <button id="pauseBtn">⏸️ Pause</button>
-      <button id="soundBtn">🔈 Sound</button>
+      <button id="musicBtn" type="button" aria-pressed="false" title="Turn background music on or off">Music: Off</button>
+      <button id="sfxBtn" type="button" aria-pressed="false" title="Turn sound effects on or off">Effects: Off</button>
       <button id="saveBtn">💾 Save</button>
       <label style="background:var(--panel2); border:1px solid var(--border); border-radius:6px; padding:6px 9px; font-size:11px; cursor:pointer;">
         📂 Load<input id="loadInput" type="file" accept=".json" style="display:none;">
@@ -389,6 +395,10 @@
       <button id="statsBtn">📊 Stats</button>
       <button id="panelToggleBtn">☰</button>
     </div>
+    <section id="objectivesBar" aria-label="Objectives" hidden>
+      <strong>Objectives</strong>
+      <ol id="objectivesList"></ol>
+    </section>
   </div>
   <div id="statsDropdown" hidden></div>
   <button id="hudToggleBtn" title="Hide map info">▲</button>
@@ -398,6 +408,7 @@
 
   <div id="unitInfoBox">
     <div id="unitInfoText"></div>
+    <button type="button" id="releaseVesselsBtn" style="display:none; margin-top:6px; width:100%; background:var(--accent); color:#06121f; border:1px solid var(--accent); border-radius:5px; padding:5px; font-size:11px; cursor:pointer;">Release vessels</button>
     <button type="button" id="deselectBtn" style="margin-top:6px; width:100%; background:var(--panel); color:var(--text); border:1px solid var(--border); border-radius:5px; padding:5px; font-size:11px; cursor:pointer;">&#10005; Deselect</button>
   </div>
   <div id="minimapWrap"><canvas id="minimap" width="180" height="180"></canvas></div>
@@ -504,9 +515,64 @@
   </div>
 </div>
 
+<!-- GIF PLAYER START -->
+<script>
+/*
+gifuct-js
+The MIT License (MIT)
+
+Copyright (c) 2015 Matt Way
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+
+js-binary-schema-parser
+The MIT License (MIT)
+
+Copyright (c) 2015 Matt Way
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+*/
+var GMGif=(()=>{var N=Object.create;var U=Object.defineProperty;var Q=Object.getOwnPropertyDescriptor;var V=Object.getOwnPropertyNames;var ee=Object.getPrototypeOf,re=Object.prototype.hasOwnProperty;var T=(a,e)=>()=>(e||a((e={exports:{}}).exports,e),e.exports),te=(a,e)=>{for(var r in e)U(a,r,{get:e[r],enumerable:!0})},K=(a,e,r,t)=>{if(e&&typeof e=="object"||typeof e=="function")for(let n of V(e))!re.call(a,n)&&n!==r&&U(a,n,{get:()=>e[n],enumerable:!(t=Q(e,n))||t.enumerable});return a};var ae=(a,e,r)=>(r=a!=null?N(ee(a)):{},K(e||!a||!a.__esModule?U(r,"default",{value:a,enumerable:!0}):r,a)),ne=a=>K(U({},"__esModule",{value:!0}),a);var R=T(I=>{"use strict";Object.defineProperty(I,"__esModule",{value:!0});I.loop=I.conditional=I.parse=void 0;var ie=function a(e,r){var t=arguments.length>2&&arguments[2]!==void 0?arguments[2]:{},n=arguments.length>3&&arguments[3]!==void 0?arguments[3]:t;if(Array.isArray(r))r.forEach(function(d){return a(e,d,t,n)});else if(typeof r=="function")r(e,t,n,a);else{var i=Object.keys(r)[0];Array.isArray(r[i])?(n[i]={},a(e,r[i],t,n[i])):n[i]=r[i](e,t,n,a)}return t};I.parse=ie;var oe=function(e,r){return function(t,n,i,d){r(t,n,i)&&d(t,e,n,i)}};I.conditional=oe;var se=function(e,r){return function(t,n,i,d){for(var o=[],c=t.pos;r(t,n,i);){var l={};if(d(t,e,n,l),t.pos===c)break;c=t.pos,o.push(l)}return o}};I.loop=se});var H=T(v=>{"use strict";Object.defineProperty(v,"__esModule",{value:!0});v.readBits=v.readArray=v.readUnsigned=v.readString=v.peekBytes=v.readBytes=v.peekByte=v.readByte=v.buildStream=void 0;var de=function(e){return{data:e,pos:0}};v.buildStream=de;var W=function(){return function(e){return e.data[e.pos++]}};v.readByte=W;var ce=function(){var e=arguments.length>0&&arguments[0]!==void 0?arguments[0]:0;return function(r){return r.data[r.pos+e]}};v.peekByte=ce;var E=function(e){return function(r){return r.data.subarray(r.pos,r.pos+=e)}};v.readBytes=E;var ue=function(e){return function(r){return r.data.subarray(r.pos,r.pos+e)}};v.peekBytes=ue;var le=function(e){return function(r){return Array.from(E(e)(r)).map(function(t){return String.fromCharCode(t)}).join("")}};v.readString=le;var fe=function(e){return function(r){var t=E(2)(r);return e?(t[1]<<8)+t[0]:(t[0]<<8)+t[1]}};v.readUnsigned=fe;var pe=function(e,r){return function(t,n,i){for(var d=typeof r=="function"?r(t,n,i):r,o=E(e),c=new Array(d),l=0;l<d;l++)c[l]=o(t);return c}};v.readArray=pe;var he=function(e,r,t){for(var n=0,i=0;i<t;i++)n+=e[r+i]&&Math.pow(2,t-i-1);return n},ge=function(e){return function(r){for(var t=W()(r),n=new Array(8),i=0;i<8;i++)n[7-i]=!!(t&1<<i);return Object.keys(e).reduce(function(d,o){var c=e[o];return c.length?d[o]=he(n,c.index,c.length):d[o]=n[c.index],d},{})}};v.readBits=ge});var Y=T(q=>{"use strict";Object.defineProperty(q,"__esModule",{value:!0});q.default=void 0;var M=R(),s=H(),G={blocks:function(e){for(var r=0,t=[],n=e.data.length,i=0,d=(0,s.readByte)()(e);d!==r&&d;d=(0,s.readByte)()(e)){if(e.pos+d>=n){var o=n-e.pos;t.push((0,s.readBytes)(o)(e)),i+=o;break}t.push((0,s.readBytes)(d)(e)),i+=d}for(var c=new Uint8Array(i),l=0,h=0;h<t.length;h++)c.set(t[h],l),l+=t[h].length;return c}},ve=(0,M.conditional)({gce:[{codes:(0,s.readBytes)(2)},{byteSize:(0,s.readByte)()},{extras:(0,s.readBits)({future:{index:0,length:3},disposal:{index:3,length:3},userInput:{index:6},transparentColorGiven:{index:7}})},{delay:(0,s.readUnsigned)(!0)},{transparentColorIndex:(0,s.readByte)()},{terminator:(0,s.readByte)()}]},function(a){var e=(0,s.peekBytes)(2)(a);return e[0]===33&&e[1]===249}),ye=(0,M.conditional)({image:[{code:(0,s.readByte)()},{descriptor:[{left:(0,s.readUnsigned)(!0)},{top:(0,s.readUnsigned)(!0)},{width:(0,s.readUnsigned)(!0)},{height:(0,s.readUnsigned)(!0)},{lct:(0,s.readBits)({exists:{index:0},interlaced:{index:1},sort:{index:2},future:{index:3,length:2},size:{index:5,length:3}})}]},(0,M.conditional)({lct:(0,s.readArray)(3,function(a,e,r){return Math.pow(2,r.descriptor.lct.size+1)})},function(a,e,r){return r.descriptor.lct.exists}),{data:[{minCodeSize:(0,s.readByte)()},G]}]},function(a){return(0,s.peekByte)()(a)===44}),me=(0,M.conditional)({text:[{codes:(0,s.readBytes)(2)},{blockSize:(0,s.readByte)()},{preData:function(e,r,t){return(0,s.readBytes)(t.text.blockSize)(e)}},G]},function(a){var e=(0,s.peekBytes)(2)(a);return e[0]===33&&e[1]===1}),xe=(0,M.conditional)({application:[{codes:(0,s.readBytes)(2)},{blockSize:(0,s.readByte)()},{id:function(e,r,t){return(0,s.readString)(t.blockSize)(e)}},G]},function(a){var e=(0,s.peekBytes)(2)(a);return e[0]===33&&e[1]===255}),we=(0,M.conditional)({comment:[{codes:(0,s.readBytes)(2)},G]},function(a){var e=(0,s.peekBytes)(2)(a);return e[0]===33&&e[1]===254}),Be=[{header:[{signature:(0,s.readString)(3)},{version:(0,s.readString)(3)}]},{lsd:[{width:(0,s.readUnsigned)(!0)},{height:(0,s.readUnsigned)(!0)},{gct:(0,s.readBits)({exists:{index:0},resolution:{index:1,length:3},sort:{index:4},size:{index:5,length:3}})},{backgroundColorIndex:(0,s.readByte)()},{pixelAspectRatio:(0,s.readByte)()}]},(0,M.conditional)({gct:(0,s.readArray)(3,function(a,e){return Math.pow(2,e.lsd.gct.size+1)})},function(a,e){return e.lsd.gct.exists}),{frames:(0,M.loop)([ve,xe,we,ye,me],function(a){var e=(0,s.peekByte)()(a);return e===33||e===44})}],be=Be;q.default=be});var Z=T(D=>{"use strict";Object.defineProperty(D,"__esModule",{value:!0});D.deinterlace=void 0;var _e=function(e,r){for(var t=new Array(e.length),n=e.length/r,i=function(w,m){var f=e.slice(m*r,(m+1)*r);t.splice.apply(t,[w*r,r].concat(f))},d=[0,4,2,1],o=[8,8,4,2],c=0,l=0;l<4;l++)for(var h=d[l];h<n;h+=o[l])i(h,c),c++;return t};D.deinterlace=_e});var $=T(j=>{"use strict";Object.defineProperty(j,"__esModule",{value:!0});j.lzw=void 0;var Se=function(e,r,t){var n=4096,i=-1,d=t,o,c,l,h,B,w,m,u,f,x,P,F,g,y,z,b,_=new Array(t),k=new Array(n),A=new Array(n),S=new Array(n+1);for(F=e,c=1<<F,B=c+1,o=c+2,m=i,h=F+1,l=(1<<h)-1,f=0;f<c;f++)k[f]=0,A[f]=f;var P,u,p,g,y,b,z;for(P=u=p=g=y=b=z=0,x=0;x<d;){if(y===0){if(u<h){P+=r[z]<<u,u+=8,z++;continue}if(f=P&l,P>>=h,u-=h,f>o||f==B)break;if(f==c){h=F+1,l=(1<<h)-1,o=c+2,m=i;continue}if(m==i){S[y++]=A[f],m=f,g=f;continue}for(w=f,f==o&&(S[y++]=g,f=m);f>c;)S[y++]=A[f],f=k[f];g=A[f]&255,S[y++]=g,o<n&&(k[o]=m,A[o]=g,o++,(o&l)===0&&o<n&&(h++,l+=o)),m=w}y--,_[b++]=S[y],x++}for(x=b;x<d;x++)_[x]=0;return _};j.lzw=Se});var L=T(C=>{"use strict";Object.defineProperty(C,"__esModule",{value:!0});C.decompressFrames=C.decompressFrame=C.parseGIF=void 0;var ke=Fe(Y()),Ae=R(),Ie=H(),Me=Z(),Ce=$();function Fe(a){return a&&a.__esModule?a:{default:a}}var Pe=function(e){var r=new Uint8Array(e);return(0,Ae.parse)((0,Ie.buildStream)(r),ke.default)};C.parseGIF=Pe;var Te=function(e){for(var r=e.pixels.length,t=new Uint8ClampedArray(r*4),n=0;n<r;n++){var i=n*4,d=e.pixels[n],o=e.colorTable[d]||[0,0,0];t[i]=o[0],t[i+1]=o[1],t[i+2]=o[2],t[i+3]=d!==e.transparentIndex?255:0}return t},J=function(e,r,t){if(!e.image){console.warn("gif frame does not have associated image.");return}var n=e.image,i=n.descriptor.width*n.descriptor.height,d=(0,Ce.lzw)(n.data.minCodeSize,n.data.blocks,i);n.descriptor.lct.interlaced&&(d=(0,Me.deinterlace)(d,n.descriptor.width));var o={pixels:d,dims:{top:e.image.descriptor.top,left:e.image.descriptor.left,width:e.image.descriptor.width,height:e.image.descriptor.height}};return n.descriptor.lct&&n.descriptor.lct.exists?o.colorTable=n.lct:o.colorTable=r,e.gce&&(o.delay=(e.gce.delay||10)*10,o.disposalType=e.gce.extras.disposal,e.gce.extras.transparentColorGiven&&(o.transparentIndex=e.gce.transparentColorIndex)),t&&(o.patch=Te(o)),o};C.decompressFrame=J;var ze=function(e,r){return e.frames.filter(function(t){return t.image}).map(function(t){return J(t,e.gct,r)})};C.decompressFrames=ze});var Ge={};te(Ge,{createAnimation:()=>Ee});var O=ae(L()),Ue=128*1024*1024,X=0;async function Ee(a,{maxDimension:e=512}={}){let r=(0,O.parseGIF)(a),t=r.frames.filter(u=>u.image),{width:n,height:i}=r.lsd;if(!n||!i||n*i>16*1024*1024)throw new Error("GIF dimensions exceed the supported 16 megapixels.");if(!t.length)throw new Error("GIF contains no image frames.");let d=Math.min(32*1024*1024,Ue-X);if(d<t.length*4)throw new Error("The map contains too much GIF artwork to prepare for smooth playback.");let o=Math.min(1,e/Math.max(n,i),Math.sqrt(d/(n*i*t.length*4))),c=Math.max(1,Math.floor(n*o)),l=Math.max(1,Math.floor(i*o)),h=c*l*t.length*4;X+=h;let B=document.createElement("canvas");B.width=n,B.height=i;let w=B.getContext("2d",{willReadFrequently:!0}),m=document.createElement("canvas"),f=m.getContext("2d"),x=0,F=t.map(u=>{let p=x;return x+=Math.max(20,(u.gce?.delay||10)*10),p}),_=null,k=null;function A(u,p){w.clearRect(u.left,u.top,u.width,u.height);let g=r.gct?.[r.lsd.backgroundColorIndex];!p&&g&&(w.fillStyle=`rgb(${g.join(",")})`,w.fillRect(u.left,u.top,u.width,u.height))}let S=[];try{A({left:0,top:0,width:n,height:i},t[0].gce?.extras.transparentColorGiven);for(let u of t){_?.disposalType===2&&A(_.dims,_.transparentIndex!==void 0),_?.disposalType===3&&k&&w.putImageData(k,0,0);let p=u.image.descriptor;if(!p.width||!p.height||p.left+p.width>n||p.top+p.height>i)throw new Error("GIF frame lies outside its image dimensions.");let g=(0,O.decompressFrame)(u,r.gct,!0);k=g.disposalType===3?w.getImageData(0,0,n,i):null,m.width=p.width,m.height=p.height,f.putImageData(new ImageData(g.patch,p.width,p.height),0,0),w.drawImage(m,p.left,p.top);let y=document.createElement("canvas");y.width=c,y.height=l,y.getContext("2d").drawImage(B,0,0,c,l),S.push(y),_={dims:p,disposalType:g.disposalType,transparentIndex:g.transparentIndex},await new Promise(b=>setTimeout(b,0))}}catch(u){throw X-=h,S.forEach(p=>{p.width=p.height=0}),u}finally{B.width=B.height=m.width=m.height=0,k=null}let P=performance.now();return{frameCount:t.length,frameWidth:c,frameHeight:l,cacheBytes:h,total:x,frameAt(u){let p=((u-P)%x+x)%x,g=0,y=F.length-1;for(;g<y;){let b=Math.ceil((g+y)/2);F[b]<=p?g=b:y=b-1}return S[g]}}}return ne(Ge);})();
+
+</script>
+<!-- GIF PLAYER END -->
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
-import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAJ-zJW3Z25mGucMA-hnO67yn-7Q5VgF1c",
@@ -524,6 +590,12 @@ async function loadConfig() {
   if (window.GM_INLINE_CONFIG) return window.GM_INLINE_CONFIG;
   const mapId = new URLSearchParams(location.search).get('map');
   if (!mapId) throw new Error('No map specified. Open a map from the editor’s "My Maps" list.');
+  // Standalone games already contain their map. Only online map loading
+  // needs Firebase; static imports would prevent startup without internet.
+  const [{ initializeApp }, { getFirestore, doc, getDoc }] = await Promise.all([
+    import('https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js'),
+    import('https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js'),
+  ]);
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
   const snap = await getDoc(doc(db, 'maps', mapId));
@@ -531,14 +603,50 @@ async function loadConfig() {
   return snap.data();
 }
 
-function loadImage(url) {
-  return new Promise((resolve) => {
-    if (!url) { resolve(null); return; }
+const imageCache = new Map();
+function loadImage(url, options) {
+  if (!url) return Promise.resolve(null);
+  if (imageCache.has(url)) return imageCache.get(url);
+  const loading = new Promise((resolve) => {
     const img = new Image();
     img.onload = () => resolve(img);
     img.onerror = () => resolve(null);
     img.src = url;
+  }).then(async (img) => {
+    const namedGif = /^(data:image\/gif[;,]|[^?#]+\.gif(?:[?#]|$))/i.test(url);
+    if (!img) {
+      if (namedGif) throw new Error('A GIF character image could not be loaded. Check its file or upload it again.');
+      return null;
+    }
+    let bytes;
+    try {
+      const response = await fetch(url, { cache: 'reload' });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      bytes = await response.arrayBuffer();
+    } catch (err) {
+      if (namedGif) throw new Error('GIF animation could not be loaded: ' + err.message);
+      return img; // Ordinary cross-origin images can still be drawn without reading their bytes.
+    }
+    // Inspect the file signature: library URLs and offline data URLs do not
+    // necessarily have a .gif filename or the correct MIME type.
+    const signature = String.fromCharCode(...new Uint8Array(bytes, 0, Math.min(6, bytes.byteLength)));
+    if (signature !== 'GIF87a' && signature !== 'GIF89a') return img;
+    try {
+      img._gmAnimation = await GMGif.createAnimation(bytes, options);
+      img._gmAnimation.frameAt(performance.now());
+    } catch (err) {
+      throw new Error('GIF animation could not be decoded: ' + err.message);
+    }
+    return img;
   });
+  imageCache.set(url, loading);
+  return loading;
+}
+
+function drawGameImage(ctx, img, ...args) {
+  const animation = img._gmAnimation;
+  if (!animation) { ctx.drawImage(img, ...args); return; }
+  ctx.drawImage(animation.frameAt(performance.now()), ...args);
 }
 function loadAudio(url) {
   if (!url) return null;
@@ -620,6 +728,30 @@ const HOMEWORLD_SIZE = 90;
 const DEPOSIT_SIZE = 56;
 const GATED_BUILDING_SIZE = 56;
 const MISSILE_SIZE = 20; // the flying projectile itself, drawn smaller than the stationary launcher that fired it
+function visualScale(value) { return Math.max(1, Math.min(10, Math.round(Number(value) || 1))); }
+function unitVisualSize(u) { return (u.isGatedBuilding ? GATED_BUILDING_SIZE : UNIT_SIZE) * visualScale(u.visualScale); }
+function homeVisualSize(f) { return HOMEWORLD_SIZE * visualScale(f.visualScale); }
+const SPRITE_DIRECTION_ROWS = [
+  'down,left,right,up', 'down,right,left,up', 'up,right,down,left', 'up,left,down,right',
+  'down,down-left,left,up-left,up,up-right,right,down-right',
+  'up,up-right,right,down-right,down,down-left,left,up-left',
+];
+function normalizeSpriteSheet(settings) {
+  if (!settings || !SPRITE_DIRECTION_ROWS.includes(settings.directions)) return null;
+  return {
+    columns: Math.max(1, Math.min(16, Math.round(Number(settings.columns) || 4))),
+    rows: settings.directions.split(','),
+    fps: Math.max(1, Math.min(30, Number(settings.fps) || 8)),
+  };
+}
+function spriteDirection(angle, rowCount) {
+  const directions = rowCount === 8
+    ? ['right','down-right','down','down-left','left','up-left','up','up-right']
+    : ['right','down','left','up'];
+  const step = Math.PI * 2 / directions.length;
+  const index = ((Math.round(angle / step) % directions.length) + directions.length) % directions.length;
+  return directions[index];
+}
 const UNIT_COLLISION_RADIUS = 20; // half of UNIT_SIZE-ish - how much clearance a moving unit needs from an obstacle's own edge, used by steerAroundObstacles/pushOutOfObstacles below
 const AI_TICK_SECONDS = 6; // medium's value - other difficulties scale it via AI_DIFFICULTY below
 // Per-computer-player difficulty, set on the build page (index.html's
@@ -640,6 +772,7 @@ const AI_DIFFICULTY = {
 };
 const MINING_RANGE = 80; // how close a Mining Ship has to be to its deposit to actually earn resources
 const TURRET_MIN_RANGE = 50, TURRET_MAX_RANGE = 300; // valid placement ring around a faction's own Home Base
+const RESOURCE_DEFENSE_BUFFER = 100; // keep the entire mining zone this far beyond hostile stationary weapons
 // A gated building's own production queue (Air Base/War Factory/Infantry
 // Post/Helicopter Facility/Navy Harbor) - per building INSTANCE, not per
 // unit type, so queueing 10 Tanks fills the whole War Factory's queue
@@ -687,12 +820,15 @@ async function main() {
   // there was nothing to pick, no team screen either (reported as
   // "there is still no option for teams"). Failing loudly here instead,
   // with a link straight back to the editor to fix it.
-  if (!Array.isArray(cfg.computers) || cfg.computers.length === 0) {
+  const hasBaseFreeEnemy = Array.isArray(cfg.mapOnlyFactions) && cfg.mapOnlyFactions.length > 0 &&
+    (cfg.areaDefenders || []).some((point) => point.factionId >= 1 + (cfg.computers?.length || 0));
+  if ((!Array.isArray(cfg.computers) || cfg.computers.length === 0) && !hasBaseFreeEnemy) {
     statusEl.innerHTML = `This map has no computer players to play against - it may have been saved before that feature existed. <a href="index.html?map=${new URLSearchParams(location.search).get('map') || ''}" style="color:var(--accent, #4fa8ff);">Open it in the editor</a> and add at least one, then save again.`;
     return;
   }
   statusEl.textContent = 'Loading art & sound…';
-  // Turn-Based (hot-seat): 2-11 people share this device. Only the active
+  // Turn-Based (hot-seat): newly built maps allow 2-6 people; older maps
+  // with more factions remain playable. Only the active
   // faction's units can act at all (move/attack) - everyone else is
   // frozen until their own turn comes back around. Set at map-creation
   // time (index.html's Game Style picker); Real-Time is the default and
@@ -711,11 +847,14 @@ async function main() {
   const minimap = document.getElementById('minimap');
   const mctx = minimap.getContext('2d');
 
-  function resizeCanvasOnly() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+  function resizeCanvasOnly() {
+    if (canvas.width !== window.innerWidth) canvas.width = window.innerWidth;
+    if (canvas.height !== window.innerHeight) canvas.height = window.innerHeight;
+  }
   resizeCanvasOnly();
 
   const [bgImg, resourceImg, miningImg] = await Promise.all([
-    loadImage(cfg.backgroundImage), loadImage(cfg.resource?.image), loadImage(cfg.miningUnit?.image),
+    loadImage(cfg.backgroundImage, { maxDimension: 2048 }), loadImage(cfg.resource?.image), loadImage(cfg.miningUnit?.image),
   ]);
   const playerImg = await loadImage(cfg.player?.baseImage);
   const computerCfgs = cfg.computers || [];
@@ -795,6 +934,18 @@ async function main() {
     ...(cfg.units || []).map((u) => ({ ...u, buildingKey: null })),
     ...GATED_BUILDINGS.filter((b) => b.key !== 'missileSilo').flatMap((b) => b.unitCfgs.map((u) => ({ ...u, buildingKey: b.key }))),
   ];
+  // Append vessel definitions so existing unit indexes stay stable in saves.
+  unitDefs.slice().forEach((def, parentIndex) => {
+    if (!def.transport?.vessel || !['airBase', 'navyHarbor'].includes(def.buildingKey)) return;
+    def.vesselDefIndex = unitDefs.length;
+    unitDefs.push({ ...def.transport.vessel, transport: null, transportParent: parentIndex, buildingKey: def.buildingKey });
+  });
+  const mapOnlyConfigs = Array.isArray(cfg.mapOnlyFactions) ? cfg.mapOnlyFactions : [];
+  mapOnlyConfigs.forEach((faction, factionIndex) => {
+    for (const unit of faction.units || []) {
+      unitDefs.push({ ...unit, buildingKey: null, mapOnlyOnly: true, mapOnlyFactionIndex: factionIndex });
+    }
+  });
   const unitImages = await Promise.all(unitDefs.map((u) => loadImage(u.imageUrl)));
   // Only Missile Battery units (def.isMissileUnit) actually have a
   // missileImageUrl at all - loadImage(undefined) resolves to null for
@@ -823,6 +974,27 @@ async function main() {
   // missileImageUrl is the flying projectile fired at its target (drawn
   // by drawMissiles() - see the `missiles` array further down).
   const missileDefs = cfg.missileUnits || [];
+  // Maps saved before player availability was added allow every faction.
+  function canFactionProduce(def, factionId) {
+    return !!def && !def.mapOnlyOnly && (!Array.isArray(def.allowedFactions) || def.allowedFactions.includes(factionId));
+  }
+  function canFactionUseUnit(def, factionId) {
+    return def?.transportParent === undefined && canFactionProduce(def, factionId) &&
+      (!def.buildingKey || canFactionProduce(buildingCfgByKey[def.buildingKey], factionId) || hasPlacedBuilding(factionId, def.buildingKey));
+  }
+  function hasPlacedBuilding(factionId, key) {
+    return units.some((u) => u.alive && u.hp > 0 && u.mapPlaced && u.isGatedBuilding &&
+      u.factionId === factionId && u.buildingKey === key);
+  }
+  function canFactionUseBuilding(building, factionId) {
+    if (building.key === 'researchFacility') return true;
+    if (hasPlacedBuilding(factionId, building.key)) return true;
+    return canFactionProduce(building.cfg, factionId) &&
+      (building.alwaysShow || building.unitCfgs.some((def) => canFactionProduce(def, factionId)));
+  }
+  function canFactionUseMissile(def, factionId) {
+    return canFactionProduce(def, factionId) && (canFactionProduce(buildingCfgByKey.missileSilo, factionId) || hasPlacedBuilding(factionId, 'missileSilo'));
+  }
   const missileLauncherImages = await Promise.all(missileDefs.map((d) => loadImage(d.imageUrl)));
   const missileProjectileImages = await Promise.all(missileDefs.map((d) => loadImage(d.missileImageUrl)));
 
@@ -871,10 +1043,113 @@ async function main() {
     attack: cfg.sounds?.attack, buildingDestroyed: cfg.sounds?.buildingDestroyed,
     homeUnderAttack: cfg.sounds?.homeUnderAttack, endgame: cfg.sounds?.endgame,
   };
-  let soundOn = false;
-  function playSfx(url) { if (!soundOn || !url) return; try { new Audio(url).play().catch(() => {}); } catch (e) {} }
+  let musicOn = false;
+  let sfxOn = false;
+  let musicRequest = 0;
+  const activeSfx = new Set();
+  const activeSfxSources = new Set();
+  const sfxBuffers = new Map();
+  let sfxContext = null;
+  let sfxOutput = null;
+  let sfxGeneration = 0;
+  function ensureSfxContext() {
+    const Context = globalThis.AudioContext || globalThis.webkitAudioContext;
+    if (!Context) return null;
+    if (!sfxContext) {
+      sfxContext = new Context();
+      // Mix every voice, reducing clipping when many units fire together.
+      sfxOutput = sfxContext.createDynamicsCompressor();
+      sfxOutput.connect(sfxContext.destination);
+    }
+    return sfxContext;
+  }
+  function loadSfxBuffer(url, context) {
+    if (!sfxBuffers.has(url)) {
+      const pending = (async () => {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`Sound download failed (${response.status})`);
+        return context.decodeAudioData(await response.arrayBuffer());
+      })();
+      sfxBuffers.set(url, pending);
+      // A temporary network failure must not poison this sound for the match.
+      pending.catch(() => { if (sfxBuffers.get(url) === pending) sfxBuffers.delete(url); });
+    }
+    return sfxBuffers.get(url);
+  }
+  function updateAudioButtons() {
+    for (const [id, label, enabled] of [['musicBtn', 'Music', musicOn], ['sfxBtn', 'Effects', sfxOn]]) {
+      const button = document.getElementById(id);
+      button.textContent = `${label}: ${enabled ? 'On' : 'Off'}`;
+      button.setAttribute('aria-pressed', String(enabled));
+    }
+  }
+  function playSfxFallback(url) {
+    try {
+      const audio = new Audio(url);
+      const cleanup = () => {
+        if (!activeSfx.delete(audio)) return;
+        audio.pause();
+        audio.removeAttribute('src');
+        audio.load();
+      };
+      audio.addEventListener('ended', cleanup, { once: true });
+      audio.addEventListener('error', cleanup, { once: true });
+      activeSfx.add(audio);
+      try { audio.play().catch(cleanup); } catch (e) { cleanup(); }
+    } catch (e) {}
+  }
+  async function playSfx(url) {
+    if (!sfxOn || !url) return;
+    const generation = sfxGeneration;
+    let source;
+    try {
+      const context = ensureSfxContext();
+      if (!context) { playSfxFallback(url); return; }
+      await Promise.all([
+        context.state === 'running' ? Promise.resolve() : context.resume(),
+        loadSfxBuffer(url, context),
+      ]).then(([, buffer]) => {
+        // Muting cancels sounds still downloading/decoding as well as active ones.
+        if (!sfxOn || generation !== sfxGeneration) return;
+        source = context.createBufferSource();
+        source.buffer = buffer;
+        source.connect(sfxOutput);
+        source.onended = () => {
+          activeSfxSources.delete(source);
+          source.disconnect();
+        };
+        activeSfxSources.add(source);
+        source.start();
+      });
+    } catch (err) {
+      if (source) { activeSfxSources.delete(source); source.disconnect(); }
+      // Retain playback for older browsers and remote assets without fetch CORS.
+      if (sfxOn && generation === sfxGeneration) playSfxFallback(url);
+    }
+  }
+  function playUnitSound(u) {
+    if (!u) return;
+    const mapOnlyEnemy = factionOf(u.factionId)?.isMapOnly;
+    // Base-free defenders use their authored attack sound when the viewer
+    // can see them. Ordinary computer armies keep their existing audio rule.
+    if (u.factionId !== player?.id && !mapOnlyEnemy) return;
+    if (mapOnlyEnemy && fogOn && (!matchStarted || !inSight(u.x, u.y, sightSources()))) return;
+    playSfx(u.weaponSound);
+  }
 
   document.getElementById('mapTitleLabel').textContent = cfg.name || 'Untitled Map';
+  const objectives = Array.isArray(cfg.objectives)
+    ? cfg.objectives.filter((value) => typeof value === 'string' && value.trim()).slice(0, 7)
+    : [];
+  if (objectives.length) {
+    const list = document.getElementById('objectivesList');
+    objectives.forEach((value, index) => {
+      const item = document.createElement('li');
+      item.textContent = `${index + 1}. ${value.trim()}`;
+      list.appendChild(item);
+    });
+    document.getElementById('objectivesBar').hidden = false;
+  }
 
   // ---------------------------------------------------------------------
   // Factions: faction 0 is always the human player; 1..N are the computer
@@ -905,6 +1180,7 @@ async function main() {
       name: src?.name || (isPlayer ? 'Player' : `Computer ${i}`),
       color: src?.color || '#888',
       img: isPlayer ? playerImg : computerImgs[i - 1],
+      visualScale: visualScale(src?.visualScale),
       x: worldCenter.x + Math.cos(angle) * homeRadius,
       y: worldCenter.y + Math.sin(angle) * homeRadius,
       // Per-faction, set on the map (index.html's "Home Base HP" field,
@@ -1155,22 +1431,28 @@ async function main() {
   // whatever edge case the steering heuristic above doesn't fully solve
   // on its own (a sharp corner between two obstacles, a very fast unit
   // closing the last bit of distance in one tick, etc).
-  function pushOutOfObstacles(u) {
-    for (const o of obstacles) {
-      const dx = u.x - o.x, dy = u.y - o.y;
-      const dist = Math.hypot(dx, dy);
-      const minDist = o.radius + UNIT_COLLISION_RADIUS;
-      if (dist >= minDist) continue;
-      if (dist < 0.001) { u.x = o.x + minDist; u.y = o.y; continue; }
-      const push = minDist - dist;
-      u.x += (dx / dist) * push;
-      u.y += (dy / dist) * push;
+  function pushOutOfObstacles(u, extra = 0) {
+    for (let pass = 0; pass < 8; pass++) {
+      let moved = false;
+      for (const o of obstacles) {
+        if (o.entity === u) continue;
+        const dx = u.x - o.x, dy = u.y - o.y;
+        const dist = Math.hypot(dx, dy);
+        const minDist = o.radius + UNIT_COLLISION_RADIUS + extra;
+        if (dist >= minDist) continue;
+        moved = true;
+        if (dist < 0.001) { u.x = o.x + minDist; u.y = o.y; continue; }
+        const push = minDist - dist;
+        u.x += (dx / dist) * push;
+        u.y += (dy / dist) * push;
+      }
+      if (!moved) break;
     }
   }
 
   // index.html's Resource & Mining placement widget: 'base' (default,
-  // unset on any map saved before this existed) keeps the original
-  // per-faction deposit near each home base, untouched below. 'map' means
+  // unset on any map saved before this existed) creates a clear per-faction
+  // deposit beyond the building sites. 'map' means
   // the map-maker clicked one or more spots on the map's own background
   // art - stored as x/y fractions (0..1) of it, not pixels, so they scale
   // correctly to whatever this actual match's world bounding box turns
@@ -1189,10 +1471,82 @@ async function main() {
       .map((p) => ({ x: worldMinX + p.x * worldW, y: worldMinY + p.y * worldH }));
     return pts.length ? pts : null;
   }
-  const sharedGoldPoints = placementWorldPoints(cfg.resource?.placement);
+  let sharedGoldPoints = placementWorldPoints(cfg.resource?.placement);
+  // Default deposits used to sit at fixed y offsets, directly on top of
+  // some building sites. Find a clear point on the outward side of each
+  // home instead, reserving room for the miner and for buildings bought
+  // later in the match. Older hand-placed points that already overlap a
+  // base, planned building or terrain are moved to the nearest clear site.
+  const defaultDepositPoints = new Map();
+  const reservedDepositPoints = [];
+  const terrainResourceBlocks = (cfg.obstacles || []).flatMap(o => {
+    const points = placementWorldPoints(o.placement);
+    return points ? points.map(p => ({ ...p, radius: (o.size || 120) / 2 })) : [];
+  });
+  function clearDefaultDeposit(x, y) {
+    const edge = UNIT_COLLISION_RADIUS + 5;
+    if (x < worldMinX + edge || x > worldMaxX - edge || y < worldMinY + edge || y > worldMaxY - edge) return false;
+    if (reservedDepositPoints.some(p => Math.hypot(x - p.x, y - p.y) < DEPOSIT_SIZE + UNIT_COLLISION_RADIUS)) return false;
+    if (terrainResourceBlocks.some(o => Math.hypot(x - o.x, y - o.y) < o.radius + DEPOSIT_SIZE / 2 + UNIT_COLLISION_RADIUS + 10)) return false;
+    return factions.every(f => {
+      if (Math.hypot(x - f.x, y - f.y) < homeVisualSize(f) / 2 + DEPOSIT_SIZE / 2 + UNIT_COLLISION_RADIUS + 10) return false;
+      return GATED_BUILDINGS.every(b => Math.hypot(x - (f.x + b.offsetX), y - (f.y + b.offsetY)) >=
+        GATED_BUILDING_SIZE * visualScale(b.cfg.visualScale) / 2 + DEPOSIT_SIZE / 2 + UNIT_COLLISION_RADIUS + 10);
+    });
+  }
+  function reserveMapDeposit(point) {
+    if (clearDefaultDeposit(point.x, point.y)) {
+      reservedDepositPoints.push(point);
+      return point;
+    }
+    for (let radius = 40; radius <= Math.max(worldW, worldH); radius += 40) {
+      for (let step = 0; step < 24; step++) {
+        const angle = step * Math.PI / 12;
+        const p = { x: point.x + Math.cos(angle) * radius, y: point.y + Math.sin(angle) * radius };
+        if (!clearDefaultDeposit(p.x, p.y)) continue;
+        reservedDepositPoints.push(p);
+        return p;
+      }
+    }
+    // An exceptionally crowded map may have no clear point. Preserve the
+    // authored deposit rather than removing a resource from the match.
+    reservedDepositPoints.push(point);
+    return point;
+  }
+  if (sharedGoldPoints) sharedGoldPoints = sharedGoldPoints.map(reserveMapDeposit);
+  const sharedExtraPoints = new Map();
+  EXTRA_RESOURCES.forEach(r => {
+    const points = placementWorldPoints(r.placement);
+    if (points) sharedExtraPoints.set(r.id, points.map(reserveMapDeposit));
+  });
+  function reserveDefaultDeposit(f, ordinal) {
+    const outward = Math.atan2(f.y - worldCenter.y, f.x - worldCenter.x);
+    const spread = ordinal ? (ordinal % 2 ? 1 : -1) * Math.ceil(ordinal / 2) * 0.25 : 0;
+    for (const radius of [375, 425, 325, 475, 275, 525, 575, 625, 675, 725]) {
+      for (const turn of [0, 0.18, -0.18, 0.36, -0.36, 0.54, -0.54, 0.72, -0.72, 1.08, -1.08, Math.PI]) {
+        const angle = outward + spread + turn;
+        const x = f.x + Math.cos(angle) * radius, y = f.y + Math.sin(angle) * radius;
+        if (!clearDefaultDeposit(x, y)) continue;
+        const p = { x, y };
+        reservedDepositPoints.push(p);
+        return p;
+      }
+    }
+    // Search around the older location too if the outward arcs are full.
+    // With oversized art even that can be impossible; reserveMapDeposit
+    // then retains the authored economy instead of dropping a resource.
+    return reserveMapDeposit({ x: f.x, y: f.y - 100 });
+  }
+  factions.forEach(f => {
+    let ordinal = 0;
+    if (!sharedGoldPoints) defaultDepositPoints.set(`${f.id}:gold`, reserveDefaultDeposit(f, ordinal++));
+    EXTRA_RESOURCES.forEach(r => {
+      if (r.placement?.mode !== 'map') defaultDepositPoints.set(`${f.id}:${r.id}`, reserveDefaultDeposit(f, ordinal++));
+    });
+  });
   const deposits = sharedGoldPoints
     ? sharedGoldPoints.map((p) => ({ factionId: null, x: p.x, y: p.y, size: cfg.resource?.size || 5000 }))
-    : factions.map((f) => ({ factionId: f.id, x: f.x, y: f.y - 100, size: cfg.resource?.size || 5000 }));
+    : factions.map((f) => ({ factionId: f.id, ...defaultDepositPoints.get(`${f.id}:gold`), size: cfg.resource?.size || 5000 }));
   // Nearest-of-the-shared-deposits, used only when Gold is placed on the
   // map (several real, distinct locations - not one shared point copied
   // per faction) to decide which one a freshly-built Mining Ship auto-
@@ -1209,10 +1563,8 @@ async function main() {
     return best;
   }
   // One deposit marker per extra resource per faction - purely a visual
-  // "this is where it comes from" (no range/mining-unit interaction, see
-  // the passive income loop in update()), laid out in a row below home
-  // base so they don't overlap Gold's own deposit (above home, y-100) or
-  // any of the GATED_BUILDINGS (which sit at |offset| <= 140). A resource
+  // "this is where it comes from", placed at the clear reserved points
+  // beside each base. A resource
   // placed "on the map" instead gets one shared marker per placed point
   // (below) rather than one of these per faction.
   const extraDeposits = factions.flatMap((f) => EXTRA_RESOURCES
@@ -1220,14 +1572,40 @@ async function main() {
     .filter(({ r }) => !(r.placement && r.placement.mode === 'map'))
     .map(({ r, i }) => ({
       factionId: f.id, resourceId: r.id,
-      x: f.x + (i - (EXTRA_RESOURCES.length - 1) / 2) * 90, y: f.y + 200,
+      ...defaultDepositPoints.get(`${f.id}:${r.id}`),
       img: EXTRA_RESOURCE_IMAGES[i],
     })))
     .concat(EXTRA_RESOURCES.flatMap((r, i) => {
-      const pts = placementWorldPoints(r.placement);
+      const pts = sharedExtraPoints.get(r.id);
       if (!pts) return [];
       return pts.map((pos) => ({ factionId: null, resourceId: r.id, x: pos.x, y: pos.y, img: EXTRA_RESOURCE_IMAGES[i] }));
     }));
+  // These combat-only groups are appended after every home-based economy
+  // and resource site has been built. HP stays zero because they have no
+  // Home Base; their placed defenders still fight as their own team.
+  mapOnlyConfigs.forEach((source, index) => {
+    const id = factions.length;
+    factions.push({ id, isMapOnly: true, isPlayer: false, isHuman: false,
+      name: source.name || `Enemy Group ${index + 1}`, color: /^#[0-9a-f]{6}$/i.test(source.color || '') ? source.color : '#b474d9',
+      team: `map_only_${index}`, hp: 0, maxHp: 0, x: worldCenter.x, y: worldCenter.y,
+      resources: freshWallet(), research: freshResearch(),
+      built: Object.fromEntries(GATED_BUILDINGS.map((b) => [b.key, false])),
+      buildQueue: Object.fromEntries(GATED_BUILDINGS.map((b) => [b.key, []])),
+      stats: { kills: 0, losses: 0 }, difficulty: 'medium' });
+  });
+  // A turret/launcher cannot be put within firing range of a hostile or
+  // shared deposit. Include the 80-unit mining zone in the calculation:
+  // even a ship on its near edge remains 100 units beyond weapon range.
+  // Friendly deposits need physical clearance instead of weapon clearance.
+  function defenseBlocksMining(factionId, x, y, range, structureRadius = UNIT_SIZE / 2) {
+    const minimum = Math.max(0, Number(range) || 0) + MINING_RANGE + RESOURCE_DEFENSE_BUFFER;
+    const physicalClearance = DEPOSIT_SIZE / 2 + structureRadius + UNIT_COLLISION_RADIUS + 10;
+    return deposits.concat(extraDeposits).some(d => Math.hypot(x - d.x, y - d.y) <
+      (d.factionId === factionId ? physicalClearance : minimum));
+  }
+  function maximumMissileRange() {
+    return 500 * (1 + Math.max(0, ...getResearchPercents('missileRange').map(Number)) / 100);
+  }
 
   // Terrain Obstacles (index.html's 3c section) - solid, non-combat
   // scenery placed on the map ("place a boulder or mountain and units
@@ -1272,6 +1650,78 @@ async function main() {
   // graph" approach for circular obstacles, simplified by sampling each
   // circle at fixed angles instead of computing exact bitangents (a
   // slightly less optimal route, never a wrong one).
+  const terrainObstacleCount = obstacles.length;
+  let structureObstacleSignature = '';
+  let obstacleVersion = 0;
+  let updatingSimulation = false;
+  let structureSyncDirty = true;
+  function syncStructureObstacles() {
+    // One scan per simulation step, unless a structure changes during it.
+    // Every moving/chasing troop calls this; repeating allocations and
+    // scans for each troop caused garbage-collection stalls in live matches.
+    if (updatingSimulation && !structureSyncDirty) return;
+    const solid = [
+      ...factions.filter(f => f.hp > 0).map(f => ({ entity: f, x: f.x, y: f.y, radius: homeVisualSize(f) / 2 })),
+      ...units.filter(u => u.alive && u.hp > 0 && (u.isGatedBuilding || u.isTurret || u.isMissileLauncher))
+        .map(u => ({ entity: u, x: u.x, y: u.y, radius: unitVisualSize(u) / 2 })),
+    ];
+    const signature = solid.map(o => `${o.entity.isFactionHome ? 'home' : 'unit'}:${o.entity.id}:${o.x}:${o.y}:${o.radius}`).join('|');
+    structureSyncDirty = false;
+    if (signature === structureObstacleSignature) return;
+    const changedSolids = solid.filter(o => !obstacles.some(old => old.entity === o.entity && old.x === o.x && old.y === o.y && old.radius === o.radius));
+    structureObstacleSignature = signature;
+    obstacles.splice(terrainObstacleCount, obstacles.length - terrainObstacleCount, ...solid);
+    pathGraph = null;
+    obstacleVersion++;
+    for (const u of units) {
+      if (u.alive && u.speed > 0 && changedSolids.some(o => Math.hypot(u.x - o.x, u.y - o.y) < o.radius + UNIT_COLLISION_RADIUS + 1)) {
+        pushOutOfObstacles(u, PATH_MARGIN + 2);
+      }
+    }
+  }
+  function productionBuildings(fac, key) {
+    return fac.hp <= 0 ? [] : units.filter(u => u.alive && u.hp > 0 && u.isGatedBuilding &&
+      u.factionId === fac.id && u.buildingKey === key);
+  }
+  function productionBuilding(fac, key) {
+    if (fac.hp <= 0) return null;
+    return key ? productionBuildings(fac, key)[0] || null : fac;
+  }
+  const productionCursors = new Map();
+  function distanceToTarget(u, target) {
+    const radius = target.isFactionHome ? homeVisualSize(target) / 2
+      : (target.isGatedBuilding || target.isTurret || target.isMissileLauncher) ? unitVisualSize(target) / 2 : 0;
+    return Math.max(0, Math.hypot(target.x - u.x, target.y - u.y) - (radius ? radius + UNIT_COLLISION_RADIUS : 0));
+  }
+  function findSpawnPoint(origin) {
+    syncStructureObstacles();
+    const radius = (origin.isGatedBuilding ? unitVisualSize(origin) : homeVisualSize(origin)) / 2;
+    // Search clear perimeter rings; blocked exits keep completed units queued.
+    for (let ring = 0; ring < 32; ring++) {
+      const distance = radius + UNIT_COLLISION_RADIUS + PATH_MARGIN + 4 + ring * 20;
+      for (let i = 0; i < 48; i++) {
+        const angle = i * Math.PI * 2 / 48;
+        const p = { x: origin.x + Math.cos(angle) * distance, y: origin.y + Math.sin(angle) * distance };
+        if (p.x < worldMinX + UNIT_COLLISION_RADIUS || p.x > worldMaxX - UNIT_COLLISION_RADIUS ||
+            p.y < worldMinY + UNIT_COLLISION_RADIUS || p.y > worldMaxY - UNIT_COLLISION_RADIUS) continue;
+        if (obstacles.every(o => Math.hypot(p.x - o.x, p.y - o.y) >= obstacleRadiusForPath(o) + 1)) return p;
+      }
+    }
+    return null;
+  }
+  function moveAlongClearSegment(u, tx, ty, distance) {
+    // Substeps prevent tunneling through a newly placed structure or a
+    // blocker on a fallback route, even at high speed or after a lag spike.
+    while (distance > 0.001) {
+      const dx = tx - u.x, dy = ty - u.y, length = Math.hypot(dx, dy);
+      if (length < 0.001) break;
+      const step = Math.min(distance, length, 8);
+      const p = { x: u.x + dx / length * step, y: u.y + dy / length * step };
+      if (obstacles.some(o => segmentIntersectsCircle(u, p, o.x, o.y, o.radius + UNIT_COLLISION_RADIUS + 1))) break;
+      u.x = p.x; u.y = p.y;
+      distance -= step;
+    }
+  }
   const PATH_SAMPLES_PER_OBSTACLE = 12;
   // Extra clearance a planned path must keep beyond the hard collision
   // radius - deliberately generous (bigger than one obstacle-avoidance
@@ -1302,13 +1752,15 @@ async function main() {
   // obstacle it has no special relationship with.
   const PATH_EPS = 0.5;
   function segmentIntersectsCircle(A, B, cx, cy, r) {
+    const radius = r - PATH_EPS;
+    if (radius <= 0 || cx + radius < Math.min(A.x, B.x) || cx - radius > Math.max(A.x, B.x) ||
+        cy + radius < Math.min(A.y, B.y) || cy - radius > Math.max(A.y, B.y)) return false;
     const dx = B.x - A.x, dy = B.y - A.y;
     const len2 = dx * dx + dy * dy;
-    if (len2 < 1e-6) return Math.hypot(A.x - cx, A.y - cy) < r - PATH_EPS;
-    let t = ((cx - A.x) * dx + (cy - A.y) * dy) / len2;
+    let t = len2 < 1e-6 ? 0 : ((cx - A.x) * dx + (cy - A.y) * dy) / len2;
     t = Math.max(0, Math.min(1, t));
     const px = A.x + t * dx, py = A.y + t * dy;
-    return Math.hypot(px - cx, py - cy) < r - PATH_EPS;
+    return (px - cx) ** 2 + (py - cy) ** 2 < radius * radius;
   }
   // ringSkipIdx: the ONE obstacle to skip, used only for a ring edge
   // connecting two adjacent sample points on that SAME obstacle's own
@@ -1335,7 +1787,7 @@ async function main() {
     }
     return true;
   }
-  let pathGraph = null; // { nodes: [{x,y,obstacleIdx}], adj: [[{to,dist}, ...], ...] } - built lazily, once
+  let pathGraph = null;
   function buildPathGraph() {
     const nodes = [];
     obstacles.forEach((o, oi) => {
@@ -1345,88 +1797,192 @@ async function main() {
         nodes.push({ x: o.x + Math.cos(ang) * r, y: o.y + Math.sin(ang) * r, obstacleIdx: oi });
       }
     });
-    const adj = nodes.map(() => []);
-    // Ring edges: each obstacle's own sample points connect to their
-    // immediate neighbors around its circle, so a path can hug all the
-    // way around a single obstacle (or a chain of overlapping ones) when
-    // that's genuinely the only way through, not just jump between
-    // obstacles that already have a clear line between them.
-    obstacles.forEach((o, oi) => {
-      const base = oi * PATH_SAMPLES_PER_OBSTACLE;
-      for (let k = 0; k < PATH_SAMPLES_PER_OBSTACLE; k++) {
-        const a = base + k, b = base + (k + 1) % PATH_SAMPLES_PER_OBSTACLE;
-        // Still checked against every OTHER obstacle (just not this one,
-        // whose own chord this naturally dips inside of) - two adjacent
-        // sample points can otherwise sit close enough to a different,
-        // overlapping obstacle that hugging straight between them would
-        // cut through IT instead.
-        if (!segmentClearsObstacles(nodes[a], nodes[b], oi)) continue;
-        const d = Math.hypot(nodes[a].x - nodes[b].x, nodes[a].y - nodes[b].y);
-        adj[a].push({ to: b, dist: d }); adj[b].push({ to: a, dist: d });
+    // Connections are calculated only for nodes a route search visits.
+    // Rebuilding every pair after construction blocked the whole game.
+    pathGraph = { nodes, adj: new Array(nodes.length) };
+  }
+  function pathNeighbors(index) {
+    const { nodes, adj } = pathGraph;
+    if (adj[index]) return adj[index];
+    const from = nodes[index], edges = [];
+    for (let j = 0; j < nodes.length; j++) {
+      if (j === index) continue;
+      const to = nodes[j];
+      let ringSkip = -1;
+      if (from.obstacleIdx === to.obstacleIdx) {
+        const separation = Math.abs(index - j);
+        if (separation !== 1 && separation !== PATH_SAMPLES_PER_OBSTACLE - 1) continue;
+        ringSkip = from.obstacleIdx;
+        const o = obstacles[ringSkip];
+        if (segmentIntersectsCircle(from, to, o.x, o.y, o.radius + UNIT_COLLISION_RADIUS + 1)) continue;
       }
-    });
-    // Cross edges: any two sample points on DIFFERENT obstacles that have
-    // a clear line between them - this is what actually lets a path jump
-    // from one obstacle's neighborhood to another's, or leap straight
-    // past a whole cluster once there's a gap. Checked against every
-    // obstacle with no skip at all (not even the two the points sit on) -
-    // a sample point only ever grazes its OWN circle at that one exact
-    // spot (covered by segmentIntersectsCircle's own small epsilon), so
-    // there's nothing to skip; skipping either one outright let an edge
-    // leave a point on one side of it and cut straight back through that
-    // same circle's interior further along the same segment.
-    for (let i = 0; i < nodes.length; i++) {
-      for (let j = i + 1; j < nodes.length; j++) {
-        if (nodes[i].obstacleIdx === nodes[j].obstacleIdx) continue;
-        if (segmentClearsObstacles(nodes[i], nodes[j], -1)) {
-          const d = Math.hypot(nodes[i].x - nodes[j].x, nodes[i].y - nodes[j].y);
-          adj[i].push({ to: j, dist: d }); adj[j].push({ to: i, dist: d });
-        }
+      if (segmentClearsObstacles(from, to, ringSkip)) {
+        edges.push({ to: j, dist: Math.hypot(from.x - to.x, from.y - to.y) });
       }
     }
-    pathGraph = { nodes, adj };
+    return (adj[index] = edges);
   }
   // Real route from (sx,sy) to (tx,ty) around every obstacle in the way -
   // an array of waypoints ending in the exact goal point. A straight line
   // that's already clear returns just [{x:tx,y:ty}], so a normal order on
   // a map with no obstacles nearby costs nothing beyond the one check.
   function findPathAround(sx, sy, tx, ty) {
+    syncStructureObstacles();
+    // Move orders and combat approaches stop outside solid footprints.
+    for (let pass = 0; pass <= obstacles.length; pass++) {
+      let changed = false;
+      for (const o of obstacles) {
+        const radius = obstacleRadiusForPath(o) + 1;
+        const dx = tx - o.x, dy = ty - o.y, distance = Math.hypot(dx, dy);
+        if (distance >= radius) continue;
+        const angle = distance > 0.001 ? Math.atan2(dy, dx) : Math.atan2(sy - o.y, sx - o.x);
+        tx = o.x + Math.cos(angle) * radius; ty = o.y + Math.sin(angle) * radius;
+        changed = true;
+      }
+      if (!changed) break;
+    }
     const start = { x: sx, y: sy }, goal = { x: tx, y: ty };
     if (segmentClearsObstacles(start, goal, -1)) return [{ x: tx, y: ty }];
     if (!pathGraph) buildPathGraph();
-    const { nodes, adj } = pathGraph;
+    const { nodes } = pathGraph;
     const startIdx = nodes.length, goalIdx = nodes.length + 1;
-    const fullAdj = adj.map((list) => list.slice());
-    fullAdj.push([]); fullAdj.push([]);
+    const startEdges = [];
     for (let i = 0; i < nodes.length; i++) {
       if (segmentClearsObstacles(start, nodes[i], -1)) {
         const d = Math.hypot(start.x - nodes[i].x, start.y - nodes[i].y);
-        fullAdj[startIdx].push({ to: i, dist: d }); fullAdj[i].push({ to: startIdx, dist: d });
-      }
-      if (segmentClearsObstacles(goal, nodes[i], -1)) {
-        const d = Math.hypot(goal.x - nodes[i].x, goal.y - nodes[i].y);
-        fullAdj[goalIdx].push({ to: i, dist: d }); fullAdj[i].push({ to: goalIdx, dist: d });
+        startEdges.push({ to: i, dist: d });
       }
     }
-    // Plain O(N^2) Dijkstra - graph sizes here (tens to a few hundred
-    // nodes for any reasonable number of placed obstacles) make the
-    // simplicity worth it over a real priority queue.
+    // A* prioritizes progress toward this destination. The straight-line
+    // heuristic is admissible because every edge uses its real length.
     const N = nodes.length + 2;
     const dist = new Array(N).fill(Infinity); dist[startIdx] = 0;
     const prev = new Array(N).fill(-1);
     const visited = new Array(N).fill(false);
-    for (let iter = 0; iter < N; iter++) {
-      let u = -1, best = Infinity;
-      for (let i = 0; i < N; i++) if (!visited[i] && dist[i] < best) { best = dist[i]; u = i; }
-      if (u === -1 || u === goalIdx) break;
+    const heuristic = nodes.map(p => Math.hypot(p.x - goal.x, p.y - goal.y));
+    heuristic.push(Math.hypot(sx - tx, sy - ty), 0);
+    // A linear scan of every graph node on every A* step became costly
+    // when several troops chased targets around the same structures.
+    const open = [];
+    function addOpen(index) {
+      const item = { index, score: dist[index] + heuristic[index] };
+      let i = open.length;
+      open.push(item);
+      while (i > 0) {
+        const parent = (i - 1) >> 1;
+        if (open[parent].score <= item.score) break;
+        open[i] = open[parent]; i = parent;
+      }
+      open[i] = item;
+    }
+    function takeOpen() {
+      const first = open[0], last = open.pop();
+      if (open.length) {
+        let i = 0;
+        while (i * 2 + 1 < open.length) {
+          let child = i * 2 + 1;
+          if (child + 1 < open.length && open[child + 1].score < open[child].score) child++;
+          if (last.score <= open[child].score) break;
+          open[i] = open[child]; i = child;
+        }
+        open[i] = last;
+      }
+      return first;
+    }
+    addOpen(startIdx);
+    while (open.length) {
+      const item = takeOpen(), u = item.index;
+      if (visited[u] || item.score > dist[u] + heuristic[u]) continue;
+      if (u === goalIdx) break;
       visited[u] = true;
-      for (const e of fullAdj[u]) if (dist[u] + e.dist < dist[e.to]) { dist[e.to] = dist[u] + e.dist; prev[e.to] = u; }
+      if (u !== startIdx && segmentClearsObstacles(nodes[u], goal, -1) && dist[u] + heuristic[u] < dist[goalIdx]) {
+        dist[goalIdx] = dist[u] + heuristic[u]; prev[goalIdx] = u;
+        addOpen(goalIdx);
+      }
+      for (const e of u === startIdx ? startEdges : pathNeighbors(u)) {
+        if (dist[u] + e.dist < dist[e.to]) { dist[e.to] = dist[u] + e.dist; prev[e.to] = u; addOpen(e.to); }
+      }
     }
     if (dist[goalIdx] === Infinity) return [{ x: tx, y: ty }]; // no route found (shouldn't normally happen) - fall back to a straight order; local steering is still the backstop underneath it
     const chain = [];
     for (let cur = goalIdx; cur !== -1; cur = prev[cur]) chain.push(cur === startIdx ? start : cur === goalIdx ? goal : nodes[cur]);
     chain.reverse();
     return chain.slice(1); // drop the start point itself - the rest are waypoints to walk through, ending at goal
+  }
+  // Combat can request many routes in one update. Run the same pathfinder in
+  // a worker so a difficult search cannot block the animation frame. The
+  // fallback below still handles browsers that do not permit blob workers.
+  const chaseWorkerJobs = new Map();
+  let nextChaseWorkerJob = 1;
+  let chasePathWorker = null;
+  try {
+    const source = `
+      const UNIT_COLLISION_RADIUS = ${UNIT_COLLISION_RADIUS};
+      const PATH_MARGIN = ${PATH_MARGIN};
+      const PATH_EPS = ${PATH_EPS};
+      const PATH_SAMPLES_PER_OBSTACLE = ${PATH_SAMPLES_PER_OBSTACLE};
+      let obstacles = [], pathGraph = null, currentVersion = -1;
+      function syncStructureObstacles() {}
+      ${obstacleRadiusForPath.toString()}
+      ${segmentIntersectsCircle.toString()}
+      ${segmentClearsObstacles.toString()}
+      ${buildPathGraph.toString()}
+      ${pathNeighbors.toString()}
+      ${findPathAround.toString()}
+      self.onmessage = ({ data }) => {
+        try {
+          if (data.version !== currentVersion) {
+            currentVersion = data.version;
+            obstacles = data.obstacles;
+            pathGraph = null;
+          }
+          self.postMessage({ id: data.id, version: data.version,
+            route: findPathAround(data.sx, data.sy, data.tx, data.ty) });
+        } catch (error) { self.postMessage({ id: data.id, error: String(error) }); }
+      };
+    `;
+    const url = URL.createObjectURL(new Blob([source], { type: 'text/javascript' }));
+    chasePathWorker = new Worker(url);
+    URL.revokeObjectURL(url);
+    chasePathWorker.onmessage = ({ data }) => {
+      const job = chaseWorkerJobs.get(data.id);
+      chaseWorkerJobs.delete(data.id);
+      if (data.error) {
+        console.warn('Combat route worker failed; using main-thread fallback:', data.error);
+        chasePathWorker.terminate(); chasePathWorker = null;
+        chaseWorkerJobs.clear();
+        return;
+      }
+      if (!job || job.unit._chaseWorkerJob !== job) return;
+      const u = job.unit;
+      u._chaseWorkerJob = null;
+      if (!u.alive || u.target !== job.target || data.version !== obstacleVersion ||
+          Math.hypot(u.target.x - job.tx, u.target.y - job.ty) > CHASE_REPLAN_DIST ||
+          !routeIsStillClear(u, data.route, 0)) return;
+      u._chaseWaypoints = data.route;
+      u._chaseIndex = 0;
+      u._chaseForX = job.tx; u._chaseForY = job.ty;
+      u._chaseVersion = data.version;
+      u._chaseAtGoal = false;
+    };
+    chasePathWorker.onerror = (error) => {
+      console.warn('Combat route worker unavailable; using main-thread fallback:', error.message);
+      chasePathWorker.terminate(); chasePathWorker = null;
+      chaseWorkerJobs.clear();
+    };
+  } catch (error) {
+    console.warn('Combat route worker unavailable; using main-thread fallback:', error);
+  }
+  function requestChaseRoute(u, tx, ty) {
+    const pending = u._chaseWorkerJob;
+    if (pending && pending.target === u.target && pending.version === obstacleVersion &&
+        Math.hypot(tx - pending.tx, ty - pending.ty) <= CHASE_REPLAN_DIST) return;
+    const job = { id: nextChaseWorkerJob++, unit: u, target: u.target, tx, ty, version: obstacleVersion };
+    u._chaseWorkerJob = job;
+    chaseWorkerJobs.set(job.id, job);
+    chasePathWorker.postMessage({ id: job.id, version: job.version,
+      obstacles: obstacles.map(o => ({ x: o.x, y: o.y, radius: o.radius })),
+      sx: u.x, sy: u.y, tx, ty });
   }
   // The one place a real MOVE order should ever be created - always sets
   // moveTarget to the true final destination (still what isLocked-style
@@ -1436,10 +1992,24 @@ async function main() {
   // obstacles on the map at all, so a map that doesn't use the feature
   // pays nothing for it.
   function issueMoveOrder(u, tx, ty) {
+    syncStructureObstacles();
     u.orderType = 'move';
     u.moveTarget = { x: tx, y: ty };
     u.pathWaypoints = obstacles.length ? findPathAround(u.x, u.y, tx, ty) : [{ x: tx, y: ty }];
     u.pathIndex = 0;
+    u._pathVersion = obstacleVersion;
+  }
+  function routeIsStillClear(u, waypoints, index) {
+    if (!waypoints || !waypoints.length) return false;
+    let from = u;
+    for (let i = index; i < waypoints.length; i++) {
+      const to = waypoints[i];
+      for (const o of obstacles) {
+        if (segmentIntersectsCircle(from, to, o.x, o.y, o.radius + UNIT_COLLISION_RADIUS + 2)) return false;
+      }
+      from = to;
+    }
+    return true;
   }
   // combatTick/healTick/convertTick's own "close distance with the
   // target" step used pure reactive local steering (moveTowardWithAvoidance)
@@ -1467,24 +2037,91 @@ async function main() {
   // through to the cheap no-obstacles path (same as issueMoveOrder) on a
   // map that doesn't use Terrain Obstacles at all.
   const CHASE_REPLAN_DIST = 80;
+  // A group acquiring the same target can otherwise run dozens of full
+  // visibility-graph searches in one update, blocking every troop's frame.
+  // Routes are immutable, and a nearby follower can use a leader's route
+  // only after checking every leg from its own position for clearance.
+  const chaseRoutesThisFrame = new Map();
+  let pendingChaseRoutes = [];
+  let chaseSearchesThisFrame = 0;
+  // Spend the whole frame's travel budget, including across route corners.
+  // Reaching a waypoint must not consume an idle frame or discard distance.
+  function walkRoute(u, waypoints, index, remaining) {
+    while (index < waypoints.length) {
+      const wp = waypoints[index];
+      const distance = Math.hypot(wp.x - u.x, wp.y - u.y);
+      if (distance < 0.001) { index++; continue; }
+      if (remaining <= 0.001) break;
+      const step = Math.min(remaining, distance);
+      const x = u.x, y = u.y;
+      u.facingAngle = facingToward(u, wp.x, wp.y);
+      moveAlongClearSegment(u, wp.x, wp.y, step);
+      const traveled = Math.hypot(u.x - x, u.y - y);
+      if (traveled > 0.001) u._isMoving = true;
+      remaining -= traveled;
+      // A blocked leg must stop here; never skip across the obstacle.
+      if (traveled < step - 0.001) break;
+      if (Math.hypot(wp.x - u.x, wp.y - u.y) < 0.001) index++;
+      else break;
+    }
+    return { index, remaining };
+  }
   function chaseTowardTarget(u, tx, ty, sp, dt) {
-    if (!obstacles.length) { moveTowardWithAvoidance(u, tx, ty, sp, dt); return; }
-    const stale = !u._chaseWaypoints || !u._chaseWaypoints.length
-      || u._chaseIndex >= u._chaseWaypoints.length
+    syncStructureObstacles();
+    if (u._chaseVersion !== obstacleVersion && routeIsStillClear(u, u._chaseWaypoints, u._chaseIndex)) u._chaseVersion = obstacleVersion;
+    const stale = u._chaseVersion !== obstacleVersion || !u._chaseWaypoints || !u._chaseWaypoints.length
+      || (!u._chaseAtGoal && u._chaseIndex >= u._chaseWaypoints.length)
       || Math.hypot(tx - (u._chaseForX ?? Infinity), ty - (u._chaseForY ?? Infinity)) > CHASE_REPLAN_DIST;
     if (stale) {
-      u._chaseWaypoints = findPathAround(u.x, u.y, tx, ty);
+      // Most combat targets can be approached directly. This check also
+      // avoids putting those units behind a squad's queued graph searches.
+      let route = segmentClearsObstacles(u, { x: tx, y: ty }, -1) ? [{ x: tx, y: ty }] : null;
+      const shared = u.target && chaseRoutesThisFrame.get(u.target);
+      if (!route && shared) for (const candidate of shared) {
+        if (candidate.version !== obstacleVersion ||
+            Math.hypot(tx - candidate.tx, ty - candidate.ty) > 8 ||
+            Math.hypot(u.x - candidate.x, u.y - candidate.y) > CHASE_REPLAN_DIST) continue;
+        if (routeIsStillClear(u, candidate.route, 0)) { route = candidate.route; break; }
+      }
+      if (!route) {
+        if (updatingSimulation && chasePathWorker) {
+          requestChaseRoute(u, tx, ty);
+          moveTowardWithAvoidance(u, tx, ty, sp, dt);
+          return;
+        }
+        if (updatingSimulation) {
+          if (!pendingChaseRoutes.includes(u)) pendingChaseRoutes.push(u);
+          // A full search may take longer than one 60 FPS frame. Let one
+          // unit search per update while the rest keep moving with local
+          // avoidance until their turn in the queue or a shared route.
+          if (pendingChaseRoutes[0] !== u || chaseSearchesThisFrame) {
+            moveTowardWithAvoidance(u, tx, ty, sp, dt);
+            return;
+          }
+          chaseSearchesThisFrame++;
+        }
+        route = findPathAround(u.x, u.y, tx, ty);
+        if (u.target) {
+          const routes = shared || [];
+          routes.push({ x: u.x, y: u.y, tx, ty, version: obstacleVersion, route });
+          chaseRoutesThisFrame.set(u.target, routes);
+        }
+      }
+      u._chaseWorkerJob = null;
+      const pendingIndex = pendingChaseRoutes.indexOf(u);
+      if (pendingIndex !== -1) pendingChaseRoutes.splice(pendingIndex, 1);
+      u._chaseWaypoints = route;
       u._chaseIndex = 0;
       u._chaseForX = tx; u._chaseForY = ty;
+      u._chaseVersion = obstacleVersion;
+      u._chaseAtGoal = false;
     }
-    const wp = u._chaseWaypoints[u._chaseIndex];
-    const dx = wp.x - u.x, dy = wp.y - u.y, dist = Math.hypot(dx, dy);
-    if (dist < 4) { u._chaseIndex++; return; }
-    // Capped at `dist`, same reasoning runMoveOrder's own step uses - a
-    // fast unit could otherwise overshoot a waypoint and ping-pong across
-    // it forever instead of ever landing inside the arrival window.
-    const step = Math.min(sp * dt, dist);
-    u.x += (dx / dist) * step; u.y += (dy / dist) * step;
+    const result = walkRoute(u, u._chaseWaypoints, u._chaseIndex, sp * dt);
+    u._chaseIndex = result.index;
+    u._chaseAtGoal = result.index >= u._chaseWaypoints.length;
+    if (u._chaseAtGoal && result.remaining > 0.001) {
+      walkRoute(u, [{ x: tx, y: ty }], 0, result.remaining);
+    }
   }
 
   const units = [];
@@ -1595,7 +2232,7 @@ async function main() {
   function previewHp(base) { return Math.round(effectiveStat(activeFaction, base, 'hp')); }
   function previewRange(base) { return Math.round(effectiveStat(activeFaction, base, 'range')); }
   function previewSpeed(base) { return effectiveStat(activeFaction, base, 'speed').toFixed(1); }
-  function spawnUnit(factionId, defIndex, x, y) {
+  function spawnUnit(factionId, defIndex, x, y, initializeCargo = true) {
     const fac = factionOf(factionId);
     const def = unitDefs[defIndex];
     const u = {
@@ -1603,8 +2240,10 @@ async function main() {
       hp: Math.round(effectiveStat(fac, def.hp, 'hp')), maxHp: Math.round(effectiveStat(fac, def.hp, 'hp')),
       attack: def.attack, range: Math.round(effectiveStat(fac, def.range, 'range')), speed: effectiveStat(fac, def.speed, 'speed'),
       img: unitImages[defIndex], x, y, alive: true, selected: false,
+      visualScale: visualScale(def.visualScale),
+      spriteSheet: normalizeSpriteSheet(def.spriteSheet),
       orderType: null, moveTarget: null, target: null,
-      lockedUntilTurn: 0, facingAngle: 0, weapon: def.weapon || 'laser',
+      lockedUntilTurn: 0, facingAngle: 0, weapon: def.weapon || 'laser', weaponSound: def.weaponSound || null,
       // index.html's "Rotate to face movement direction" checkbox -
       // defaults true for a unit saved before this field existed.
       rotateToFace: def.rotateToFace !== false,
@@ -1638,6 +2277,7 @@ async function main() {
       // or a Missile Battery unit).
       isMissileUnit: !!def.isMissileUnit,
       missileImg: unitMissileImages[defIndex],
+      missileVisualScale: visualScale(def.missileVisualScale),
       missileSpeed: def.missileSpeed,
       missileRotateToFace: def.missileRotateToFace !== false,
       // index.html's "Auto Attack" checkbox - defaults ON here (unlike
@@ -1651,7 +2291,35 @@ async function main() {
       autoAttack: def.autoAttack !== false,
     };
     units.push(u);
+    if (def.vesselDefIndex !== undefined) {
+      u.transportCapacity = Math.max(1, Math.min(10, Math.round(Number(def.transport.capacity) || 1)));
+      if (initializeCargo && canFactionProduce(unitDefs[def.vesselDefIndex], factionId)) {
+        for (let i = 0; i < u.transportCapacity; i++) {
+          const vessel = spawnUnit(factionId, def.vesselDefIndex, x, y, false);
+          embarkUnit(vessel, u);
+        }
+      }
+    }
     return u;
+  }
+  function spawnAreaDefenders() {
+    for (const point of cfg.areaDefenders || []) {
+      if (!point || !Number.isInteger(point.factionId) || !factions[point.factionId] ||
+          (factions[point.factionId].hp <= 0 && !factions[point.factionId].isMapOnly) ||
+          !Number.isFinite(point.x) || !Number.isFinite(point.y)) continue;
+      const defIndex = unitDefs.findIndex((def) => def.placementId && def.placementId === point.placementId);
+      if (defIndex < 0) continue;
+      const def = unitDefs[defIndex];
+      if (def.mapOnlyOnly && (!factions[point.factionId].isMapOnly ||
+          def.mapOnlyFactionIndex !== point.factionId - factionCount)) continue;
+      const x = worldMinX + Math.max(0, Math.min(1, point.x)) * worldW;
+      const y = worldMinY + Math.max(0, Math.min(1, point.y)) * worldH;
+      const defender = spawnUnit(point.factionId, defIndex, x, y);
+      clampToWorld(defender);
+      pushOutOfObstacles(defender);
+      defender.defendPost = { x: defender.x, y: defender.y,
+        range: Math.max(100, Math.min(1000, Math.round(Number(point.range) || 300))) };
+    }
   }
   // Deliberately separate from spawnUnit/unitDefs - see the note by
   // turretDefs' declaration above. isTurret is what the per-unit update
@@ -1659,6 +2327,7 @@ async function main() {
   // (which has no idea turretDefs even exists) instead of colliding on
   // the same defIndex space.
   function spawnTurret(factionId, defIndex, x, y) {
+    structureSyncDirty = true;
     const fac = factionOf(factionId);
     const def = turretDefs[defIndex];
     const u = {
@@ -1666,6 +2335,7 @@ async function main() {
       hp: Math.round(effectiveStat(fac, def.hp, 'hp')), maxHp: Math.round(effectiveStat(fac, def.hp, 'hp')),
       attack: def.attack, range: Math.round(effectiveStat(fac, def.range, 'range')), speed: 0,
       img: turretImages[defIndex], x, y, alive: true, selected: false,
+      visualScale: visualScale(def.visualScale),
       orderType: null, moveTarget: null, target: null,
       // A turret's single static image doesn't hold up rotated to face an
       // arbitrary enemy direction - confirmed by screenshotting an
@@ -1682,7 +2352,7 @@ async function main() {
       // true. A manually-clicked target (any selected unit's normal
       // click-to-attack order, unchanged) still fires normally either
       // way - this only stops it from ever picking its OWN target.
-      lockedUntilTurn: 0, facingAngle: 0, weapon: def.weapon || 'laser', rotateToFace: false,
+      lockedUntilTurn: 0, facingAngle: 0, weapon: def.weapon || 'laser', weaponSound: def.weaponSound || null, rotateToFace: false,
       autoAttack: def.autoAttack !== false,
     };
     units.push(u);
@@ -1698,6 +2368,7 @@ async function main() {
   // special-case isMissileLauncher for targeting, only for what firing
   // actually does once it has a target.
   function spawnMissileLauncher(factionId, defIndex, x, y) {
+    structureSyncDirty = true;
     const fac = factionOf(factionId);
     const def = missileDefs[defIndex];
     const hp = Math.round(effectiveStat(fac, def.hp, 'hp'));
@@ -1705,6 +2376,7 @@ async function main() {
       id: nextUnitId++, factionId, defIndex, isMiner: false, isMissileLauncher: true,
       hp, maxHp: hp, attack: def.attack, speed: 0,
       img: missileLauncherImages[defIndex], x, y, alive: true, selected: false,
+      visualScale: visualScale(def.visualScale),
       orderType: null, moveTarget: null, target: null,
       // Unlike a Gun Turret, the launcher itself never visually turns to
       // face what it's firing at - only its separate missile projectile
@@ -1718,7 +2390,7 @@ async function main() {
       // per-unit update() loop's own isMissileLauncher branch), the same
       // shape as a Gun Turret's Auto Attack.
       lockedUntilTurn: 0, facingAngle: 0, rotateToFace: false,
-      autoAttack: def.autoAttack === true,
+      autoAttack: def.autoAttack === true, weaponSound: def.weaponSound || null,
       // Baked on here (rather than spawnMissile re-deriving them from
       // missileDefs[launcher.defIndex] every time it fires) so
       // spawnMissile can read them the same way regardless of whether
@@ -1728,6 +2400,7 @@ async function main() {
       // missileImg/missileSpeed/missileRotateToFace for the other side
       // of this.
       missileImg: missileProjectileImages[defIndex],
+      missileVisualScale: visualScale(def.missileVisualScale),
       missileSpeed: def.missileSpeed,
       missileRotateToFace: def.missileRotateToFace !== false,
     };
@@ -1745,18 +2418,59 @@ async function main() {
   // fac.built[key] back to false and clears that building's production
   // queue once this dies, so losing it actually revokes what it
   // unlocked instead of the HP being decorative.
-  function spawnGatedBuildingEntity(fac, key) {
+  function spawnGatedBuildingEntity(fac, key, x, y) {
+    structureSyncDirty = true;
     const b = GATED_BUILDINGS.find((gb) => gb.key === key);
     const hp = Math.round(effectiveStat(fac, b.cfg.hp, 'hp'));
     const u = {
       id: nextUnitId++, factionId: fac.id, defIndex: -1, isMiner: false, isTurret: false,
       isGatedBuilding: true, buildingKey: key,
       hp, maxHp: hp, attack: 0, range: 0, speed: 0,
-      img: b.img, x: fac.x + b.offsetX, y: fac.y + b.offsetY, alive: true, selected: false,
+      img: b.img, x: x ?? fac.x + b.offsetX, y: y ?? fac.y + b.offsetY, alive: true, selected: false,
+      visualScale: visualScale(b.cfg.visualScale),
       orderType: null, moveTarget: null, target: null, lockedUntilTurn: 0, facingAngle: 0,
     };
     units.push(u);
     return u;
+  }
+  function enemyStructureWithin500(factionId, x, y) {
+    return factions.some((fac) => fac.id !== factionId && fac.hp > 0 && Math.hypot(x - fac.x, y - fac.y) < 500) ||
+      units.some((u) => u.alive && u.hp > 0 && u.factionId !== factionId &&
+        (u.isGatedBuilding || u.isTurret || u.isMissileLauncher) && Math.hypot(x - u.x, y - u.y) < 500);
+  }
+  function spawnPlacedStructures() {
+    for (const point of cfg.placedStructures || []) {
+      if (!point || !Number.isInteger(point.factionId) || !factions[point.factionId] ||
+          factions[point.factionId].hp <= 0 || !Number.isFinite(point.x) || !Number.isFinite(point.y) ||
+          point.x < 0 || point.x > 1 || point.y < 0 || point.y > 1) continue;
+      const fac = factions[point.factionId];
+      const x = worldMinX + point.x * worldW, y = worldMinY + point.y * worldH;
+      if (enemyStructureWithin500(fac.id, x, y)) continue;
+      if (units.some((u) => u.alive && u.hp > 0 && (u.isGatedBuilding || u.isTurret || u.isMissileLauncher) &&
+          Math.hypot(x - u.x, y - u.y) < 65)) continue;
+      let entity = null;
+      const placedBuilding = point.kind === 'building'
+        ? GATED_BUILDINGS.find((b) => b.key === point.buildingKey) : null;
+      // Older maps could save an optional placed building without art.
+      // Skip it instead of drawing an unrelated emoji on the battlefield.
+      if (placedBuilding?.img) {
+        if (deposits.concat(extraDeposits).some((d) => Math.hypot(x - d.x, y - d.y) < 90)) continue;
+        entity = spawnGatedBuildingEntity(fac, point.buildingKey, x, y);
+        fac.built[point.buildingKey] = true;
+      } else if (point.kind === 'turret') {
+        const index = turretDefs.findIndex((def) => def.placementId && def.placementId === point.placementId);
+        if (index >= 0 && defenseBlocksMining(fac.id, x, y,
+            effectiveStat(fac, turretDefs[index].range, 'range'), UNIT_SIZE * visualScale(turretDefs[index].visualScale) / 2)) continue;
+        if (index >= 0) entity = spawnTurret(fac.id, index, x, y);
+      } else if (point.kind === 'launcher') {
+        const index = missileDefs.findIndex((def) => def.placementId && def.placementId === point.placementId);
+        if (index >= 0 && defenseBlocksMining(fac.id, x, y,
+            maximumMissileRange(), UNIT_SIZE * visualScale(missileDefs[index].visualScale) / 2)) continue;
+        if (index >= 0) entity = spawnMissileLauncher(fac.id, index, x, y);
+      }
+      if (entity) entity.mapPlaced = true;
+    }
+    syncStructureObstacles();
   }
   // Regular Combat Units (buildingKey === null) still spawn the instant
   // they're paid for - unchanged. An Air Base/War Factory unit instead
@@ -1767,17 +2481,56 @@ async function main() {
   // AI-built units go through the exact same path.
   function startProduction(fac, defIndex) {
     const def = unitDefs[defIndex];
+    if (!def || !canFactionUseUnit(def, fac.id)) return false;
+    const origin = productionBuilding(fac, def.buildingKey);
+    if (!origin) return false;
     if (def.buildingKey) {
       // See MAX_QUEUE_PER_BUILDING - the build panel already disables
       // Queue once full, this is the same check server-side-of-the-
       // client-only-game (i.e. the actual enforcement, not just the UI
       // hint) so nothing - AI included, since aiThink calls this same
       // function - can ever push past the cap.
-      if (fac.buildQueue[def.buildingKey].length >= MAX_QUEUE_PER_BUILDING) return;
+      if (fac.buildQueue[def.buildingKey].length >= MAX_QUEUE_PER_BUILDING) return false;
       fac.buildQueue[def.buildingKey].push({ defIndex, remaining: Math.max(1, Number(def.prodTime) || 30) });
     } else {
-      spawnUnit(fac.id, defIndex, fac.x + 40 + (Math.random() - 0.5) * 60, fac.y + (Math.random() - 0.5) * 60);
+      const point = findSpawnPoint(origin);
+      if (!point) return false;
+      spawnUnit(fac.id, defIndex, point.x, point.y);
     }
+    return true;
+  }
+  function advanceProduction(f, dt) {
+    for (const key of Object.keys(f.buildQueue)) {
+      const q = f.buildQueue[key];
+      if (!q.length) continue;
+      const producers = productionBuildings(f, key);
+      if (!producers.length) { q.length = 0; continue; }
+      const def = unitDefs[q[0].defIndex];
+      if (!def || def.buildingKey !== key || !canFactionUseUnit(def, f.id)) { q.shift(); continue; }
+      q[0].remaining = Math.max(0, q[0].remaining - dt);
+      if (q[0].remaining > 0) continue;
+      // One shared queue per building type remains unchanged. Completed
+      // units rotate through its living copies so every placed producer
+      // can spawn them, and a blocked exit can fall back to another copy.
+      const cursorKey = `${f.id}:${key}`;
+      const cursor = productionCursors.get(cursorKey) || 0;
+      let point = null;
+      for (let offset = 0; offset < producers.length; offset++) {
+        point = findSpawnPoint(producers[(cursor + offset) % producers.length]);
+        if (point) { productionCursors.set(cursorKey, cursor + offset + 1); break; }
+      }
+      if (!point) continue;
+      const item = q.shift();
+      spawnUnit(f.id, item.defIndex, point.x, point.y);
+      if (f === activeFaction) renderBuildPanel();
+    }
+  }
+  function produceMiner(fac) {
+    const origin = productionBuilding(fac, null);
+    const point = origin && findSpawnPoint(origin);
+    if (!point) return false;
+    spawnMiner(fac.id, point.x, point.y);
+    return true;
   }
   function spawnMiner(factionId, x, y) {
     // Auto-orders itself to a deposit the moment it's built - matching
@@ -1802,14 +2555,102 @@ async function main() {
       id: nextUnitId++, factionId, defIndex: -1, isMiner: true,
       hp, maxHp: hp, attack: 0, range: 0, speed: 1.6,
       img: miningImg, x, y, alive: true, selected: false,
+      visualScale: visualScale(cfg.miningUnit?.visualScale),
+      spriteSheet: normalizeSpriteSheet(cfg.miningUnit?.spriteSheet),
       orderType: null, moveTarget: null,
       target: null, lockedUntilTurn: 0, facingAngle: 0,
+      rotateToFace: cfg.miningUnit?.rotateToFace !== false,
     };
     if (deposit) issueMoveOrder(u, deposit.x, deposit.y);
     units.push(u);
     return u;
   }
 
+  function carriedUnits(transport) {
+    return units.filter(u => u.embarkedOn === transport.id && u.hp > 0);
+  }
+  function embarkUnit(u, transport) {
+    u.embarkedOn = transport.id;
+    // Inactive units are excluded by the existing draw, targeting, combat,
+    // mining, selection and minimap filters, but remain in saved cargo.
+    u.alive = false;
+    u.selected = false;
+    u.x = transport.x; u.y = transport.y;
+    u.orderType = null; u.target = null; u.moveTarget = null; u.pathWaypoints = null;
+    u._chaseWaypoints = null;
+  }
+  function canBoard(u, transport) {
+    return u !== transport && u.alive && u.hp > 0 && u.speed > 0 && !u.defendPost && !u.transportCapacity &&
+      !u.isGatedBuilding && !u.isTurret && !u.isMissileLauncher &&
+      transport.alive && transport.hp > 0 && transport.transportCapacity > 0 &&
+      u.factionId === transport.factionId;
+  }
+  function orderBoard(u, transport) {
+    if (!canBoard(u, transport) || isLocked(u)) return false;
+    const reservations = units.filter(v => v !== u && v.alive && v.orderType === 'board' && v.target === transport).length;
+    if (carriedUnits(transport).length + reservations >= transport.transportCapacity) return false;
+    u.orderType = 'board'; u.target = transport; u.moveTarget = null; u.pathWaypoints = null;
+    u._chaseWaypoints = null;
+    return true;
+  }
+  function boardingTick(u, dt) {
+    const transport = u.target;
+    if (!transport || !canBoard(u, transport) || carriedUnits(transport).length >= transport.transportCapacity) {
+      u.orderType = null; u.target = null;
+      return;
+    }
+    if (isLocked(u)) return;
+    const reach = (unitVisualSize(u) + unitVisualSize(transport)) / 2 + 12;
+    if (Math.hypot(u.x - transport.x, u.y - transport.y) <= reach) {
+      embarkUnit(u, transport);
+      return;
+    }
+    u.facingAngle = facingToward(u, transport.x, transport.y);
+    chaseTowardTarget(u, transport.x, transport.y, u.speed * MOVE_PX_PER_SPEED, dt);
+    clampToWorld(u); pushOutOfObstacles(u);
+    u._isMoving = true;
+  }
+  function releaseVessels(transport) {
+    if (!transport.alive || transport.hp <= 0 || !transport.transportCapacity || isLocked(transport) ||
+        (turnMode && transport.factionId !== activeIdx)) return false;
+    const cargo = carriedUnits(transport);
+    if (!cargo.length) return false;
+    syncStructureObstacles();
+    const points = [];
+    for (const vessel of cargo) {
+      let point = null;
+      const clearance = Math.max(UNIT_COLLISION_RADIUS, unitVisualSize(vessel) / 2);
+      for (let ring = 0; ring < 16 && !point; ring++) {
+        const radius = unitVisualSize(transport) / 2 + clearance + PATH_MARGIN + 8 + ring * 24;
+        for (let n = 0; n < 48; n++) {
+          const a = n * Math.PI * 2 / 48;
+          const p = { x: transport.x + Math.cos(a) * radius, y: transport.y + Math.sin(a) * radius, clearance };
+          if (p.x < worldMinX + clearance || p.x > worldMaxX - clearance || p.y < worldMinY + clearance || p.y > worldMaxY - clearance) continue;
+          if (obstacles.some(o => Math.hypot(p.x - o.x, p.y - o.y) < o.radius + clearance + PATH_MARGIN + 1)) continue;
+          if (points.some(other => Math.hypot(p.x - other.x, p.y - other.y) < clearance + other.clearance + 4)) continue;
+          point = p; break;
+        }
+      }
+      if (!point) return false; // Release all together; blocked cargo stays safe aboard.
+      points.push(point);
+    }
+    cargo.forEach((vessel, index) => {
+      vessel.x = points[index].x; vessel.y = points[index].y;
+      vessel.embarkedOn = null; vessel.alive = true; vessel.selected = false;
+      vessel.orderType = null; vessel.target = null; vessel.moveTarget = null;
+      vessel._chaseWaypoints = null;
+    });
+    return true;
+  }
+  function destroyEmbarkedUnits(transport, attackerFactionId) {
+    for (const vessel of carriedUnits(transport)) {
+      vessel.hp = 0; vessel.alive = false; vessel.embarkedOn = null;
+      if (attackerFactionId !== undefined) {
+        factionOf(attackerFactionId).stats.kills++;
+        factionOf(vessel.factionId).stats.losses++;
+      }
+    }
+  }
   function livingUnits(factionId) { return units.filter((u) => u.alive && u.factionId === factionId); }
   function isAlly(a, b) { return a === b || factionOf(a).team === factionOf(b).team; }
   function nearestEnemy(u) {
@@ -1846,12 +2687,12 @@ async function main() {
     for (const f of factions) {
       if (isAlly(u.factionId, f.id)) continue;
       if (f.hp <= 0) continue;
-      const hd = Math.hypot(f.x - u.x, f.y - u.y);
+      const hd = distanceToTarget(u, f);
       if (hd <= bestDist) { best = f; bestDist = hd; }
     }
     for (const e of units) {
       if (!e.alive || e.mining || isAlly(u.factionId, e.factionId)) continue;
-      const d = Math.hypot(e.x - u.x, e.y - u.y);
+      const d = distanceToTarget(u, e);
       if (d <= bestDist) { best = e; bestDist = d; }
     }
     return best;
@@ -1922,6 +2763,7 @@ async function main() {
       x: launcher.x, y: launcher.y, factionId: launcher.factionId, target,
       damage: launcher.attack, speed: (Number(launcher.missileSpeed) || 4) * MOVE_PX_PER_SPEED,
       img: launcher.missileImg, facingAngle: 0,
+      visualScale: visualScale(launcher.missileVisualScale),
       // index.html's "Rotate missile to face its travel direction"
       // checkbox - defaults true for a unit/launcher saved before this
       // field existed, same convention as a normal unit's own
@@ -2026,53 +2868,22 @@ async function main() {
     return Math.atan2(ty - u.y, tx - u.x) + Math.PI / 2;
   }
 
-  // Walks the real route issueMoveOrder planned (pathWaypoints/pathIndex)
-  // one waypoint at a time instead of straight at moveTarget directly -
-  // moveTarget stays the true final destination (still what order-active
-  // checks and save/load read), but the actual walk follows the planned
-  // route around whatever obstacles are in the way, with the reactive
-  // local steering (moveTowardWithAvoidance) still doing the fine-grained
-  // walk between any two waypoints as a backstop.
-  // Walks each leg of the planned route (issueMoveOrder's pathWaypoints)
-  // as a plain straight line, NOT through moveTowardWithAvoidance's own
-  // reactive steering - every leg was already verified obstacle-clear
-  // (with real margin) when the route was planned, so there's nothing
-  // left to react to. Running the reactive steerer on top of an already-
-  // planned leg was actively counterproductive: threading a genuinely
-  // tight-but-clear gap between two obstacles, it could still nudge the
-  // unit a few px off the ideal line, re-triggering avoidance around
-  // whichever obstacle it drifted nearest to and deflecting it into its
-  // NEIGHBOR's clearance zone instead - a brand new trap the planner
-  // never anticipated, since it only ever checked the ideal line. Plain
-  // straight-line walking has nothing to drift off course from.
-  // pushOutOfObstacles stays on purely as a defensive backstop (should
-  // essentially never trigger, given the planner's own margin).
+  // Follow the planned, obstacle-clear legs at constant travel speed.
+  // moveTarget remains the final destination for orders and saved games.
+  // Collision checks protect each leg; reactive steering would deflect
+  // the unit off the safe route in narrow gaps.
   function runMoveOrder(u, dt) {
-    if (!u.pathWaypoints || !u.pathWaypoints.length) { u.orderType = null; u.moveTarget = null; u.pathWaypoints = null; return; }
-    const wp = u.pathWaypoints[u.pathIndex];
-    const dx = wp.x - u.x, dy = wp.y - u.y;
-    const dist = Math.hypot(dx, dy);
-    if (dist < 4) {
-      u.pathIndex++;
-      if (u.pathIndex >= u.pathWaypoints.length) { u.orderType = null; u.moveTarget = null; u.pathWaypoints = null; }
-    } else {
-      u.facingAngle = facingToward(u, wp.x, wp.y);
-      const sp = u.speed * MOVE_PX_PER_SPEED;
-      // Capped at `dist` - a fast unit (or a waypoint only just out of
-      // the dist<4 "arrived" window) could otherwise cover more ground
-      // in one tick than actually remained, overshooting clean past the
-      // waypoint and immediately "arriving" from the OTHER side next
-      // tick too far the other way - a perpetual ping-pong across it
-      // that never lands within 4px, so the order never actually
-      // completed. Multiple short legs (a planned route with several
-      // waypoints close together) made this far more likely to surface
-      // than the old single-destination case ever did.
-      const step = Math.min(sp * dt, dist);
-      u.x += (dx / dist) * step; u.y += (dy / dist) * step;
-      clampToWorld(u);
-      pushOutOfObstacles(u);
-      u._isMoving = true;
+    syncStructureObstacles();
+    if (u.moveTarget && u._pathVersion !== obstacleVersion) {
+      if (routeIsStillClear(u, u.pathWaypoints, u.pathIndex)) u._pathVersion = obstacleVersion;
+      else issueMoveOrder(u, u.moveTarget.x, u.moveTarget.y);
     }
+    if (!u.pathWaypoints || !u.pathWaypoints.length) { u.orderType = null; u.moveTarget = null; u.pathWaypoints = null; return; }
+    const result = walkRoute(u, u.pathWaypoints, u.pathIndex, u.speed * MOVE_PX_PER_SPEED * dt);
+    u.pathIndex = result.index;
+    clampToWorld(u);
+    pushOutOfObstacles(u);
+    if (u.pathIndex >= u.pathWaypoints.length) { u.orderType = null; u.moveTarget = null; u.pathWaypoints = null; }
   }
 
   // A unit that just attacked does nothing else at all - can't re-attack
@@ -2103,10 +2914,13 @@ async function main() {
   // only difference is WHEN this runs relative to the attack being
   // ordered (instantly vs. after real travel time).
   function applyDamageToTarget(t, dmg, attackerFactionId) {
+    if (t.embarkedOn != null) return;
     t.hp -= dmg;
-    playSfx(sounds.attack);
+    if (attackerFactionId === player.id) playSfx(sounds.attack);
     if (t.hp <= 0) {
+      if (t.isFactionHome || t.isGatedBuilding || t.isTurret || t.isMissileLauncher) structureSyncDirty = true;
       t.hp = 0;
+      if (t.transportCapacity) destroyEmbarkedUnits(t, attackerFactionId);
       if (t.maxHp === undefined || t.isFactionHome) playSfx(sounds.homeUnderAttack);
       if (!t.isFactionHome && t.alive !== undefined) { t.alive = false; playSfx(sounds.buildingDestroyed); }
       // 📊 Stats dropdown: whoever landed the killing blow gets a kill,
@@ -2132,8 +2946,9 @@ async function main() {
       // bug fixed for the "just built it" direction earlier).
       if (t.isGatedBuilding) {
         const owner = factionOf(t.factionId);
-        owner.built[t.buildingKey] = false;
-        owner.buildQueue[t.buildingKey] = [];
+        const stillBuilt = !!productionBuilding(owner, t.buildingKey);
+        owner.built[t.buildingKey] = stillBuilt;
+        if (!stillBuilt) owner.buildQueue[t.buildingKey] = [];
         if (owner === activeFaction) { renderBuildPanel(); renderResearchPanel(); }
       }
     }
@@ -2147,7 +2962,7 @@ async function main() {
     // can improve mid-match, so it's read fresh every tick rather than
     // baked in at spawn time.
     const range = u.isMissileLauncher ? missileRange(factionOf(u.factionId)) : u.range;
-    const dist = Math.hypot(t.x - u.x, t.y - u.y);
+    const dist = distanceToTarget(u, t);
     // Turrets and Missile Silo launchers both have rotateToFace:false (see
     // their spawn functions), so this facingAngle update is a harmless
     // no-op for them - only a moving unit chasing a target actually gets
@@ -2199,9 +3014,11 @@ async function main() {
       // already gets for free.
       const incomingDamage = missiles.reduce((sum, m) => m.target === t ? sum + m.damage : sum, 0);
       if (t.hp - incomingDamage <= 0) { u.target = null; return; }
+      playUnitSound(u);
       spawnMissile(u, t);
       lockUnit(u);
     } else {
+      playUnitSound(u);
       fireWeaponEffect(u, t);
       applyDamageToTarget(t, u.attack, u.factionId);
       lockUnit(u);
@@ -2227,7 +3044,7 @@ async function main() {
     // discovered and dropped, not silently "used" anyway.
     if (t.hp >= t.maxHp) { u.target = null; return; }
     if (isLocked(u)) return;
-    const dist = Math.hypot(t.x - u.x, t.y - u.y);
+    const dist = distanceToTarget(u, t);
     u.facingAngle = facingToward(u, t.x, t.y);
     if (dist > u.range) {
       const sp = u.speed * MOVE_PX_PER_SPEED;
@@ -2236,6 +3053,7 @@ async function main() {
       pushOutOfObstacles(u);
       u._isMoving = true;
     } else {
+      playUnitSound(u);
       t.hp = Math.min(t.maxHp, t.hp + u.healAmount);
       // A distinct green pulse (reusing the same `effects` array every
       // weapon effect already draws through) instead of one of the 26
@@ -2285,9 +3103,15 @@ async function main() {
   // the isFactionHome exclusion below, unconditional either way.
   // ---------------------------------------------------------------------
   const CLERICS_CONVERT_STRUCTURES = cfg.religiousInstitution?.convertStationary !== false;
-  function isConvertible(t) {
+  function isConvertible(t, newFactionId) {
     if (!t || t.alive === false || t.isFactionHome || t.isMiner || t.isCleric) return false;
     if (!CLERICS_CONVERT_STRUCTURES && (t.isTurret || t.isMissileLauncher || t.isGatedBuilding)) return false;
+    if (newFactionId !== undefined) {
+      if (t.isGatedBuilding && t.buildingKey !== 'researchFacility' && !t.mapPlaced && !canFactionProduce(buildingCfgByKey[t.buildingKey], newFactionId)) return false;
+      if (t.isTurret && !canFactionProduce(turretDefs[t.defIndex], newFactionId)) return false;
+      if (t.isMissileLauncher && !canFactionUseMissile(missileDefs[t.defIndex], newFactionId)) return false;
+      if (!t.isGatedBuilding && !t.isTurret && !t.isMissileLauncher && !canFactionUseUnit(unitDefs[t.defIndex], newFactionId)) return false;
+    }
     return true;
   }
   // AI-controlled Clerics pick their own target (a human just clicks one -
@@ -2297,7 +3121,7 @@ async function main() {
   function nearestConvertibleEnemy(u) {
     let best = null, bestDist = Infinity;
     for (const e of units) {
-      if (isAlly(u.factionId, e.factionId) || !isConvertible(e)) continue;
+      if (isAlly(u.factionId, e.factionId) || !isConvertible(e, u.factionId)) continue;
       const dist = Math.hypot(e.x - u.x, e.y - u.y);
       if (dist < bestDist) { bestDist = dist; best = e; }
     }
@@ -2320,8 +3144,10 @@ async function main() {
   function convertUnit(t, newFactionId) {
     const oldFactionId = t.factionId;
     t.factionId = newFactionId;
+    if (t.transportCapacity) carriedUnits(t).forEach(vessel => { vessel.factionId = newFactionId; });
     t.orderType = null; t.target = null; t.moveTarget = null; t.pathWaypoints = null;
     t.selected = false;
+    t.defendPost = null;
     t.attackedThisTurn = false; t.lockedUntilTurn = 0;
     // A gated building's own unlock flag/production queue live on the
     // FACTION object (fac.built[key]/fac.buildQueue[key]), not on this
@@ -2335,11 +3161,11 @@ async function main() {
     // state the same way) unlock to the new owner.
     if (t.isGatedBuilding) {
       const oldOwner = factionOf(oldFactionId);
-      oldOwner.built[t.buildingKey] = false;
-      oldOwner.buildQueue[t.buildingKey] = [];
+      const stillBuilt = !!productionBuilding(oldOwner, t.buildingKey);
+      oldOwner.built[t.buildingKey] = stillBuilt;
+      if (!stillBuilt) oldOwner.buildQueue[t.buildingKey] = [];
       const newOwner = factionOf(newFactionId);
       newOwner.built[t.buildingKey] = true;
-      newOwner.buildQueue[t.buildingKey] = [];
       if (oldOwner === activeFaction || newOwner === activeFaction) { renderBuildPanel(); renderResearchPanel(); }
     }
   }
@@ -2355,9 +3181,9 @@ async function main() {
   // here to get that distinction right.
   function convertTick(u, dt) {
     const t = u.target;
-    if (!isConvertible(t)) { u.target = null; return; }
+    if (!isConvertible(t, u.factionId)) { u.target = null; return; }
     if (isLocked(u)) return;
-    const dist = Math.hypot(t.x - u.x, t.y - u.y);
+    const dist = distanceToTarget(u, t);
     u.facingAngle = facingToward(u, t.x, t.y);
     if (dist > u.range) {
       const sp = u.speed * MOVE_PX_PER_SPEED;
@@ -2366,6 +3192,7 @@ async function main() {
       pushOutOfObstacles(u);
       u._isMoving = true;
     } else {
+      playUnitSound(u);
       convertUnit(t, u.factionId);
       // A distinct pulse (reusing the same `effects` array every weapon
       // effect and the medic's own heal pulse already draw through),
@@ -2384,13 +3211,78 @@ async function main() {
   }
   // Tag every faction object once so combatTick can tell a homeworld
   // target apart from a unit target without extra lookups.
-  factions.forEach((f) => { f.isFactionHome = true; });
+  factions.forEach((f) => { f.isFactionHome = !f.isMapOnly; });
 
   // Set once at map-creation time (index.html's Fog of War checkbox),
   // fixed for the whole match - no longer a topbar button a player could
   // flip on/off mid-game.
   let turnTimer = TURN_SECONDS, turnNumber = 1, aiTimer = AI_TICK_SECONDS, fogOn = !!cfg.fogOfWar;
-  let elapsed = 0; // real seconds since the match started - drives the home-base "planet" spin animation only (see drawFactionHome)
+  let elapsed = 0; // real seconds since the match started; drives home-base spin and optional map motion
+
+  // Each faction remembers only terrain explored by its own team. Sight is
+  // recalculated from living units every frame, so enemies disappear when
+  // they leave sight while the terrain itself remains explored.
+  const SIGHT_RANGE = 100, EXPLORED_SIZE = 512;
+  const exploredMaps = factions.map(() => {
+    const map = document.createElement('canvas');
+    map.width = map.height = EXPLORED_SIZE;
+    return map;
+  });
+  const exploredContexts = exploredMaps.map((map) => map.getContext('2d'));
+  const fogCanvas = document.createElement('canvas');
+  const fogCtx = fogCanvas.getContext('2d');
+  function sightSources(viewer = activeFaction) {
+    const sources = [];
+    for (const f of factions) {
+      if (f.hp > 0 && isAlly(viewer.id, f.id)) sources.push(f);
+    }
+    for (const u of units) {
+      if (u.alive && !u.embarkedOn && isAlly(viewer.id, u.factionId)) sources.push(u);
+    }
+    return sources;
+  }
+  function inSight(x, y, sources) {
+    return sources.some((source) => (source.x - x) ** 2 + (source.y - y) ** 2 <= SIGHT_RANGE ** 2);
+  }
+  function recordExploration() {
+    if (!fogOn || !matchStarted) return;
+    for (const f of factions) {
+      if (f.hp <= 0) continue;
+      const exploration = exploredContexts[f.id];
+      exploration.fillStyle = '#fff';
+      for (const source of sightSources(f)) {
+        const x = (source.x - worldMinX) * EXPLORED_SIZE / worldW;
+        const y = (source.y - worldMinY) * EXPLORED_SIZE / worldH;
+        exploration.beginPath();
+        exploration.ellipse(x, y, SIGHT_RANGE * EXPLORED_SIZE / worldW, SIGHT_RANGE * EXPLORED_SIZE / worldH, 0, 0, Math.PI * 2);
+        exploration.fill();
+      }
+    }
+  }
+  function drawFog(sources) {
+    if (fogCanvas.width !== canvas.width) fogCanvas.width = canvas.width;
+    if (fogCanvas.height !== canvas.height) fogCanvas.height = canvas.height;
+    fogCtx.clearRect(0, 0, canvas.width, canvas.height);
+    fogCtx.fillStyle = '#01050b';
+    fogCtx.fillRect(0, 0, canvas.width, canvas.height);
+    // Previously explored terrain is dim. Current sight is completely clear.
+    fogCtx.globalCompositeOperation = 'destination-out';
+    fogCtx.globalAlpha = 0.4;
+    fogCtx.drawImage(exploredMaps[activeFaction.id],
+      (worldMinX - camera.x) * camera.zoom + canvas.width / 2,
+      (worldMinY - camera.y) * camera.zoom + canvas.height / 2,
+      worldW * camera.zoom, worldH * camera.zoom);
+    fogCtx.globalAlpha = 1;
+    fogCtx.fillStyle = '#fff';
+    for (const source of sources) {
+      const p = toScreen(source.x, source.y);
+      const radius = SIGHT_RANGE * camera.zoom;
+      if (p.x + radius < 0 || p.x - radius > canvas.width || p.y + radius < 0 || p.y - radius > canvas.height) continue;
+      fogCtx.beginPath(); fogCtx.arc(p.x, p.y, radius, 0, Math.PI * 2); fogCtx.fill();
+    }
+    fogCtx.globalCompositeOperation = 'source-over';
+    ctx.drawImage(fogCanvas, 0, 0);
+  }
 
   // Centers on the middle of a faction's homeworld AND all its own living
   // units, not just the homeworld - advanceTurn() used to snap straight
@@ -2466,6 +3358,7 @@ async function main() {
     const pad = 300;
     const fitZoom = Math.min(canvas.width / (center.w + pad * 2), canvas.height / (center.h + pad * 2));
     camera.zoom = Math.min(1, Math.max(ZOOM_MIN, fitZoom));
+    units.filter((u) => u.alive && factionOf(u.factionId).isMapOnly).forEach((u) => { u.attackedThisTurn = false; });
     livingUnits(activeFaction.id).forEach((u) => {
       u.attackedThisTurn = false;
       // A standing 'attack' order from last turn (the unit's target is
@@ -2586,9 +3479,9 @@ async function main() {
     // Facility) over a random unit - otherwise an AI that never happens
     // to roll it could go the whole match without ever unlocking that
     // building's units, or never researching anything at all.
-    const neededBuilding = GATED_BUILDINGS.find((b) => (b.unitCfgs.length || b.alwaysShow) && !fac.built[b.key] && canAffordGold(fac, b.cfg.cost));
+    const neededBuilding = GATED_BUILDINGS.find((b) => canFactionUseBuilding(b, fac.id) && !fac.built[b.key] && canAffordGold(fac, b.cfg.cost));
     if (wantsFirstMiner || wantsAnotherMiner) {
-      spawnMiner(fac.id, fac.x - 40, fac.y); spendGold(fac, 80);
+      if (produceMiner(fac)) spendGold(fac, 80);
     } else if (neededBuilding && Math.random() < diff.buildingChance) {
       spendGold(fac, neededBuilding.cfg.cost); fac.built[neededBuilding.key] = true;
       spawnGatedBuildingEntity(fac, neededBuilding.key);
@@ -2598,11 +3491,10 @@ async function main() {
       // a full queue (see its own comment), and gold's already spent by
       // the time that check would run, so this has to happen before
       // spendCosts below, not after.
-      const affordable = unitDefs.map((d, i) => ({ d, i })).filter((x) => canAffordCosts(fac, getCosts(x.d)) && (!x.d.buildingKey || (fac.built[x.d.buildingKey] && fac.buildQueue[x.d.buildingKey].length < MAX_QUEUE_PER_BUILDING)));
+      const affordable = unitDefs.map((d, i) => ({ d, i })).filter((x) => canFactionUseUnit(x.d, fac.id) && canAffordCosts(fac, getCosts(x.d)) && (!x.d.buildingKey || (fac.built[x.d.buildingKey] && fac.buildQueue[x.d.buildingKey].length < MAX_QUEUE_PER_BUILDING)));
       if (affordable.length) {
         const pick = affordable[Math.floor(Math.random() * affordable.length)];
-        spendCosts(fac, getCosts(pick.d));
-        startProduction(fac, pick.i);
+        if (startProduction(fac, pick.i)) spendCosts(fac, getCosts(pick.d));
       }
     }
     // Turrets: no placement-mode UI for the AI, it just picks a random
@@ -2610,13 +3502,19 @@ async function main() {
     // TURRET_MIN_RANGE/MAX_RANGE) and places one directly. Low, separate
     // chance each tick so it doesn't crowd out the AI's other spending -
     // this is a defensive extra, not its main economy.
-    const affordableTurret = turretDefs.map((d, i) => ({ d, i })).filter((x) => canAffordCosts(fac, getCosts(x.d)));
+    const affordableTurret = turretDefs.map((d, i) => ({ d, i })).filter((x) => canFactionProduce(x.d, fac.id) && canAffordCosts(fac, getCosts(x.d)));
     if (affordableTurret.length && Math.random() < diff.turretChance) {
       const pick = affordableTurret[Math.floor(Math.random() * affordableTurret.length)];
-      const angle = Math.random() * Math.PI * 2;
-      const dist = TURRET_MIN_RANGE + Math.random() * (TURRET_MAX_RANGE - TURRET_MIN_RANGE);
-      spendCosts(fac, getCosts(pick.d));
-      spawnTurret(fac.id, pick.i, fac.x + Math.cos(angle) * dist, fac.y + Math.sin(angle) * dist);
+      for (let attempt = 0; attempt < 20; attempt++) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = TURRET_MIN_RANGE + Math.random() * (TURRET_MAX_RANGE - TURRET_MIN_RANGE);
+        const x = fac.x + Math.cos(angle) * dist, y = fac.y + Math.sin(angle) * dist;
+        if (enemyStructureWithin500(fac.id, x, y)) continue;
+        if (defenseBlocksMining(fac.id, x, y, effectiveStat(fac, pick.d.range, 'range'), UNIT_SIZE * visualScale(pick.d.visualScale) / 2)) continue;
+        spendCosts(fac, getCosts(pick.d));
+        spawnTurret(fac.id, pick.i, x, y);
+        break;
+      }
     }
     // Missile Silo launchers: same random-valid-spot placement as Gun
     // Turrets above, just additionally gated behind the Missile Silo
@@ -2626,18 +3524,85 @@ async function main() {
     // per-unit update() loop's `!fac.isHuman` branch picking
     // nearestEnemy() and calling combatTick, which drops the order again
     // if that target turns out to be outside missileRange()).
-    const affordableMissile = missileDefs.map((d, i) => ({ d, i })).filter((x) => canAffordCosts(fac, getCosts(x.d)));
+    const affordableMissile = missileDefs.map((d, i) => ({ d, i })).filter((x) => canFactionUseMissile(x.d, fac.id) && canAffordCosts(fac, getCosts(x.d)));
     if (fac.built.missileSilo && affordableMissile.length && Math.random() < diff.turretChance) {
       const pick = affordableMissile[Math.floor(Math.random() * affordableMissile.length)];
-      const angle = Math.random() * Math.PI * 2;
-      const dist = TURRET_MIN_RANGE + Math.random() * (TURRET_MAX_RANGE - TURRET_MIN_RANGE);
-      spendCosts(fac, getCosts(pick.d));
-      spawnMissileLauncher(fac.id, pick.i, fac.x + Math.cos(angle) * dist, fac.y + Math.sin(angle) * dist);
+      for (let attempt = 0; attempt < 20; attempt++) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = TURRET_MIN_RANGE + Math.random() * (TURRET_MAX_RANGE - TURRET_MIN_RANGE);
+        const x = fac.x + Math.cos(angle) * dist, y = fac.y + Math.sin(angle) * dist;
+        if (enemyStructureWithin500(fac.id, x, y)) continue;
+        if (defenseBlocksMining(fac.id, x, y, maximumMissileRange(), UNIT_SIZE * visualScale(pick.d.visualScale) / 2)) continue;
+        spendCosts(fac, getCosts(pick.d));
+        spawnMissileLauncher(fac.id, pick.i, x, y);
+        break;
+      }
     }
   }
 
   function update(dt) {
     if (paused || gameOver || !matchStarted) return;
+    updatingSimulation = true;
+    structureSyncDirty = true;
+    try { updateSimulation(dt); }
+    finally { updatingSimulation = false; }
+  }
+  // Map-placed defenders guard a post rather than following the normal AI
+  // hunt or player move-order paths. The patrol radius is measured from the
+  // post, while the troop keeps its own existing weapon/heal/convert range.
+  function areaDefenderTick(u, dt) {
+    const post = u.defendPost;
+    const inPostRange = (target) => target && target.hp > 0 && target.alive !== false &&
+      distanceToTarget(post, target) <= post.range;
+    if (u.target && (!inPostRange(u.target) ||
+        (u.isMedic ? !isAlly(u.factionId, u.target.factionId) || u.target.hp >= u.target.maxHp
+          : isAlly(u.factionId, u.target.isFactionHome ? u.target.id : u.target.factionId) ||
+            (u.isCleric && !isConvertible(u.target, u.factionId))))) {
+      u.target = null;
+    }
+    if (!u.target) {
+      if (u.isMedic) {
+        let bestDistance = Infinity;
+        for (const ally of units) {
+          if (!ally.alive || ally === u || ally.isGatedBuilding || !isAlly(u.factionId, ally.factionId) || ally.hp >= ally.maxHp || !inPostRange(ally)) continue;
+          const distance = Math.hypot(ally.x - post.x, ally.y - post.y);
+          if (distance < bestDistance) { u.target = ally; bestDistance = distance; }
+        }
+      } else if (u.isCleric) {
+        let bestDistance = Infinity;
+        for (const enemy of units) {
+          if (!enemy.alive || isAlly(u.factionId, enemy.factionId) || !isConvertible(enemy, u.factionId) || !inPostRange(enemy)) continue;
+          const distance = Math.hypot(enemy.x - post.x, enemy.y - post.y);
+          if (distance < bestDistance) { u.target = enemy; bestDistance = distance; }
+        }
+      } else {
+        u.target = nearestEnemyInRange({ x: post.x, y: post.y, factionId: u.factionId, range: post.range });
+      }
+    }
+    if (u.target) {
+      u.orderType = u.isMedic ? 'heal' : u.isCleric ? 'convert' : 'attack';
+      u.moveTarget = null;
+      u.pathWaypoints = null;
+      if (u.isMedic) healTick(u, dt);
+      else if (u.isCleric) convertTick(u, dt);
+      else combatTick(u, dt);
+      return;
+    }
+    if (Math.hypot(u.x - post.x, u.y - post.y) > 3 && u.speed > 0) {
+      if (u.orderType !== 'move' || !u.moveTarget ||
+          Math.hypot(u.moveTarget.x - post.x, u.moveTarget.y - post.y) > 1) issueMoveOrder(u, post.x, post.y);
+      runMoveOrder(u, dt);
+    } else {
+      u.orderType = null; u.moveTarget = null; u.pathWaypoints = null;
+    }
+  }
+  function updateSimulation(dt) {
+    chaseRoutesThisFrame.clear();
+    chaseSearchesThisFrame = 0;
+    pendingChaseRoutes = pendingChaseRoutes.filter(u => u.alive && u.target && u.target.hp > 0 &&
+      u.target.alive !== false && !isLocked(u) &&
+      (!turnMode || u.factionId === activeIdx) && distanceToTarget(u, u.target) > (u.range || 0));
+    syncStructureObstacles();
     elapsed += dt;
     if (turnMode) {
       // No continued/global clock in this mode - just each faction's own
@@ -2660,16 +3625,7 @@ async function main() {
       // building's own queue ticks down, so one building produces one
       // unit at a time, but the two buildings' queues run independently
       // of each other and of anything turn-related.
-      for (const key of Object.keys(f.buildQueue)) {
-        const q = f.buildQueue[key];
-        if (!q.length) continue;
-        q[0].remaining -= dt;
-        if (q[0].remaining <= 0) {
-          const item = q.shift();
-          spawnUnit(f.id, item.defIndex, f.x + 40 + (Math.random() - 0.5) * 60, f.y + (Math.random() - 0.5) * 60);
-          if (f === activeFaction) renderBuildPanel();
-        }
-      }
+      advanceProduction(f, dt);
       // Income only flows while a miner is actually parked within range
       // of its faction's own deposit - matching "a Mining Ship parked
       // within range of a deposit drains it," not "having built one ever
@@ -2780,7 +3736,13 @@ async function main() {
       // pick back up exactly where they left off once their turn comes
       // back around. Real-Time mode: always true, so this never changes
       // anything there.
-      if (turnMode && fac.id !== activeIdx) continue;
+      if (turnMode && fac.id !== activeIdx && !fac.isMapOnly) continue;
+      if (u.orderType === 'board') { boardingTick(u, dt); continue; }
+      if (u.defendPost) { areaDefenderTick(u, dt); continue; }
+      if (u.transportCapacity && !fac.isHuman && carriedUnits(u).length) {
+        const enemy = nearestEnemy(u);
+        if (enemy && Math.hypot(enemy.x - u.x, enemy.y - u.y) < Math.max(u.range || 0, 400)) releaseVessels(u);
+      }
       if (u.isTurret) {
         // Never moves (speed 0, so combatTick's own out-of-range chase
         // math always computes zero displacement), and by default
@@ -2845,7 +3807,7 @@ async function main() {
       // just given a move order.
       if (u.isCleric) {
         if (!fac.isHuman) {
-          if (!isConvertible(u.target)) u.target = nearestConvertibleEnemy(u);
+          if (!isConvertible(u.target, u.factionId)) u.target = nearestConvertibleEnemy(u);
           if (u.target) convertTick(u, dt);
         } else if (u.orderType === 'convert' && u.target) {
           convertTick(u, dt);
@@ -2888,7 +3850,7 @@ async function main() {
         // all. A pure Auto-Attack unit with nothing in range just stands
         // still - it never marches off after something distant the way
         // an explicit attack order (or AI) does.
-        if (u.target && (u.target.hp <= 0 || u.target.alive === false || Math.hypot(u.target.x - u.x, u.target.y - u.y) > u.range)) {
+        if (u.target && (u.target.hp <= 0 || u.target.alive === false || distanceToTarget(u, u.target) > u.range)) {
           u.target = null;
         }
         if (!u.target) u.target = nearestEnemyInRange(u);
@@ -2921,7 +3883,7 @@ async function main() {
       m.y += (t.y - m.y) / dist * m.speed * dt;
     }
 
-    const aliveTeams = new Set(factions.filter((f) => f.hp > 0).map((f) => f.team));
+    const aliveTeams = new Set(factions.filter((f) => f.hp > 0 || (f.isMapOnly && livingUnits(f.id).length > 0)).map((f) => f.team));
     if (aliveTeams.size <= 1 && matchStarted) {
       gameOver = true;
       const winningTeam = [...aliveTeams][0];
@@ -3007,6 +3969,104 @@ async function main() {
     const dw = bgImg.width * coverScale, dh = bgImg.height * coverScale;
     bgDraw = { x: worldMinX + (worldW - dw) / 2, y: worldMinY + (worldH - dh) / 2, w: dw, h: dh };
   }
+  const validGradientColor = (value, fallback) => /^#[0-9a-f]{6}$/i.test(value || '') ? value : fallback;
+  const mapGradientStart = validGradientColor(cfg.mapGradient?.start, '#0b1b35');
+  const mapGradientEnd = validGradientColor(cfg.mapGradient?.end, '#294765');
+  const mapMotion = ['ocean', 'rain', 'snow'].includes(cfg.mapMotion) ? cfg.mapMotion : 'none';
+
+  // Animate only the scenery layer. World coordinates and the camera stay
+  // fixed, so map placements, movement orders, and collision never drift.
+  function mapMotionNoise(x, y) {
+    const value = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
+    return value - Math.floor(value);
+  }
+  function drawMapMotion() {
+    if (mapMotion === 'none') return;
+    const topLeft = toWorld(0, 0), bottomRight = toWorld(canvas.width, canvas.height);
+    const minX = Math.max(worldMinX, topLeft.x), maxX = Math.min(worldMaxX, bottomRight.x);
+    const minY = Math.max(worldMinY, topLeft.y), maxY = Math.min(worldMaxY, bottomRight.y);
+    if (minX >= maxX || minY >= maxY) return;
+    const worldTopLeft = toScreen(worldMinX, worldMinY);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(worldTopLeft.x, worldTopLeft.y, worldW * camera.zoom, worldH * camera.zoom);
+    ctx.clip();
+    if (mapMotion === 'ocean') {
+      // Travelling wave crests make water art or a blue gradient feel alive.
+      ctx.lineWidth = 2;
+      for (let y = Math.floor((minY - 30) / 150) * 150; y <= maxY + 30; y += 150) {
+        ctx.strokeStyle = 'rgba(152,226,255,0.24)';
+        ctx.beginPath();
+        let first = true;
+        for (let x = minX - 24; x <= maxX + 24; x += 24) {
+          const p = toScreen(x, y + Math.sin(x / 95 - elapsed * 1.2 + y / 70) * 13 + Math.sin(x / 210 + elapsed * 0.7) * 5);
+          if (first) { ctx.moveTo(p.x, p.y); first = false; } else ctx.lineTo(p.x, p.y);
+        }
+        ctx.stroke();
+        ctx.strokeStyle = 'rgba(125,210,250,0.12)';
+        ctx.beginPath();
+        first = true;
+        for (let x = minX - 24; x <= maxX + 24; x += 24) {
+          const p = toScreen(x, y + 17 + Math.sin(x / 95 - elapsed * 1.2 + y / 70) * 13);
+          if (first) { ctx.moveTo(p.x, p.y); first = false; } else ctx.lineTo(p.x, p.y);
+        }
+        ctx.stroke();
+      }
+    } else if (mapMotion === 'rain') {
+      const fall = elapsed * 180, wind = elapsed * 40;
+      ctx.strokeStyle = 'rgba(160,210,255,0.48)';
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      for (let row = Math.floor((minY - fall - 100) / 140); row <= Math.ceil((maxY - fall + 100) / 140); row++) {
+        for (let col = Math.floor((minX - wind - 100) / 110); col <= Math.ceil((maxX - wind + 100) / 110); col++) {
+          const x = col * 110 + wind + mapMotionNoise(col, row) * 75;
+          const y = row * 140 + fall + mapMotionNoise(row, col) * 90;
+          const p = toScreen(x, y);
+          ctx.moveTo(p.x, p.y);
+          ctx.lineTo(p.x - 6 * camera.zoom, p.y + 20 * camera.zoom);
+        }
+      }
+      ctx.stroke();
+    } else if (mapMotion === 'snow') {
+      const fall = elapsed * 28, wind = elapsed * 9;
+      for (let row = Math.floor((minY - fall - 120) / 145); row <= Math.ceil((maxY - fall + 120) / 145); row++) {
+        for (let col = Math.floor((minX - wind - 120) / 145); col <= Math.ceil((maxX - wind + 120) / 145); col++) {
+          const x = col * 145 + wind + mapMotionNoise(col, row) * 110 + Math.sin(elapsed * 0.7 + row) * 13;
+          const y = row * 145 + fall + mapMotionNoise(row, col) * 105;
+          const p = toScreen(x, y);
+          const radius = 1 + mapMotionNoise(col + 8, row) * 1.8;
+          ctx.fillStyle = 'rgba(240,249,255,0.78)';
+          ctx.beginPath(); ctx.arc(p.x, p.y, radius, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+    }
+    ctx.restore();
+  }
+
+  // Rasterizing the world-sized gradient on every frame stalls browser
+  // compositing, even when the JavaScript render call itself looks cheap.
+  // Cache only the viewport-sized background; moving troops stay live.
+  const gradientCanvas = document.createElement('canvas');
+  const gradientCtx = gradientCanvas.getContext('2d', { alpha: false });
+  let gradientCameraX = NaN, gradientCameraY = NaN, gradientZoom = NaN;
+  function drawMapGradient() {
+    if (gradientCanvas.width !== canvas.width || gradientCanvas.height !== canvas.height ||
+        gradientCameraX !== camera.x || gradientCameraY !== camera.y || gradientZoom !== camera.zoom) {
+      if (gradientCanvas.width !== canvas.width) gradientCanvas.width = canvas.width;
+      if (gradientCanvas.height !== canvas.height) gradientCanvas.height = canvas.height;
+      gradientCtx.setTransform(1, 0, 0, 1, 0, 0);
+      gradientCtx.fillStyle = '#06121f';
+      gradientCtx.fillRect(0, 0, canvas.width, canvas.height);
+      gradientCtx.setTransform(camera.zoom, 0, 0, camera.zoom, canvas.width / 2 - camera.x * camera.zoom, canvas.height / 2 - camera.y * camera.zoom);
+      const gradient = gradientCtx.createLinearGradient(worldMinX, worldMinY, worldMaxX, worldMaxY);
+      gradient.addColorStop(0, mapGradientStart);
+      gradient.addColorStop(1, mapGradientEnd);
+      gradientCtx.fillStyle = gradient;
+      gradientCtx.fillRect(worldMinX, worldMinY, worldW, worldH);
+      gradientCameraX = camera.x; gradientCameraY = camera.y; gradientZoom = camera.zoom;
+    }
+    ctx.drawImage(gradientCanvas, 0, 0);
+  }
 
   // Draws an image FIT inside a maxSize x maxSize box, preserving its own
   // aspect ratio (the longer side equals maxSize), instead of forcing it
@@ -3027,17 +4087,17 @@ async function main() {
   const HOME_SPIN_RADIANS_PER_SEC = 0.15; // a full rotation roughly every 42s - slow, planet-like, not a spinning coin
   function drawFactionHome(f) {
     const p = toScreen(f.x, f.y);
-    const size = HOMEWORLD_SIZE * camera.zoom;
+    const size = homeVisualSize(f) * camera.zoom;
     if (f.img) {
       const fit = fittedSize(f.img, size);
       if (HOME_IS_PLANET) {
         ctx.save();
         ctx.translate(p.x, p.y);
         ctx.rotate(elapsed * HOME_SPIN_RADIANS_PER_SEC);
-        ctx.drawImage(f.img, -fit.w / 2, -fit.h / 2, fit.w, fit.h);
+        drawGameImage(ctx, f.img, -fit.w / 2, -fit.h / 2, fit.w, fit.h);
         ctx.restore();
       } else {
-        ctx.drawImage(f.img, p.x - fit.w / 2, p.y - fit.h / 2, fit.w, fit.h);
+        drawGameImage(ctx, f.img, p.x - fit.w / 2, p.y - fit.h / 2, fit.w, fit.h);
       }
     } else { ctx.fillStyle = f.color; ctx.beginPath(); ctx.arc(p.x, p.y, size / 2, 0, 7); ctx.fill(); }
     const pct = Math.max(0, f.hp / f.maxHp);
@@ -3048,8 +4108,9 @@ async function main() {
   }
   function drawUnit(u) {
     const p = toScreen(u.x, u.y);
-    if (p.x < -60 || p.x > canvas.width + 60 || p.y < -60 || p.y > canvas.height + 60) return;
-    const size = (u.isGatedBuilding ? GATED_BUILDING_SIZE : UNIT_SIZE) * camera.zoom;
+    const size = unitVisualSize(u) * camera.zoom;
+    const margin = size / 2 + 10;
+    if (p.x < -margin || p.x > canvas.width + margin || p.y < -margin || p.y > canvas.height + margin) return;
     if (u.selected) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p.x, p.y, size / 2 + 5, 0, 7); ctx.stroke(); }
     // A moving unit gets a small, cheap "still feels alive" walking
     // wobble - a vertical bounce plus a slight rotational sway - instead
@@ -3068,7 +4129,7 @@ async function main() {
     // position, not the bounce.
     const BOB_PX = 3, BOB_SPEED = 9, SWAY_RAD = 0.09;
     let bobY = 0, swayAngle = 0;
-    if (u._isMoving && UNIT_BOBBING_ENABLED) {
+    if (u._isMoving && UNIT_BOBBING_ENABLED && !u.spriteSheet) {
       const phase = performance.now() / 1000 * BOB_SPEED + u.id * 0.9;
       bobY = Math.sin(phase) * BOB_PX * camera.zoom;
       swayAngle = Math.cos(phase) * SWAY_RAD;
@@ -3085,11 +4146,22 @@ async function main() {
     // instead of walking once rotated toward diagonal movement - the sway
     // above is skipped right along with it, for the same reason.
     if (u.img) {
-      const fit = fittedSize(u.img, size);
       ctx.save();
       ctx.translate(p.x, p.y + bobY);
-      if (u.rotateToFace !== false) ctx.rotate((u.facingAngle || 0) + swayAngle);
-      ctx.drawImage(u.img, -fit.w / 2, -fit.h / 2, fit.w, fit.h);
+      if (u.spriteSheet) {
+        const sheet = u.spriteSheet;
+        if (u._isMoving) u._spriteDirection = spriteDirection((u.facingAngle || 0) - Math.PI / 2, sheet.rows.length);
+        const row = Math.max(0, sheet.rows.indexOf(u._spriteDirection || 'down'));
+        const column = u._isMoving ? Math.floor(performance.now() / 1000 * sheet.fps + u.id * 0.21) % sheet.columns : 0;
+        const frameW = u.img.naturalWidth / sheet.columns;
+        const frameH = u.img.naturalHeight / sheet.rows.length;
+        const fit = fittedSize({ width: frameW, height: frameH }, size);
+        ctx.drawImage(u.img, column * frameW, row * frameH, frameW, frameH, -fit.w / 2, -fit.h / 2, fit.w, fit.h);
+      } else {
+        const fit = fittedSize(u.img, size);
+        if (u.rotateToFace !== false) ctx.rotate((u.facingAngle || 0) + swayAngle);
+        drawGameImage(ctx, u.img, -fit.w / 2, -fit.h / 2, fit.w, fit.h);
+      }
       ctx.restore();
     } else if (u.isGatedBuilding) {
       // Same fallback as before this became a real unit - a colored
@@ -3105,6 +4177,11 @@ async function main() {
     const pct = Math.max(0, u.hp / u.maxHp);
     ctx.fillStyle = '#2a3550'; ctx.fillRect(p.x - size / 2, p.y - size / 2 - 7, size, 3);
     ctx.fillStyle = factionOf(u.factionId).color; ctx.fillRect(p.x - size / 2, p.y - size / 2 - 7, size * pct, 3);
+    if (factionOf(u.factionId).isMapOnly) {
+      ctx.fillStyle = factionOf(u.factionId).color;
+      ctx.font = '11px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(factionOf(u.factionId).name, p.x, p.y + size / 2 + 14);
+    }
     if (isLocked(u)) { ctx.fillStyle = '#fff'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('🔒', p.x, p.y - size / 2 - 12); }
     // Live income label over the current viewpoint's own (or an ally's)
     // Mining Ship - same idea as After Earth showing what a mining vessel
@@ -3148,7 +4225,7 @@ async function main() {
     const size = DEPOSIT_SIZE * camera.zoom;
     if (resourceImg) {
       const fit = fittedSize(resourceImg, size);
-      ctx.drawImage(resourceImg, p.x - fit.w / 2, p.y - fit.h / 2, fit.w, fit.h);
+      drawGameImage(ctx, resourceImg, p.x - fit.w / 2, p.y - fit.h / 2, fit.w, fit.h);
     } else { ctx.fillStyle = '#e8b93a'; ctx.beginPath(); ctx.arc(p.x, p.y, size / 2, 0, 7); ctx.fill(); }
   }
   // Same idea as drawDeposit() above, just per-item image (d.img) instead
@@ -3160,7 +4237,7 @@ async function main() {
     const size = DEPOSIT_SIZE * camera.zoom;
     if (d.img) {
       const fit = fittedSize(d.img, size);
-      ctx.drawImage(d.img, p.x - fit.w / 2, p.y - fit.h / 2, fit.w, fit.h);
+      drawGameImage(ctx, d.img, p.x - fit.w / 2, p.y - fit.h / 2, fit.w, fit.h);
     } else {
       ctx.fillStyle = '#8a94ad';
       ctx.beginPath(); ctx.arc(p.x, p.y, size / 2, 0, 7); ctx.fill();
@@ -3179,7 +4256,7 @@ async function main() {
     const size = o.radius * 2 * camera.zoom;
     if (o.img) {
       const fit = fittedSize(o.img, size);
-      ctx.drawImage(o.img, p.x - fit.w / 2, p.y - fit.h / 2, fit.w, fit.h);
+      drawGameImage(ctx, o.img, p.x - fit.w / 2, p.y - fit.h / 2, fit.w, fit.h);
     } else {
       ctx.fillStyle = '#6b5b47';
       ctx.beginPath(); ctx.arc(p.x, p.y, size / 2, 0, 7); ctx.fill();
@@ -3217,13 +4294,13 @@ async function main() {
   function drawMissiles() {
     for (const m of missiles) {
       const p = toScreen(m.x, m.y);
-      const size = MISSILE_SIZE * camera.zoom;
+      const size = MISSILE_SIZE * visualScale(m.visualScale) * camera.zoom;
       if (m.img) {
         const fit = fittedSize(m.img, size);
         ctx.save();
         ctx.translate(p.x, p.y);
         if (m.rotateToFace !== false) ctx.rotate(m.facingAngle || 0);
-        ctx.drawImage(m.img, -fit.w / 2, -fit.h / 2, fit.w, fit.h);
+        drawGameImage(ctx, m.img, -fit.w / 2, -fit.h / 2, fit.w, fit.h);
         ctx.restore();
       } else {
         ctx.fillStyle = '#ff5f6d';
@@ -3532,6 +4609,8 @@ async function main() {
   }
 
   function render() {
+    recordExploration();
+    const visibleSources = fogOn ? (matchStarted ? sightSources() : []) : null;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     // Solid fallback first, always - so panning anywhere the background
     // image doesn't cover shows the game's own dark background, never a
@@ -3546,17 +4625,21 @@ async function main() {
       // its precomputed world-space rect. It pans/zooms with the camera
       // instead of sliding across the screen.
       ctx.setTransform(camera.zoom, 0, 0, camera.zoom, canvas.width / 2 - camera.x * camera.zoom, canvas.height / 2 - camera.y * camera.zoom);
-      ctx.drawImage(bgImg, bgDraw.x, bgDraw.y, bgDraw.w, bgDraw.h);
+      drawGameImage(ctx, bgImg, bgDraw.x, bgDraw.y, bgDraw.w, bgDraw.h);
       ctx.restore();
+    } else {
+      drawMapGradient();
     }
+    drawMapMotion();
 
     for (const d of deposits) drawDeposit(d);
     for (const d of extraDeposits) drawExtraDeposit(d);
-    for (const o of obstacles) drawObstacle(o);
-    for (const f of factions) if (f.hp > 0) drawFactionHome(f);
-    for (const u of units) if (u.alive) drawUnit(u);
+    for (const o of obstacles) if (!o.entity) drawObstacle(o);
+    for (const f of factions) if (f.hp > 0 && (!visibleSources || isAlly(activeFaction.id, f.id) || inSight(f.x, f.y, visibleSources))) drawFactionHome(f);
+    for (const u of units) if (u.alive && (!visibleSources || isAlly(activeFaction.id, u.factionId) || inSight(u.x, u.y, visibleSources))) drawUnit(u);
     drawMissiles();
     drawEffects();
+    if (visibleSources) drawFog(visibleSources);
     drawTurretRangeRing();
 
     renderHud();
@@ -3566,6 +4649,18 @@ async function main() {
     updateProductionStatus();
   }
 
+  // Setting identical text/disabled attributes still invalidates browser
+  // layout. Keep live controls current without rebuilding them every frame.
+  const uiHtml = new WeakMap();
+  function setUiProperty(element, property, value) {
+    if (property === 'disabled') value = !!value;
+    if (element[property] !== value) element[property] = value;
+  }
+  function setUiHtml(element, html) {
+    if (uiHtml.get(element) === html) return;
+    element.innerHTML = html;
+    uiHtml.set(element, html);
+  }
   function renderHud() {
     const row = document.getElementById('hudRow');
     // "🪙 ... Gold" - the ticking number up top had no label at all before
@@ -3583,17 +4678,17 @@ async function main() {
     // drawFactionHome/renderMinimap already skip these, this row didn't,
     // so an excluded faction still showed up here even though it never
     // takes a turn. Reported as "I unchecked 5 of 11 but it shows all 11."
-    row.innerHTML = factions.filter((f) => f.hp > 0).map((f) => {
+    setUiHtml(row, factions.filter((f) => f.hp > 0).map((f) => {
       const resourceText = ALL_RESOURCE_IDS.map((id) => `${id === 'gold' ? '🪙' : '🔹'} ${Math.round(f.resources[id] || 0)} ${RESOURCE_NAMES[id]}`).join(' · ');
       return `<span style="color:${f.color}">${turnMode && f.id === activeIdx ? '👉 ' : ''}${f.name}: ${Math.round(f.hp)} HP · ${resourceText}${turnMode ? ` [Team ${f.team}]` : (f.team === player.team ? ' 🤝' : '')}</span>`;
-    }).join(' ');
+    }).join(' '));
     if (turnMode) {
       const secs = Math.max(0, Math.ceil(hotseatTimer));
       const round = Math.ceil(moveNumber / activeFactionCount());
-      document.getElementById('turnLabel').textContent = `🔄 Round ${round} · Move ${moveNumber} · ${activeFaction.name}'s turn · ${secs}s left`;
+      setUiProperty(document.getElementById('turnLabel'), 'textContent', `🔄 Round ${round} · Move ${moveNumber} · ${activeFaction.name}'s turn · ${secs}s left`);
     } else {
       const mins = Math.floor(Math.max(0, turnTimer) / 60), secs = Math.floor(Math.max(0, turnTimer) % 60);
-      document.getElementById('turnLabel').textContent = `Turn ${turnNumber} · next in ${mins}:${String(secs).padStart(2, '0')}`;
+      setUiProperty(document.getElementById('turnLabel'), 'textContent', `Turn ${turnNumber} · next in ${mins}:${String(secs).padStart(2, '0')}`);
     }
   }
 
@@ -3609,10 +4704,10 @@ async function main() {
   const statsDropdownEl = document.getElementById('statsDropdown');
   function renderStatsDropdown() {
     if (statsDropdownEl.hidden) return;
-    statsDropdownEl.innerHTML = '<h4>📊 Match Stats</h4>' + factions.filter((f) => f.hp > 0).map((f) => {
+    setUiHtml(statsDropdownEl, '<h4>📊 Match Stats</h4>' + factions.filter((f) => f.hp > 0).map((f) => {
       const label = turnMode ? `Team ${f.team ?? '?'}` : (f.team === player.team ? '🤝' : '');
       return `<div class="statsRow"><span class="statsName" style="color:${f.color}">${f.name}${label ? ' ' + label : ''}</span><span class="statsNums">⚔ ${f.stats.kills} · ☠ ${f.stats.losses}</span></div>`;
-    }).join('');
+    }).join(''));
   }
   // Positioned in JS (not fixed CSS) from the button's own current
   // on-screen rect - the topbar can wrap onto more than one line on a
@@ -3645,9 +4740,20 @@ async function main() {
     mctx.fillStyle = '#06121f'; mctx.fillRect(0, 0, 180, 180);
     const sx = 180 / worldW, sy = 180 / worldH;
     function toMini(x, y) { return { x: (x - worldMinX) * sx, y: (y - worldMinY) * sy }; }
+    const sources = fogOn ? (matchStarted ? sightSources() : []) : null;
+    if (sources) {
+      mctx.save();
+      mctx.globalAlpha = 0.32;
+      mctx.drawImage(exploredMaps[activeFaction.id], 0, 0, 180, 180);
+      mctx.restore();
+      mctx.fillStyle = '#224660';
+      for (const source of sources) {
+        const p = toMini(source.x, source.y);
+        mctx.beginPath(); mctx.ellipse(p.x, p.y, SIGHT_RANGE * sx, SIGHT_RANGE * sy, 0, 0, Math.PI * 2); mctx.fill();
+      }
+    }
     function within(x, y) {
-      if (!fogOn) return true;
-      return livingUnits(activeFaction.id).some((u) => Math.hypot(u.x - x, u.y - y) < 500) || Math.hypot(activeFaction.x - x, activeFaction.y - y) < 700;
+      return !sources || inSight(x, y, sources);
     }
     for (const f of factions) {
       if (f.hp <= 0 || !within(f.x, f.y)) continue;
@@ -3682,6 +4788,7 @@ async function main() {
       const sel = selectedUnits();
       if (sel.length) {
         sel.forEach((u) => {
+          if (u.defendPost) return;
           if (isLocked(u)) return; // attacked this turn - can't take a new order yet
           issueMoveOrder(u, worldX, worldY); u.target = null;
         });
@@ -3787,8 +4894,15 @@ async function main() {
     // a click that's already in flight the instant it happens.
     if (placingTurret.factionId !== activeFaction.id) { setPlacingTurret(null); renderBuildPanel(); return; }
     const def = turretDefs[placingTurret.defIndex];
+    if (!def || !canFactionProduce(def, activeFaction.id)) { setPlacingTurret(null); renderBuildPanel(); return; }
     const dist = Math.hypot(p.x - activeFaction.x, p.y - activeFaction.y);
     if (dist < TURRET_MIN_RANGE || dist > TURRET_MAX_RANGE) return;
+    if (enemyStructureWithin500(activeFaction.id, p.x, p.y)) return;
+    if (defenseBlocksMining(activeFaction.id, p.x, p.y, effectiveStat(activeFaction, def.range, 'range'), UNIT_SIZE * visualScale(def.visualScale) / 2)) {
+      const button = document.getElementById(`turretBtn-${placingTurret.defIndex}`);
+      if (button) button.textContent = 'Too close to a mine';
+      return;
+    }
     const costs = getCosts(def);
     if (!canAffordCosts(activeFaction, costs)) { setPlacingTurret(null); renderBuildPanel(); return; }
     spendCosts(activeFaction, costs);
@@ -3802,8 +4916,15 @@ async function main() {
     // faction's base instead of the one who actually armed it.
     if (placingMissile.factionId !== activeFaction.id) { setPlacingMissile(null); renderBuildPanel(); return; }
     const def = missileDefs[placingMissile.defIndex];
+    if (!def || !canFactionUseMissile(def, activeFaction.id)) { setPlacingMissile(null); renderBuildPanel(); return; }
     const dist = Math.hypot(p.x - activeFaction.x, p.y - activeFaction.y);
     if (dist < TURRET_MIN_RANGE || dist > TURRET_MAX_RANGE) return;
+    if (enemyStructureWithin500(activeFaction.id, p.x, p.y)) return;
+    if (defenseBlocksMining(activeFaction.id, p.x, p.y, maximumMissileRange(), UNIT_SIZE * visualScale(def.visualScale) / 2)) {
+      const button = document.getElementById(`missileBtn-${placingMissile.defIndex}`);
+      if (button) button.textContent = 'Too close to a mine';
+      return;
+    }
     const costs = getCosts(def);
     if (!canAffordCosts(activeFaction, costs)) { setPlacingMissile(null); renderBuildPanel(); return; }
     spendCosts(activeFaction, costs);
@@ -3811,12 +4932,23 @@ async function main() {
     setPlacingMissile(null);
     renderBuildPanel();
   }
+  function nearestClickable(items, p, sizeOf, padding = 0) {
+    let nearest = null, nearestDistance = Infinity;
+    for (const item of items) {
+      const distance = Math.hypot(item.x - p.x, item.y - p.y);
+      if (distance < sizeOf(item) / 2 + padding && distance < nearestDistance) {
+        nearest = item;
+        nearestDistance = distance;
+      }
+    }
+    return nearest;
+  }
   function handleClick(evt) {
     const r = canvas.getBoundingClientRect();
     const p = toWorld(evt.clientX - r.left, evt.clientY - r.top);
     if (placingTurret) { tryPlaceTurret(p); return; }
     if (placingMissile) { tryPlaceMissileLauncher(p); return; }
-    const own = livingUnits(activeFaction.id).find((u) => Math.hypot(u.x - p.x, u.y - p.y) < (u.isGatedBuilding ? GATED_BUILDING_SIZE : UNIT_SIZE) / 2 + 8);
+    const own = nearestClickable(livingUnits(activeFaction.id), p, unitVisualSize, 8);
     // Clicking one of your OWN units while a medic is selected orders
     // that medic to heal it, instead of the normal "clicking your own
     // unit re-selects it" behavior right below - has to be checked
@@ -3832,7 +4964,7 @@ async function main() {
     // never even LOOKS like it's about to heal something that doesn't
     // need it in the first place).
     if (own && !own.isGatedBuilding && own.hp < own.maxHp) {
-      const medics = selectedUnits().filter((u) => u.isMedic && u !== own);
+      const medics = selectedUnits().filter((u) => u.isMedic && !u.defendPost && u !== own);
       if (medics.length) {
         medics.forEach((u) => {
           if (isLocked(u)) return;
@@ -3843,6 +4975,14 @@ async function main() {
       }
     }
     if (own) {
+      // Clicking a Carrier/Mothership with friendly mobile units selected
+      // orders those units to board instead of replacing the selection.
+      if (own.transportCapacity) {
+        const boarders = selectedUnits().filter((u) => u !== own);
+        let ordered = false;
+        boarders.forEach((u) => { if (orderBoard(u, own)) ordered = true; });
+        if (ordered) { deselectAll(); return; }
+      }
       livingUnits(activeFaction.id).forEach((u) => u.selected = false);
       own.selected = true;
       showUnitInfo(own, 1);
@@ -3854,23 +4994,22 @@ async function main() {
     // base and see how much health is left, it doesn't show it." Checked
     // here so it still shows HP even on a click that also becomes an
     // attack-order target below.
-    const clickedBase = factions.find((f) => f.hp > 0 && Math.hypot(f.x - p.x, f.y - p.y) < HOMEWORLD_SIZE / 2);
+    const sources = fogOn ? sightSources() : null;
+    const clickedBase = nearestClickable(factions.filter((f) => f.hp > 0 &&
+      (!sources || isAlly(activeFaction.id, f.id) || inSight(f.x, f.y, sources))), p, homeVisualSize);
     const sel = selectedUnits();
     if (!sel.length) {
       if (clickedBase) showHomeBaseInfo(clickedBase); else hideUnitInfo();
       return;
     }
     let target = clickedBase && !isAlly(activeFaction.id, clickedBase.id) ? clickedBase : null;
-    if (!target) {
-      // An enemy Mining Ship used to be un-targetable here specifically
-      // (the !u.isMiner exclusion) even though it was always a real,
-      // killable unit everywhere else (AI's own nearestEnemy() never
-      // excluded them) - a player just had no way to actually click one
-      // to order an attack. Reported as "we need to allow the mining
-      // ships to be attacked."
-      target = units.find((u) => u.alive && !isAlly(activeFaction.id, u.factionId) && Math.hypot(u.x - p.x, u.y - p.y) < (u.isGatedBuilding ? GATED_BUILDING_SIZE : UNIT_SIZE) / 2 + 8);
-    }
+    // Include Mining Ships, which are real attackable units, and pick
+    // the nearest center when large art overlaps a Home Base or unit.
+    const enemyUnit = nearestClickable(units.filter((u) => u.alive && !isAlly(activeFaction.id, u.factionId) &&
+      (!sources || inSight(u.x, u.y, sources))), p, unitVisualSize, 8);
+    if (enemyUnit && (!target || Math.hypot(enemyUnit.x - p.x, enemyUnit.y - p.y) < Math.hypot(target.x - p.x, target.y - p.y))) target = enemyUnit;
     sel.forEach((u) => {
+      if (u.defendPost) return; // placed defenders hold their assigned post
       if (isLocked(u)) return; // attacked this turn - can't take a new order yet
       // A Cleric can't attack at all - clicking an enemy orders it to
       // convert instead, but only when that specific target is actually
@@ -3879,7 +5018,7 @@ async function main() {
       // enemy while a Cleric is selected falls through to a plain move
       // order to the clicked point instead of silently doing nothing, the
       // same as clicking empty space would.
-      const validTarget = target && (!u.isCleric || isConvertible(target));
+      const validTarget = target && (!u.isCleric || isConvertible(target, u.factionId));
       if (validTarget) { u.orderType = u.isCleric ? 'convert' : 'attack'; u.target = target; u.moveTarget = null; u.pathWaypoints = null; }
       else { issueMoveOrder(u, p.x, p.y); u.target = null; }
     });
@@ -3929,7 +5068,7 @@ async function main() {
     if (turnMode && !activeFaction.isHuman) return;
     const r = canvas.getBoundingClientRect();
     const p = toWorld(clientX - r.left, clientY - r.top);
-    const own = livingUnits(activeFaction.id).find((u) => Math.hypot(u.x - p.x, u.y - p.y) < (u.isGatedBuilding ? GATED_BUILDING_SIZE : UNIT_SIZE) / 2 + 8);
+    const own = nearestClickable(livingUnits(activeFaction.id), p, unitVisualSize, 8);
     if (!own) return;
     const matches = livingUnits(activeFaction.id).filter((u) => sameUnitType(u, own) && isOnScreen(u));
     livingUnits(activeFaction.id).forEach((u) => u.selected = false);
@@ -4053,7 +5192,9 @@ async function main() {
   function showUnitInfo(u, count) {
     const box = document.getElementById('unitInfoBox');
     const textEl = document.getElementById('unitInfoText');
+    const releaseBtn = document.getElementById('releaseVesselsBtn');
     if (!u) {
+      releaseBtn.style.display = 'none';
       box.style.display = count ? 'block' : 'none';
       if (count) textEl.innerHTML = `<strong>${count} units selected</strong>`;
       return;
@@ -4064,6 +5205,11 @@ async function main() {
       : u.isGatedBuilding ? buildingCfgByKey[u.buildingKey]
       : unitDefs[u.defIndex];
     box.style.display = 'block';
+    const cargo = u.transportCapacity ? carriedUnits(u).length : 0;
+    releaseBtn.style.display = u.transportCapacity && cargo ? 'block' : 'none';
+    releaseBtn.disabled = !u.alive || u.hp <= 0 || isLocked(u) || (turnMode && u.factionId !== activeIdx);
+    releaseBtn.textContent = cargo ? `Release ${cargo} vessel${cargo === 1 ? '' : 's'}` : 'Release vessels';
+    releaseBtn.onclick = () => { if (releaseVessels(u)) showUnitInfo(u, 1); };
     const statsLine = u.isMiner ? ''
       : u.isTurret ? ` · ATK ${u.attack} · RNG ${u.range} · stationary`
       : u.isMissileLauncher ? ` · Missile DMG ${u.attack} · RNG ${missileRange(factionOf(u.factionId))} · stationary - click a target to fire`
@@ -4073,14 +5219,16 @@ async function main() {
       : u.isMissileUnit ? ` · Missile DMG ${u.attack} · RNG ${u.range} · SPD ${u.speed.toFixed(1)}`
       : ` · ATK ${u.attack} · RNG ${u.range} · SPD ${u.speed.toFixed(1)}`;
     textEl.innerHTML = `<strong>${def.name}</strong><br>HP ${Math.round(u.hp)}/${u.maxHp}${statsLine}${isLocked(u) ? '<br><span style="color:var(--warn)">🔒 locked until next turn</span>' : ''}`;
+    if (u.transportCapacity) textEl.innerHTML += `<br>Vessels aboard ${cargo}/${u.transportCapacity}`;
   }
   function showHomeBaseInfo(f) {
     const box = document.getElementById('unitInfoBox');
     const textEl = document.getElementById('unitInfoText');
+    document.getElementById('releaseVesselsBtn').style.display = 'none';
     box.style.display = 'block';
     textEl.innerHTML = `<strong>${f.name} ${cfg.baseLabel || 'Home Base'}</strong><br>HP ${Math.round(f.hp)}/${f.maxHp}`;
   }
-  function hideUnitInfo() { document.getElementById('unitInfoBox').style.display = 'none'; }
+  function hideUnitInfo() { document.getElementById('releaseVesselsBtn').style.display = 'none'; document.getElementById('unitInfoBox').style.display = 'none'; }
   function deselectAll() {
     livingUnits(activeFaction.id).forEach((u) => u.selected = false);
     hideUnitInfo();
@@ -4143,7 +5291,7 @@ async function main() {
     const bar = document.getElementById('homeHpBar');
     if (!bar) return;
     const pct = Math.max(0, activeFaction.hp / activeFaction.maxHp);
-    bar.querySelector('.label span:last-child').textContent = `${Math.round(activeFaction.hp)} / ${activeFaction.maxHp} HP`;
+    setUiProperty(bar.querySelector('.label span:last-child'), 'textContent', `${Math.round(activeFaction.hp)} / ${activeFaction.maxHp} HP`);
     const fill = bar.querySelector('.fill');
     fill.style.width = pct * 100 + '%';
     fill.classList.toggle('low', pct < 0.3);
@@ -4199,9 +5347,12 @@ async function main() {
   // (updateProductionStatus) so the two can't drift out of sync with
   // each other.
   function unitRowState(def, i) {
-    const hasRF = activeFaction.built.researchFacility;
+    // A map-placed producer starts ready to make its own units, even if
+    // this faction has not purchased a Research Facility yet.
+    const hasRF = activeFaction.built.researchFacility ||
+      (def.buildingKey && hasPlacedBuilding(activeFaction.id, def.buildingKey));
     const building = def.buildingKey && GATED_BUILDINGS.find((b) => b.key === def.buildingKey);
-    const locked = !hasRF || (building && !activeFaction.built[building.key]);
+    const locked = !hasRF || !productionBuilding(activeFaction, def.buildingKey);
     const lockReason = !hasRF ? buildingCfgByKey.researchFacility.name : (building ? building.cfg.name : '');
     const queueFull = building && activeFaction.buildQueue[building.key].length >= MAX_QUEUE_PER_BUILDING;
     const unitCosts = getCosts(def);
@@ -4247,7 +5398,7 @@ async function main() {
   function updateProductionStatus() {
     GATED_BUILDINGS.forEach((b) => {
       const statsEl = document.getElementById(`buildStats-${b.key}`);
-      if (statsEl) statsEl.textContent = buildingStatsText(b);
+      if (statsEl) setUiProperty(statsEl, 'textContent', buildingStatsText(b));
       // Live-refreshes the Build button's disabled state as gold changes
       // from passive mining income - renderBuildPanel() itself only runs
       // on discrete events (building something, research finishing,
@@ -4262,26 +5413,26 @@ async function main() {
       const btnEl = document.getElementById(`buildBtn-${b.key}`);
       if (btnEl) {
         const built = activeFaction.built[b.key];
-        btnEl.disabled = built || (b.key !== 'researchFacility' && !activeFaction.built.researchFacility) || !canAffordGold(activeFaction, b.cfg.cost);
+        setUiProperty(btnEl, 'disabled', built || (b.key !== 'researchFacility' && !activeFaction.built.researchFacility) || !canAffordGold(activeFaction, b.cfg.cost));
       }
     });
     const minerBtnEl = document.getElementById('minerBtn');
     if (minerBtnEl) {
       const minerUnlocked = activeFaction.built.researchFacility && activeFaction.research.researched.has('mining_ops');
-      minerBtnEl.disabled = !minerUnlocked || !canAffordGold(activeFaction, 80);
+      setUiProperty(minerBtnEl, 'disabled', !minerUnlocked || !canAffordGold(activeFaction, 80));
     }
     turretDefs.forEach((def, i) => {
       const btnEl = document.getElementById(`turretBtn-${i}`);
       if (!btnEl) return;
       const isPlacingThis = placingTurret && placingTurret.defIndex === i;
-      btnEl.disabled = !activeFaction.built.researchFacility || (!isPlacingThis && !canAffordCosts(activeFaction, getCosts(def)));
+      setUiProperty(btnEl, 'disabled', !activeFaction.built.researchFacility || (!isPlacingThis && !canAffordCosts(activeFaction, getCosts(def))));
     });
     missileDefs.forEach((def, i) => {
       const btnEl = document.getElementById(`missileBtn-${i}`);
       if (!btnEl) return;
       const isPlacingThis = placingMissile && placingMissile.defIndex === i;
       const locked = !activeFaction.built.researchFacility || !activeFaction.built.missileSilo;
-      btnEl.disabled = locked || (!isPlacingThis && !canAffordCosts(activeFaction, getCosts(def)));
+      setUiProperty(btnEl, 'disabled', locked || (!isPlacingThis && !canAffordCosts(activeFaction, getCosts(def))));
     });
     // Same staleness problem as every row above, for the Research tab -
     // renderResearchPanel() also only redraws on discrete events (a
@@ -4304,20 +5455,20 @@ async function main() {
       const active = activeFaction.research.active && activeFaction.research.active.id === id;
       const lockedByPrereq = t.prereq && !activeFaction.research.researched.has(t.prereq);
       if (descEl) {
-        descEl.textContent = `Cost ${t.cost} · ${t.timeSeconds}s${lockedByPrereq ? ' · requires ' + techDisplayName(t.prereq) : ''}${active ? ' · researching… ' + Math.ceil(activeFaction.research.active.remaining) + 's left' : ''}`;
+        setUiProperty(descEl, 'textContent', `Cost ${t.cost} · ${t.timeSeconds}s${lockedByPrereq ? ' · requires ' + techDisplayName(t.prereq) : ''}${active ? ' · researching… ' + Math.ceil(activeFaction.research.active.remaining) + 's left' : ''}`);
       }
       if (btnEl) {
-        btnEl.textContent = !hasRFNow ? 'Locked' : (done ? 'Done' : (active ? 'In progress' : 'Research'));
-        btnEl.disabled = !hasRFNow || done || !!activeFaction.research.active || lockedByPrereq || !canAffordGold(activeFaction, t.cost);
+        setUiProperty(btnEl, 'textContent', !hasRFNow ? 'Locked' : (done ? 'Done' : (active ? 'In progress' : 'Research')));
+        setUiProperty(btnEl, 'disabled', !hasRFNow || done || !!activeFaction.research.active || lockedByPrereq || !canAffordGold(activeFaction, t.cost));
       }
     });
     unitDefs.forEach((def, i) => {
       const statsEl = document.getElementById(`unitStats-${i}`);
       if (!statsEl) return; // Build tab hasn't been rendered this session yet, or this unit isn't in it
       const { statsText, btnText, btnDisabled } = unitRowState(def, i);
-      statsEl.textContent = statsText;
+      setUiProperty(statsEl, 'textContent', statsText);
       const btnEl = document.getElementById(`unitBtn-${i}`);
-      if (btnEl) { btnEl.textContent = btnText; btnEl.disabled = btnDisabled; }
+      if (btnEl) { setUiProperty(btnEl, 'textContent', btnText); setUiProperty(btnEl, 'disabled', btnDisabled); }
     });
   }
   // Turn-Based mode only: while a computer-controlled faction is active,
@@ -4362,7 +5513,7 @@ async function main() {
     minerBtn.id = 'minerBtn';
     minerBtn.textContent = minerUnlocked ? 'Build' : 'Locked';
     minerBtn.disabled = !minerUnlocked || !canAffordGold(activeFaction, 80);
-    minerBtn.onclick = () => { spendGold(activeFaction, 80); spawnMiner(activeFaction.id, activeFaction.x + 40, activeFaction.y); renderBuildPanel(); };
+    minerBtn.onclick = () => { if (canAffordGold(activeFaction, 80) && produceMiner(activeFaction)) spendGold(activeFaction, 80); renderBuildPanel(); };
     minerRow.appendChild(minerBtn);
     el.appendChild(minerRow);
     // A row per gated building (Air Base, War Factory) - only shown at
@@ -4374,7 +5525,7 @@ async function main() {
     // gating the units below it, plus that building's own production
     // queue status.
     GATED_BUILDINGS.forEach((b) => {
-      if (!b.unitCfgs.length && !b.alwaysShow) return;
+      if (!canFactionUseBuilding(b, activeFaction.id)) return;
       const built = activeFaction.built[b.key];
       const queue = activeFaction.buildQueue[b.key];
       const row = document.createElement('div');
@@ -4395,6 +5546,7 @@ async function main() {
       // "mining is still locked on the research page" even though the
       // gate itself (fac.built.researchFacility) was already lifted.
       btn.onclick = () => {
+        if (!canFactionUseBuilding(b, activeFaction.id) || activeFaction.built[b.key] || !canAffordGold(activeFaction, b.cfg.cost)) return;
         spendGold(activeFaction, b.cfg.cost);
         activeFaction.built[b.key] = true;
         spawnGatedBuildingEntity(activeFaction, b.key);
@@ -4404,6 +5556,7 @@ async function main() {
       el.appendChild(row);
     });
     unitDefs.forEach((def, i) => {
+      if (!canFactionUseUnit(def, activeFaction.id)) return;
       const row = document.createElement('div');
       row.className = 'buildRow';
       // Just for the name line's icon - unitRowState below independently
@@ -4415,7 +5568,12 @@ async function main() {
       btn.id = `unitBtn-${i}`;
       btn.textContent = btnText;
       btn.disabled = btnDisabled;
-      btn.onclick = () => { spendCosts(activeFaction, getCosts(def)); startProduction(activeFaction, i); renderBuildPanel(); };
+      btn.onclick = () => {
+        if (!canFactionUseUnit(def, activeFaction.id) || !canAffordCosts(activeFaction, getCosts(def))) return;
+        if (def.buildingKey && (!activeFaction.built[def.buildingKey] || activeFaction.buildQueue[def.buildingKey].length >= MAX_QUEUE_PER_BUILDING)) return;
+        if (startProduction(activeFaction, i)) spendCosts(activeFaction, getCosts(def));
+        renderBuildPanel();
+      };
       row.appendChild(btn);
       el.appendChild(row);
     });
@@ -4425,11 +5583,12 @@ async function main() {
     // only actually deducted once a valid spot is clicked. Clicking the
     // button again while already placing this same turret cancels it.
     turretDefs.forEach((def, i) => {
+      if (!canFactionProduce(def, activeFaction.id)) return;
       const row = document.createElement('div');
       row.className = 'buildRow';
       const isPlacingThis = placingTurret && placingTurret.defIndex === i;
       const turretCosts = getCosts(def);
-      row.innerHTML = `<div class="name">${def.name} 🎯</div><div class="stats">HP ${previewHp(def.hp)} · ATK ${def.attack} · RNG ${previewRange(def.range)} · Cost ${costsText(turretCosts)} · place ${TURRET_MIN_RANGE}-${TURRET_MAX_RANGE} range of ${cfg.baseLabel || 'Home Base'}${!hasRF ? ` · requires ${buildingCfgByKey.researchFacility.name} first` : ''}</div>`;
+      row.innerHTML = `<div class="name">${def.name} 🎯</div><div class="stats">HP ${previewHp(def.hp)} · ATK ${def.attack} · RNG ${previewRange(def.range)} · Cost ${costsText(turretCosts)} · place ${TURRET_MIN_RANGE}-${TURRET_MAX_RANGE} range of ${cfg.baseLabel || 'Home Base'} · must clear hostile mining zones${!hasRF ? ` · requires ${buildingCfgByKey.researchFacility.name} first` : ''}</div>`;
       const btn = document.createElement('button');
       btn.id = `turretBtn-${i}`;
       btn.textContent = isPlacingThis ? 'Click the map… (or Esc)' : 'Place';
@@ -4448,13 +5607,14 @@ async function main() {
     // owned unit (click it, then click a target).
     const missileSiloBuilt = activeFaction.built.missileSilo;
     missileDefs.forEach((def, i) => {
+      if (!canFactionUseMissile(def, activeFaction.id)) return;
       const row = document.createElement('div');
       row.className = 'buildRow';
       const isPlacingThis = placingMissile && placingMissile.defIndex === i;
       const missileCosts = getCosts(def);
       const locked = !hasRF || !missileSiloBuilt;
       const lockReason = !hasRF ? buildingCfgByKey.researchFacility.name : buildingCfgByKey.missileSilo.name;
-      row.innerHTML = `<div class="name">${def.name} 🚀</div><div class="stats">HP ${previewHp(def.hp)} · Missile DMG ${def.attack} · RNG ${missileRange(activeFaction)} · Cost ${costsText(missileCosts)} · place ${TURRET_MIN_RANGE}-${TURRET_MAX_RANGE} range of ${cfg.baseLabel || 'Home Base'}${locked ? ` · requires ${lockReason} first` : ''}</div>`;
+      row.innerHTML = `<div class="name">${def.name} 🚀</div><div class="stats">HP ${previewHp(def.hp)} · Missile DMG ${def.attack} · RNG ${missileRange(activeFaction)} · Cost ${costsText(missileCosts)} · place ${TURRET_MIN_RANGE}-${TURRET_MAX_RANGE} range of ${cfg.baseLabel || 'Home Base'} · must clear hostile mining zones${locked ? ` · requires ${lockReason} first` : ''}</div>`;
       const btn = document.createElement('button');
       btn.id = `missileBtn-${i}`;
       btn.textContent = isPlacingThis ? 'Click the map… (or Esc)' : 'Place';
@@ -4515,11 +5675,41 @@ async function main() {
     paused = !paused;
     document.getElementById('pauseBtn').textContent = paused ? '▶️ Resume' : '⏸️ Pause';
   });
-  document.getElementById('soundBtn').addEventListener('click', () => {
-    soundOn = !soundOn;
-    document.getElementById('soundBtn').textContent = soundOn ? '🔊 Sound' : '🔈 Sound';
-    if (soundOn && sounds.music) { sounds.music.loop = true; sounds.music.play().catch(() => {}); }
-    else if (sounds.music) sounds.music.pause();
+  document.getElementById('musicBtn').addEventListener('click', () => {
+    musicOn = !musicOn;
+    const request = ++musicRequest;
+    if (musicOn && sounds.music) {
+      sounds.music.loop = true;
+      sounds.music.play().catch(() => {
+        if (request !== musicRequest) return;
+        musicOn = false;
+        updateAudioButtons();
+      });
+    } else if (sounds.music) sounds.music.pause();
+    updateAudioButtons();
+  });
+  document.getElementById('sfxBtn').addEventListener('click', () => {
+    sfxOn = !sfxOn;
+    sfxGeneration++;
+    if (sfxOn) {
+      // Resume inside the click gesture to satisfy browser autoplay policy.
+      try { ensureSfxContext()?.resume().catch(() => {}); } catch (e) {}
+    }
+    if (!sfxOn) {
+      // Silence effects already playing, including long custom weapon sounds.
+      for (const source of activeSfxSources) {
+        try { source.stop(); } catch (e) {}
+        source.disconnect();
+      }
+      activeSfxSources.clear();
+      for (const audio of activeSfx) {
+        audio.pause();
+        audio.removeAttribute('src');
+        audio.load();
+      }
+      activeSfx.clear();
+    }
+    updateAudioButtons();
   });
   // ---------------------------------------------------------------------
   // Hidden page - the logo in the top-left corner (present in every game
@@ -4702,8 +5892,9 @@ async function main() {
   function serializeState() {
     return {
       cfg, turnNumber, turnTimer, activeIdx, hotseatTimer, moveNumber,
+      exploredMaps: fogOn ? exploredMaps.map((map) => map.toDataURL('image/png')) : null,
       factions: factions.map((f) => ({ id: f.id, resources: f.resources, hp: f.hp, team: f.team, built: f.built, buildQueue: f.buildQueue, researched: [...f.research.researched], active: f.research.active, stats: f.stats })),
-      units: units.filter((u) => u.alive).map((u) => ({ factionId: u.factionId, defIndex: u.defIndex, isMiner: !!u.isMiner, isTurret: !!u.isTurret, isMissileLauncher: !!u.isMissileLauncher, isGatedBuilding: !!u.isGatedBuilding, buildingKey: u.buildingKey, x: u.x, y: u.y, hp: u.hp, maxHp: u.maxHp })),
+      units: units.filter((u) => u.alive).map((u) => ({ factionId: u.factionId, defIndex: u.defIndex, isMiner: !!u.isMiner, isTurret: !!u.isTurret, isMissileLauncher: !!u.isMissileLauncher, isGatedBuilding: !!u.isGatedBuilding, buildingKey: u.buildingKey, mapPlaced: !!u.mapPlaced, x: u.x, y: u.y, hp: u.hp, maxHp: u.maxHp, defendPost: u.defendPost || null })),
     };
   }
   document.getElementById('saveBtn').addEventListener('click', () => {
@@ -4717,6 +5908,14 @@ async function main() {
     const file = e.target.files[0];
     if (!file) return;
     const data = JSON.parse(await file.text());
+    if (fogOn && Array.isArray(data.exploredMaps)) {
+      await Promise.all(data.exploredMaps.slice(0, exploredMaps.length).map((src, i) => new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => { exploredContexts[i].clearRect(0, 0, EXPLORED_SIZE, EXPLORED_SIZE); exploredContexts[i].drawImage(img, 0, 0); resolve(); };
+        img.onerror = resolve;
+        img.src = src;
+      })));
+    }
     data.factions.forEach((fd) => {
       const f = factions[fd.id];
       // A save from before multiple resources existed has fd.resources
@@ -4734,15 +5933,21 @@ async function main() {
       if (fd.buildQueue) f.buildQueue = fd.buildQueue;
       f.research.researched = new Set(fd.researched); f.research.active = fd.active;
     });
+    productionCursors.clear();
     units.length = 0;
     data.units.forEach((u) => {
+      if (u.isGatedBuilding && u.mapPlaced && !GATED_BUILDINGS.find((b) => b.key === u.buildingKey)?.img) return;
       const spawned = u.isMiner ? spawnMiner(u.factionId, u.x, u.y)
         : u.isTurret ? spawnTurret(u.factionId, u.defIndex, u.x, u.y)
         : u.isMissileLauncher ? spawnMissileLauncher(u.factionId, u.defIndex, u.x, u.y)
-        : u.isGatedBuilding ? spawnGatedBuildingEntity(factionOf(u.factionId), u.buildingKey)
+        : u.isGatedBuilding ? spawnGatedBuildingEntity(factionOf(u.factionId), u.buildingKey, u.x, u.y)
         : spawnUnit(u.factionId, u.defIndex, u.x, u.y);
       spawned.hp = u.hp; spawned.maxHp = u.maxHp;
+      spawned.x = u.x; spawned.y = u.y;
+      spawned.mapPlaced = !!u.mapPlaced;
+      if (u.defendPost) spawned.defendPost = u.defendPost;
     });
+    syncStructureObstacles();
     if (turnMode && typeof data.activeIdx === 'number') {
       activeIdx = data.activeIdx;
       activeFaction = factions[activeIdx];
@@ -4757,10 +5962,10 @@ async function main() {
   // Team select screen - ALWAYS shown before the match starts, for every
   // map regardless of how many computer players it has. You're always
   // Team A; each other faction gets a real team-letter picker (A through
-  // however many factions exist - up to 11, with 10 computer players),
+  // however many factions exist - up to 6 in a newly built map),
   // not just an A/B toggle. Two factions sharing a letter fight together;
-  // every other letter is its own independent side - so 10 computer
-  // players can genuinely be Teams A-J, a real free-for-all, instead of
+  // every other letter is its own independent side - so 5 computer
+  // players can genuinely be Teams A-F, a real free-for-all, instead of
   // always being forced into exactly two
   // sides. The only rule enforced is that at least one other faction has
   // a different team than yours - putting literally everyone on your own
@@ -4770,7 +5975,7 @@ async function main() {
   const allyListEl = document.getElementById('allyList');
   const startMatchBtn = document.getElementById('startMatchBtn');
   const teamErrorEl = document.getElementById('teamSelectError');
-  const TEAM_LETTERS = Array.from({ length: factions.length }, (_, i) => String.fromCharCode(65 + i)); // 'A', 'B', ... one per faction that exists
+  const TEAM_LETTERS = Array.from({ length: factionCount }, (_, i) => String.fromCharCode(65 + i)); // base-owning factions only
   const DIFFICULTY_LABELS = { easy: 'Easy', medium: 'Medium', hard: 'Hard', superhard: 'Super Hard' };
   const pickedTeam = {}; // factionId -> one of TEAM_LETTERS, for computer players only
   // factionId -> true if this computer player is left out of THIS match
@@ -4893,15 +6098,16 @@ async function main() {
     // with other factions, doesn't matter which, as long as not
     // literally every included faction is on Team A. An excluded
     // faction's picked team doesn't count either way - it's not playing.
-    const includedTeams = factions.filter((f, i) => i !== 0 && !pickedExcluded[f.id]).map((f) => pickedTeam[f.id]);
+    const includedTeams = factions.filter((f, i) => i !== 0 && !f.isMapOnly && !pickedExcluded[f.id]).map((f) => pickedTeam[f.id]);
     const distinctTeams = new Set(['A', ...includedTeams]);
-    if (distinctTeams.size < 2) {
+    if (distinctTeams.size < 2 && !factions.some((f) => f.isMapOnly &&
+        (cfg.areaDefenders || []).some((point) => point.factionId === f.id))) {
       teamErrorEl.style.display = 'block';
       return;
     }
     player.team = 'A';
     factions.forEach((f, i) => {
-      if (i === 0) return;
+      if (i === 0 || f.isMapOnly) return;
       if (pickedExcluded[f.id]) {
         // Left out of this match entirely - hp 0 reuses every "this
         // faction is already defeated" code path elsewhere in this file
@@ -4922,6 +6128,9 @@ async function main() {
       // for factions that are actually !isHuman.
       f.difficulty = pickedDifficulty[f.id];
     });
+    spawnPlacedStructures();
+    spawnAreaDefenders();
+    renderBuildPanel(); renderResearchPanel();
     teamScreenEl.classList.remove('show');
     matchStarted = true;
   });
@@ -5001,7 +6210,7 @@ async function main() {
 
   let last = performance.now();
   function loop(now) {
-    const dt = Math.min(0.05, (now - last) / 1000);
+    const dt = Math.min(0.05, Math.max(0, (now - last) / 1000));
     last = now;
     update(dt);
     render();

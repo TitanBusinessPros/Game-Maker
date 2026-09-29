@@ -89,6 +89,9 @@
   .row { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
   .field { flex: 1 1 220px; min-width: 0; }
   .field.narrow { flex: 1 1 110px; }
+  .objective-row { display:flex; align-items:flex-end; gap:10px; margin-bottom:10px; }
+  .objective-row .field { flex:1; }
+  .objective-remove { flex:none; padding:8px 12px; }
   label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 4px; }
   input[type=text], input[type=number], input[type=color], select {
     width: 100%;
@@ -127,6 +130,7 @@
     margin-left: auto;
   }
   .upload-slot .thumb {
+    position: relative;
     width: 44px; height: 44px;
     border-radius: 6px;
     background: #0b0e14 center/cover no-repeat;
@@ -135,9 +139,17 @@
     display: flex; align-items: center; justify-content: center;
     font-size: 10px; color: var(--text-dim);
   }
+  .upload-slot .thumb[data-sprite="true"]::after {
+    content: 'S'; position: absolute; right: -4px; bottom: -4px;
+    width: 17px; height: 17px; border-radius: 4px; background: var(--accent);
+    color: #06121f; font-size: 11px; font-weight: 800; line-height: 17px; text-align: center;
+  }
   .upload-slot .meta { flex: 1; min-width: 60px; }
   .upload-slot .meta .name { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .upload-slot .meta .status { font-size: 11px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .art-size-control { width: 100%; display: flex; align-items: center; gap: 10px; margin: 3px 0 0; }
+  .art-size-control select { width: 88px; padding: 5px; }
+  .map-gradient-preview { height: 54px; border: 1px solid var(--border); border-radius: 8px; margin-top: 8px; }
   .btn-library {
     background: var(--panel); color: var(--accent); border: 1px solid var(--accent);
     font-size: 11px; padding: 6px 10px; white-space: nowrap;
@@ -155,12 +167,11 @@
     cursor: crosshair; overflow: hidden;
   }
   .placement-marker {
-    position: absolute; width: 16px; height: 16px; margin: -8px 0 0 -8px;
+    position: absolute; width: 22px; height: 20px; margin: -10px 0 0 -11px;
     border-radius: 50%; background: var(--accent); border: 2px solid #06121f;
     box-shadow: 0 0 0 2px var(--accent);
-    cursor: pointer;
+    display:grid; place-items:center; color:#06121f; font-size:9px; font-weight:800; cursor: crosshair;
   }
-  .placement-marker:hover { background: var(--bad); box-shadow: 0 0 0 2px var(--bad); }
   /* Other rows' own already-placed points, shown for reference on THIS
      widget's map so nothing new gets dropped right on top of them -
      smaller, dimmer, and never clickable (removing a point only ever
@@ -169,15 +180,54 @@
      matters for very different reasons (a miner routing to a deposit vs.
      a unit needing to walk around an obstacle). */
   .placement-reference-marker {
-    position: absolute; width: 10px; height: 10px; margin: -5px 0 0 -5px;
-    border-radius: 50%; border: 2px solid #06121f; opacity: 0.85;
-    pointer-events: none;
+    position: absolute; z-index:1; width:22px; height:20px; margin:-10px 0 0 -11px;
+    display:grid; place-items:center; border-radius:50%; border:2px solid #06121f;
+    color:#06121f; font-size:9px; font-weight:800; opacity:0.95;
+    pointer-events: auto;
   }
   .placement-reference-marker.ref-resource { background: #e8b93a; box-shadow: 0 0 0 1px #e8b93a; }
-  .placement-reference-marker.ref-obstacle { background: #8a5a3a; box-shadow: 0 0 0 1px #8a5a3a; }
-  .placement-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; }
+  .placement-reference-marker.ref-obstacle { background:#8a5a3a; color:#fff; box-shadow:0 0 0 1px #8a5a3a; }
+  .placement-reference-marker.ref-defender, .placement-reference-marker.ref-building,
+  .placement-reference-marker.ref-turret, .placement-reference-marker.ref-launcher {
+    width:29px; height:23px; margin:-11.5px 0 0 -14.5px;
+    display:grid; place-items:center; border:2px solid var(--player-color);
+    border-radius:4px; background:#06121f; color:#fff; font-size:10px; font-weight:800;
+    opacity:1; box-shadow:0 0 0 1px #06121f;
+  }
+  .placement-reference-marker.ref-defender { border-radius:50%; }
+  .placement-reference-marker.ref-turret { border-style:dashed; }
+  .placement-reference-marker.ref-launcher { border-radius:0; }
+  .placement-home-base {
+    position: absolute; z-index: 2; width: 42px; height: 42px;
+    transform: translate(-50%, -50%); border: 3px solid var(--base-color);
+    border-radius: 50%; background: #142033 center/cover no-repeat;
+    box-shadow: 0 0 0 3px #06121f, 0 0 12px rgba(0,0,0,.8);
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-weight: 700; text-shadow: 0 1px 3px #000;
+    pointer-events: none;
+  }
+  .placement-base-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; font-size: 12px; }
+  .placement-base-legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .placement-base-legend i { width: 10px; height: 10px; border-radius: 50%; background: var(--base-color); }
+  .placement-feature-legend { margin-top:6px; color:var(--text-dim); font-size:11px; line-height:1.5; }
+  .placement-warning { margin: 8px 0 0; color: var(--bad); font-size: 12px; }
+  .placement-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
   .placement-count { font-size: 12px; color: var(--text-dim); }
   .placement-clear { font-size: 11px; padding: 4px 10px; }
+  .defender-players { display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 12px; }
+  .defender-player { border:1px solid var(--border); border-radius:6px; background:var(--panel-2); color:var(--text); padding:7px 10px; cursor:pointer; }
+  .defender-player[aria-pressed="true"] { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent); }
+  .defender-marker { position:absolute; z-index:3; width:31px; height:26px; transform:translate(-50%,-50%); display:grid; place-items:center; border:2px solid var(--player-color); border-radius:50%; background:#06121f; color:#fff; font-size:11px; font-weight:800; }
+  .structure-marker { border-radius:5px; }
+  .structure-marker.kind-turret { border-style:dashed; }
+  .structure-marker.kind-launcher { border-radius:0; }
+  .marker-initials { pointer-events:none; line-height:1; white-space:nowrap; }
+  .marker-owner { position:absolute; right:-6px; bottom:-6px; width:13px; height:13px; display:grid; place-items:center; border:1px solid #06121f; border-radius:50%; background:var(--player-color); color:#06121f; font-size:8px; font-weight:900; line-height:1; pointer-events:none; }
+  .defender-list { margin:10px 0 0; padding:0; list-style:none; }
+  .defender-list li { display:flex; align-items:center; justify-content:space-between; gap:10px; border-bottom:1px solid var(--border); padding:5px 0; font-size:12px; }
+  .placement-point-list { margin:8px 0 0; padding:0; list-style:none; }
+  .placement-point-list li { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:4px; font-size:11px; color:var(--text-dim); }
+  .placement-point-list button { padding:3px 8px; font-size:11px; }
 
   .research-topic { margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
   .research-topic:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
@@ -291,6 +341,9 @@
   }
   .library-item:hover { border-color: var(--accent); }
   .library-item img { width: 100%; height: 80px; object-fit: contain; background: #06121f; display: block; }
+  .library-item canvas.sprite-thumb { width: 100%; height: 80px; object-fit: contain; background: #06121f; display: block; }
+  .library-item .sprite-mark { display:block; width:24px; margin:6px auto 0; padding:2px 0; border-radius:4px; background:var(--accent); color:#06121f; font-size:12px; font-weight:800; }
+  .library-item .gif-mark { position:absolute; top:5px; right:5px; display:grid; place-items:center; width:24px; height:24px; border:2px solid var(--accent); border-radius:50%; background:#06121f; color:var(--accent); font-size:13px; font-weight:800; line-height:1; }
   .library-item .lname { font-size: 11px; padding: 6px 4px 0; word-break: break-word; }
   /* Premium Library: a locked item still shows its real thumbnail (so a
      map-maker can see what they'd be spending a credit on before
@@ -347,6 +400,11 @@
     background: none; border: none; color: var(--bad);
     cursor: pointer; font-size: 16px; line-height: 1;
   }
+  .unit-availability { margin-top: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; }
+  .unit-availability strong { display: block; margin-bottom: 6px; }
+  .unit-availability-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 6px 12px; }
+  .unit-availability-options label { display: flex; align-items: center; gap: 7px; margin: 0; font-weight: normal; }
+  .unit-availability-options input { width: auto; }
 
   button {
     cursor: pointer;
@@ -424,7 +482,9 @@
   <img src="data:image/png;base64,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" alt="Titan Business Pros logo" style="width:96px; height:96px; object-fit:contain; flex:none; border-radius:6px;">
   <h1>Titan Game Maker</h1>
   <p>Build one map's worth of art, sound, and units. Nothing here changes the combat math &mdash; it just tells the engine what to call things and what to draw.</p>
-  <p style="color:var(--text-dim); font-size:12px; margin-top:6px;">💡 Tip: character/unit images look best with a <strong>transparent background</strong> (PNG) - anything with a solid background will show up as a visible box around the sprite in-game.</p>
+  <p style="color:var(--text-dim); font-size:12px; margin-top:6px;">💡 Tip: upload transparent PNG or JPEG art, or choose an animated GIF from the Library. Images with a solid background show a visible box around the sprite in-game.</p>
+  <p style="color:var(--text-dim); font-size:12px; margin-top:4px;">Each character, unit, Home Base, structure, turret, launcher, and missile art has its own 1×–10× size setting beside its upload. Size changes appearance and the clickable area of units and bases; HP, movement, and attack range stay the same.</p>
+  <p style="color:var(--text-dim); font-size:12px; margin-top:4px;">Upload one PNG or JPEG character image, or choose an animated GIF from the Library. Sprite sheets are not supported for new uploads; they will display as one whole image.</p>
   <p style="color:var(--text-dim); font-size:12px; margin-top:10px; padding-top:10px; border-top:1px solid var(--border); max-width:520px;">
     🎬 <strong>Building a whole game, not just one map?</strong> Make each level as its own map here, finish and save it, then use its "⬇ Download My Game" button under My Maps below to save that stage as its own file - once you've got up to 20 of them, combine them into one complete, playable game (with your own cover art before every stage) using <a href="producer.html" style="color:var(--accent);">Titan Game Producer</a>.
   </p>
@@ -461,7 +521,7 @@
         <label for="gameStyle">Game style</label>
         <select id="gameStyle">
           <option value="realtime" selected>&#9201;&#65039; Real-Time (vs computer players)</option>
-          <option value="turnbased">&#128260; Turn-Based (hot-seat, 2-11 players share this device)</option>
+          <option value="turnbased">&#128260; Turn-Based (hot-seat, 2-6 players share this device)</option>
         </select>
       </div>
       <div class="field narrow" id="turnTimerField" style="display:none;">
@@ -484,21 +544,47 @@
         </label>
       </div>
     </div>
-    <p class="hint">Fog of war: off by default. When on, the minimap only reveals area within a short radius of a player's own units and Home Base - a fixed setting for the whole match, not something a player can turn on or off once playing. Unit bobbing: on by default - a small up/down bounce and sway while a unit is actually walking, so it doesn't slide across the map as a rigid, motionless sprite. Turn it off for art that looks wrong bouncing (very flat/blocky sprites, or ones meant to read as gliding/hovering).</p>
+    <p class="hint">Fog of war: off by default. When on, the main map and minimap reveal 100 world units around friendly units and bases. Explored terrain stays visible, while enemies appear only in current sight. Unit bobbing: on by default - a small up/down bounce and sway while a unit is actually walking. Turn it off for art meant to glide or hover.</p>
+    <div class="field narrow">
+      <label for="mapMotion">Map motion</label>
+      <select id="mapMotion">
+        <option value="none" selected>Still background</option>
+        <option value="ocean">Ocean Waves</option>
+        <option value="rain">Rain</option>
+        <option value="snow">Snow</option>
+      </select>
+    </div>
+    <p class="hint">Adds gentle movement to the map background during play. Troops, structures, resources, and their map positions stay fixed. Works with an uploaded background or the map gradient.</p>
     <div class="field">
       <label>Map background art (optional)</label>
       <div class="upload-slot" data-slot="backgroundImage">
         <div class="thumb">none</div>
-        <div class="meta"><div class="name">No file chosen</div><div class="status">image, any size</div></div>
-        <input type="file" accept="image/*" style="width:auto">
+        <div class="meta"><div class="name">No file chosen</div><div class="status">PNG, JPG, or animated GIF</div></div>
+        <input type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" style="width:auto">
       </div>
+      <button type="button" class="btn-secondary" id="clearMapBackground" style="margin-top:8px;">Remove map image and use gradient</button>
     </div>
+    <div class="row">
+      <div class="field narrow"><label for="mapGradientStart">Map gradient: first color</label><input type="color" id="mapGradientStart" value="#0b1b35"></div>
+      <div class="field narrow"><label for="mapGradientEnd">Map gradient: second color</label><input type="color" id="mapGradientEnd" value="#294765"></div>
+    </div>
+    <div class="map-gradient-preview" id="mapGradientPreview" aria-label="Map gradient preview"></div>
+    <p class="hint">The gradient fills the whole selected map size when no map image is uploaded. An uploaded image takes priority.</p>
+    <p class="hint">Animated GIF backgrounds and character art play in downloaded games on supported browsers such as Chrome and Edge. Use short, small GIFs for smoother loading. Browsers without GIF frame decoding show a still frame.</p>
+  </section>
+
+  <section class="section" id="sec-objectives">
+    <h2>Objectives</h2>
+    <p class="hint">Add up to 7 objectives. They appear at the top of the game as a visual guide and do not change how the game is won.</p>
+    <div id="objectivesList"></div>
+    <button type="button" class="btn-add" id="addObjectiveBtn">+ Add objective</button>
+    <p class="hint" id="objectiveLimitNotice" role="status" hidden>Maximum of 7 objectives reached.</p>
   </section>
 
   <!-- 2. Factions -->
   <section class="section" id="sec-teams">
     <h2><span class="num">2</span> Your Faction &amp; Computer Players</h2>
-    <p class="hint">You're always the player faction. Add up to 10 computer-controlled factions &mdash; at play time you'll pick which ones are on your team (e.g. 10 computer players lets you do 5v6 or a full free-for-all).</p>
+    <p class="hint">You're always the player faction. Add up to 5 other factions for 6 players total. At play time, choose their teams or play a free-for-all.</p>
     <div class="team-block good">
       <h3>Your faction</h3>
       <div class="row">
@@ -511,13 +597,14 @@
         <div class="upload-slot" data-slot="goodBaseImage">
           <div class="thumb">none</div>
           <div class="meta"><div class="name">No file chosen</div><div class="status">required to finish</div></div>
-          <input type="file" accept="image/*" style="width:auto">
+          <input type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" style="width:auto">
         </div>
       </div>
     </div>
 
     <div id="computerPlayersList"></div>
-    <button type="button" class="btn-add" id="addComputerBtn">+ Add computer player (up to 10)</button>
+    <button type="button" class="btn-add" id="addComputerBtn">+ Add computer player (up to 5)</button>
+    <p class="hint" id="computerLimitNotice" role="status" hidden></p>
   </section>
 
   <!-- 3. Resource & mining -->
@@ -539,7 +626,7 @@
       <div class="upload-slot" data-slot="resourceImage">
         <div class="thumb">none</div>
         <div class="meta"><div class="name">No file chosen</div><div class="status">required to finish</div></div>
-        <input type="file" accept="image/*" style="width:auto">
+        <input type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" style="width:auto">
       </div>
       <div class="placement-widget" id="goldPlacementWidget" data-mode="base" data-points="[]">
         <label>Placement</label>
@@ -553,7 +640,9 @@
             <span class="placement-count"></span>
             <button type="button" class="btn-secondary placement-clear">Clear all</button>
           </div>
-          <p class="hint" style="margin:6px 0 0;">Click the map to add one or more shared deposits every faction's Mining Ships travel to and gather from. Click a point to remove just that one. Upload map background art above (Map Basics) to see it here.</p>
+          <div class="placement-feature-legend">Markers show item initials (HF = Helicopter Facility). The small number badge and border color show its player. Yellow = resource; brown = obstacle.</div>
+          <ul class="placement-point-list"></ul>
+          <p class="hint" style="margin:6px 0 0;">Numbered markers show every player's Home Base; small reference markers show other placed map features. Click the map to add shared deposits; unsafe overlaps and turret/launcher firing areas are blocked. Use Remove below to delete a point.</p>
         </div>
       </div>
     </div>
@@ -576,9 +665,13 @@
       <div class="upload-slot" data-slot="miningUnitImage">
         <div class="thumb">none</div>
         <div class="meta"><div class="name">No file chosen</div><div class="status">required to finish</div></div>
-        <input type="file" accept="image/*" style="width:auto">
+        <input type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" style="width:auto">
       </div>
     </div>
+    <label style="display:flex; align-items:center; gap:6px; font-weight:normal; margin:8px 0 0;">
+      <input type="checkbox" id="miningUnitRotate" checked style="width:auto;">
+      Rotate to face movement direction
+    </label>
     <div class="field" style="margin-top:18px; padding-top:14px; border-top:1px solid var(--border);">
       <label>Additional resources (optional)</label>
       <div id="extraResourcesList"></div>
@@ -629,11 +722,12 @@
         <div class="upload-slot" data-slot="airBaseImage">
           <div class="thumb">none</div>
           <div class="meta"><div class="name">No file chosen</div><div class="status">required if you add any air units below</div></div>
-          <input type="file" accept="image/*" style="width:auto">
+          <input type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" style="width:auto">
         </div>
       </div>
       <div id="airUnitList"></div>
       <button type="button" class="btn-add" id="addAirUnitBtn">+ Add an air unit</button>
+      <button type="button" class="btn-add" id="addMothershipBtn">+ Add Mothership</button>
     </div>
     <p class="hint building-removed-note" id="airBaseRemovedNote" style="display:none;">Air Base removed - it won't show up in-game (same as leaving its unit list empty). <button type="button" class="btn-add building-restore" data-building="airBase">+ Add it back</button></p>
   </section>
@@ -653,7 +747,7 @@
         <div class="upload-slot" data-slot="warFactoryImage">
           <div class="thumb">none</div>
           <div class="meta"><div class="name">No file chosen</div><div class="status">required if you add any war factory units below</div></div>
-          <input type="file" accept="image/*" style="width:auto">
+          <input type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" style="width:auto">
         </div>
       </div>
       <div id="warUnitList"></div>
@@ -677,7 +771,7 @@
         <div class="upload-slot" data-slot="infantryPostImage">
           <div class="thumb">none</div>
           <div class="meta"><div class="name">No file chosen</div><div class="status">required if you add any infantry units below</div></div>
-          <input type="file" accept="image/*" style="width:auto">
+          <input type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" style="width:auto">
         </div>
       </div>
       <div id="infantryUnitList"></div>
@@ -701,7 +795,7 @@
         <div class="upload-slot" data-slot="heliFacilityImage">
           <div class="thumb">none</div>
           <div class="meta"><div class="name">No file chosen</div><div class="status">required if you add any helicopter units below</div></div>
-          <input type="file" accept="image/*" style="width:auto">
+          <input type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" style="width:auto">
         </div>
       </div>
       <div id="heliUnitList"></div>
@@ -725,11 +819,12 @@
         <div class="upload-slot" data-slot="navyHarborImage">
           <div class="thumb">none</div>
           <div class="meta"><div class="name">No file chosen</div><div class="status">required if you add any navy units below</div></div>
-          <input type="file" accept="image/*" style="width:auto">
+          <input type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" style="width:auto">
         </div>
       </div>
       <div id="navyUnitList"></div>
       <button type="button" class="btn-add" id="addNavyUnitBtn">+ Add a navy unit</button>
+      <button type="button" class="btn-add" id="addCarrierBtn">+ Add Carrier</button>
     </div>
     <p class="hint building-removed-note" id="navyHarborRemovedNote" style="display:none;">Navy Harbor removed - it won't show up in-game (same as leaving its unit list empty). <button type="button" class="btn-add building-restore" data-building="navyHarbor">+ Add it back</button></p>
   </section>
@@ -749,7 +844,7 @@
         <div class="upload-slot" data-slot="fieldHospitalImage">
           <div class="thumb">none</div>
           <div class="meta"><div class="name">No file chosen</div><div class="status">required if you add any medics below</div></div>
-          <input type="file" accept="image/*" style="width:auto">
+          <input type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" style="width:auto">
         </div>
       </div>
       <div id="fieldHospitalUnitList"></div>
@@ -773,7 +868,7 @@
         <div class="upload-slot" data-slot="missileSiloImage">
           <div class="thumb">none</div>
           <div class="meta"><div class="name">No file chosen</div><div class="status">required if you add a missile launcher below</div></div>
-          <input type="file" accept="image/*" style="width:auto">
+          <input type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" style="width:auto">
         </div>
       </div>
       <div id="missileUnitList"></div>
@@ -797,7 +892,7 @@
         <div class="upload-slot" data-slot="missileBatteryImage">
           <div class="thumb">none</div>
           <div class="meta"><div class="name">No file chosen</div><div class="status">required if you add any units below</div></div>
-          <input type="file" accept="image/*" style="width:auto">
+          <input type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" style="width:auto">
         </div>
       </div>
       <div id="missileBatteryUnitList"></div>
@@ -809,7 +904,7 @@
   <!-- 4h. Research Facility -->
   <section class="section" id="sec-researchfacility">
     <h2><span class="num">4h</span> Research Facility</h2>
-    <p class="hint">Not optional like the buildings above - every map has a research tree (see the Research tab in-game), so this is the one building every player has to build before they can start researching ANYTHING at all. Name it whatever fits (Research Facility, Lab, Observatory&hellip;) and give it its own art, HP, and build cost.</p>
+    <p class="hint">Every player must build a Research Facility before researching or building other structures and units. Name it whatever fits (Research Facility, Lab, Observatory&hellip;) and give it its own art, HP, and build cost.</p>
     <div class="row">
       <div class="field"><label>Building name</label><input type="text" id="researchFacilityName" value="Research Facility"></div>
       <div class="field narrow"><label>Building HP</label><input type="number" id="researchFacilityHp" value="2000" min="1000" max="5000" step="100"></div>
@@ -820,7 +915,7 @@
       <div class="upload-slot" data-slot="researchFacilityImage">
         <div class="thumb">none</div>
         <div class="meta"><div class="name">No file chosen</div><div class="status">required to finish</div></div>
-        <input type="file" accept="image/*" style="width:auto">
+        <input type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" style="width:auto">
       </div>
     </div>
   </section>
@@ -848,7 +943,7 @@
         <div class="upload-slot" data-slot="religiousInstitutionImage">
           <div class="thumb">none</div>
           <div class="meta"><div class="name">No file chosen</div><div class="status">required if you add any Clerics below</div></div>
-          <input type="file" accept="image/*" style="width:auto">
+          <input type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" style="width:auto">
         </div>
       </div>
       <label style="display:flex; align-items:center; gap:6px; font-size:13px; margin:4px 0 12px;">
@@ -907,6 +1002,44 @@
     <h2><span class="num">5a</span> Free Resources Each Round (optional)</h2>
     <p class="hint">Check any resource below to have every player (you and every computer player) automatically receive that much of it at the start of each round, on top of normal Gold mining income - off by default for every resource. This list always includes Gold plus anything added under Resource &amp; Mining above.</p>
     <div id="resourceGrantsList"></div>
+  </section>
+
+  <section class="section" id="sec-area-defenders">
+    <h2><span class="num">5b</span> Area Defenders (optional)</h2>
+    <p class="hint">Place any troop type created above at a fixed post. Choose a player, troop, and defense radius, then click the map. The troop uses its existing HP, attack, weapon, and speed. It engages enemies within 100–1000 world units of its post and returns after combat. Medics heal and Clerics convert using their existing abilities.</p>
+    <div class="row">
+      <div class="field"><label for="defenderUnitType">Troop</label><select id="defenderUnitType"></select></div>
+      <div class="field narrow"><label for="defenderRange">Defense radius (100–1000)</label><input id="defenderRange" type="number" min="100" max="1000" step="10" value="300"></div>
+    </div>
+    <label>Player for the next troop (click again to unselect)</label>
+    <div class="defender-players" id="defenderPlayers"></div>
+    <div class="placement-map">
+      <div class="placement-canvas-wrap" id="defenderPlacementMap"></div>
+      <div class="placement-footer"><span class="placement-count" id="defenderCount"></span><button type="button" class="btn-secondary placement-clear" id="clearDefenders">Clear all</button></div>
+      <div class="placement-base-legend" id="defenderBaseLegend"></div>
+      <div class="placement-feature-legend">Markers show item initials (HF = Helicopter Facility). The small number badge and border color show its player. Yellow = resource; brown = obstacle.</div>
+      <p class="hint">Click the map to place a troop for the selected player. Its name initials identify it, with the player number in a small badge. Its patrol radius is listed below, not drawn as a giant footprint. Other map features appear as small reference markers. Use Remove below to delete a troop.</p>
+      <p class="placement-warning" id="defenderWarning" role="status" hidden></p>
+    </div>
+    <ul class="defender-list" id="defenderList"></ul>
+    <h3>Structures, Silos &amp; Gun Turrets</h3>
+    <p class="hint">Choose a building, turret, or missile launcher and its owner, then click the map. Choose building art before placing that building. Placed production buildings can make unit types allowed for that player from that location. Different players' buildings, silos, turrets, and launchers must stay at least 500 world units apart.</p>
+    <div class="row"><div class="field"><label for="structureType">Structure or defense</label><select id="structureType"></select></div></div>
+    <label>Player for the next structure (click again to unselect)</label>
+    <div class="defender-players" id="structurePlayers"></div>
+    <div class="placement-map">
+      <div class="placement-canvas-wrap" id="structurePlacementMap"></div>
+      <div class="placement-footer"><span class="placement-count" id="structureCount"></span><button type="button" class="btn-secondary placement-clear" id="removeUnconfiguredStructures" hidden>Remove placements without art</button><button type="button" class="btn-secondary placement-clear" id="clearStructures">Clear all</button></div>
+      <div class="placement-base-legend" id="structureBaseLegend"></div>
+      <div class="placement-feature-legend">Markers show item initials (HF = Helicopter Facility). The small number badge and border color show its player. Yellow = resource; brown = obstacle.</div>
+      <p class="hint">Each building, turret, or launcher shows its name initials and a small player-number badge. Other map features appear as reference markers. Use Remove below to delete a structure. The 500-unit enemy spacing is checked when you place it; no large circle is drawn over the map.</p>
+      <p class="placement-warning" id="structureWarning" role="status" hidden></p>
+    </div>
+    <ul class="defender-list" id="structureList"></ul>
+    <h3>Base-free Enemy Factions</h3>
+    <p class="hint">Create a named enemy group with no Home Base or production. Choose this faction in Area Defenders above, select an existing troop or one you create here, then click the map to place its guards. Each guard uses the same 100–1000 defense radius and returns to its post after combat.</p>
+    <div id="mapOnlyFactionList"></div>
+    <button type="button" class="btn-add" id="addMapOnlyFactionBtn">+ Add a base-free enemy faction</button>
   </section>
 
   <!-- 6. My maps -->
@@ -1223,15 +1356,26 @@ function wireUploadSlot(slot) {
   input.addEventListener('change', () => {
     const file = input.files[0];
     if (!file) return;
+    if (!input.accept.startsWith('audio') && !allowedImageFile(file)) {
+      input.value = '';
+      nameEl.textContent = existingAssetUrls[slot.dataset.slot] ? 'Saved image' : 'No file chosen';
+      thumb.style.backgroundImage = existingAssetUrls[slot.dataset.slot] ? `url(${existingAssetUrls[slot.dataset.slot]})` : '';
+      thumb.replaceChildren();
+      slot.querySelector('.status').textContent = 'Choose a PNG or JPEG image. GIFs are available from the library.';
+      return;
+    }
+    setSpriteSettingsForSlot(slot.dataset.slot, null);
     nameEl.textContent = file.name;
     slot.querySelector('.status').textContent = 'ready to upload (' + Math.round(file.size / 1024) + ' KB)';
-    if (file.type.startsWith('image/')) {
+    thumb.replaceChildren();
+    if (file.type.startsWith('image/') || isGifFile(file)) {
       const url = URL.createObjectURL(file);
       thumb.style.backgroundImage = `url(${url})`;
       thumb.textContent = '';
     } else {
       thumb.textContent = 'audio';
     }
+    if (slot.dataset.slot === 'backgroundImage') refreshAllPlacementPreviews();
   });
 
   const mediaType = input.accept.startsWith('audio') ? 'audio' : 'image';
@@ -1257,14 +1401,87 @@ function wireUploadSlot(slot) {
   controls.appendChild(input);
   controls.appendChild(libraryBtn);
   controls.appendChild(premiumBtn);
+  const key = slot.dataset.slot;
+  if (/^(?:unit|airunit|warunit|infunit|heliunit|navyunit|turret|missile|missilebattery|medic|cleric|wildunit)_\d+$/.test(key) &&
+      slot.closest('.unit-row') && !slot.closest('.unit-row').querySelector(`[data-slot="${key}_weapon_sound"]`)) {
+    const ability = /^(?:medic|cleric)_/.test(key);
+    const field = document.createElement('div');
+    field.className = 'field weapon-sound-field';
+    field.style.marginTop = '8px';
+    field.innerHTML = `<label>${ability ? 'Ability' : 'Weapon fire'} sound (optional)</label>
+      <div class="upload-slot" data-slot="${key}_weapon_sound">
+        <div class="thumb">audio</div>
+        <div class="meta"><div class="name">No sound chosen</div><div class="status">${/^wildunit_/.test(key) ? 'Heard when this defender attacks nearby' : 'Heard only when this is your unit'}</div></div>
+        <input type="file" accept="audio/*" style="width:auto">
+      </div>`;
+    slot.after(field);
+    wireUploadSlot(field.querySelector('.upload-slot'));
+  }
+  if (mediaType === 'image' && key !== 'backgroundImage' && key !== 'resourceImage' &&
+      !/^resource_|^obstacle_/.test(key)) {
+    const label = document.createElement('label');
+    label.className = 'art-size-control';
+    const title = /_missile$/.test(key) ? 'Projectile size' :
+      /BaseImage$|^computer_/.test(key) ? 'Home Base size' :
+      /^(?:airBase|warFactory|infantryPost|heliFacility|navyHarbor|fieldHospital|researchFacility|missileSilo|missileBattery|religiousInstitution)Image$/.test(key) ? 'Structure size' : 'Unit size';
+    label.append(document.createTextNode(title));
+    const select = document.createElement('select');
+    select.className = 'art-size';
+    select.setAttribute('aria-label', title);
+    for (let n = 1; n <= 10; n++) select.add(new Option(`${n}×`, String(n)));
+    if (title === 'Home Base size') select.addEventListener('change', refreshAllPlacementPreviews);
+    label.appendChild(select);
+    slot.appendChild(label);
+  }
+
+}
+
+function artScale(value) { return Math.max(1, Math.min(10, Math.round(Number(value) || 1))); }
+function sizeForSlot(key) {
+  return artScale(document.querySelector(`.upload-slot[data-slot="${key}"] .art-size`)?.value);
+}
+function setSizeForSlot(key, value) {
+  const select = document.querySelector(`.upload-slot[data-slot="${key}"] .art-size`);
+  if (select) select.value = String(artScale(value));
+}
+// Preserve animation metadata when reopening older maps. New uploads are
+// ordinary images; no sprite layout is guessed or configured in the builder.
+const existingSpriteSettings = {};
+function spriteSettingsForSlot(key) {
+  return existingSpriteSettings[key] || null;
+}
+function setSpriteSettingsForSlot(key, settings) {
+  existingSpriteSettings[key] = settings || null;
+  const thumb = document.querySelector(`.upload-slot[data-slot="${key}"] .thumb`);
+  if (thumb) thumb.dataset.sprite = settings ? 'true' : 'false';
+  if (thumb && settings && existingAssetUrls[key]) drawSpriteSlotPreview(thumb, existingAssetUrls[key], settings);
+}
+function drawSpriteSlotPreview(thumb, url, settings) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 44; canvas.height = 44;
+  thumb.style.backgroundImage = 'none';
+  thumb.replaceChildren(canvas);
+  const image = new Image();
+  image.onload = () => {
+    if (canvas.parentNode !== thumb) return;
+    const rows = settings.directions.split(',');
+    const row = Math.max(0, rows.indexOf('down'));
+    const frameW = image.naturalWidth / settings.columns;
+    const frameH = image.naturalHeight / rows.length;
+    const scale = Math.min(canvas.width / frameW, canvas.height / frameH);
+    const w = frameW * scale, h = frameH * scale;
+    canvas.getContext('2d').drawImage(image, 0, row * frameH, frameW, frameH,
+      (canvas.width - w) / 2, (canvas.height - h) / 2, w, h);
+  };
+  image.src = url;
 }
 
 document.querySelectorAll('.upload-slot').forEach(wireUploadSlot);
 
 // ---------------------------------------------------------------------
 // Resource placement: every resource (Gold's own deposit, plus each
-// extra resource added below) defaults to "near each base" - the
-// existing play.html behavior, untouched if this is never opened. The
+// extra resource added below) defaults to "near each base"; play.html
+// picks a clear outward site away from planned structures. The
 // alternative, "place on the map," shows the map's own background art
 // (whatever's uploaded/picked under Map Basics above) and any number of
 // points (0..1 fractions of it, not pixels - so they scale correctly
@@ -1278,11 +1495,52 @@ document.querySelectorAll('.upload-slot').forEach(wireUploadSlot);
 // every point for that resource at once.
 // ---------------------------------------------------------------------
 const placementRefreshFns = []; // one per open placement widget, so picking/uploading a new background art live-updates every preview at once
+const MAP_GRADIENT_DEFAULTS = { start: '#0b1b35', end: '#294765' };
+function mapGradientColors() {
+  return {
+    start: document.getElementById('mapGradientStart').value || MAP_GRADIENT_DEFAULTS.start,
+    end: document.getElementById('mapGradientEnd').value || MAP_GRADIENT_DEFAULTS.end,
+  };
+}
+function mapGradientCss() {
+  const { start, end } = mapGradientColors();
+  return `linear-gradient(135deg, ${start}, ${end})`;
+}
+function refreshMapGradientPreview() {
+  document.getElementById('mapGradientPreview').style.background = mapGradientCss();
+  refreshAllPlacementPreviews();
+}
+document.getElementById('mapGradientStart').addEventListener('input', refreshMapGradientPreview);
+document.getElementById('mapGradientEnd').addEventListener('input', refreshMapGradientPreview);
+document.getElementById('clearMapBackground').addEventListener('click', () => {
+  const slot = document.querySelector('.upload-slot[data-slot="backgroundImage"]');
+  slot.querySelector('input[type=file]').value = '';
+  delete existingAssetUrls.backgroundImage;
+  slot.querySelector('.name').textContent = 'No file chosen';
+  slot.querySelector('.status').textContent = 'gradient will be used';
+  const thumb = slot.querySelector('.thumb');
+  thumb.style.backgroundImage = 'none';
+  thumb.textContent = 'none';
+  refreshAllPlacementPreviews();
+});
+refreshMapGradientPreview();
+let backgroundPreviewFile = null;
+let backgroundPreviewUrl = null;
 function currentBackgroundPreviewUrl() {
   const slot = document.querySelector('.upload-slot[data-slot="backgroundImage"]');
   const input = slot && slot.querySelector('input[type=file]');
   const file = input && input.files[0];
-  if (file) return URL.createObjectURL(file);
+  if (file) {
+    if (file !== backgroundPreviewFile) {
+      if (backgroundPreviewUrl) URL.revokeObjectURL(backgroundPreviewUrl);
+      backgroundPreviewFile = file;
+      backgroundPreviewUrl = URL.createObjectURL(file);
+    }
+    return backgroundPreviewUrl;
+  }
+  if (backgroundPreviewUrl) URL.revokeObjectURL(backgroundPreviewUrl);
+  backgroundPreviewFile = null;
+  backgroundPreviewUrl = null;
   return existingAssetUrls.backgroundImage || null;
 }
 function refreshAllPlacementPreviews() { placementRefreshFns.forEach((fn) => fn()); }
@@ -1313,7 +1571,9 @@ function placementWidgetHTML(resourceKey, placement) {
           <span class="placement-count"></span>
           <button type="button" class="btn-secondary placement-clear">Clear all</button>
         </div>
-        <p class="hint" style="margin:6px 0 0;">Click the map to add a point - every faction's Mining Ships (Gold) or a marker (other resources) appears at every point you add. Click a point to remove just that one. Upload map background art above (Map Basics) to see it here.</p>
+        <div class="placement-feature-legend">Markers show item initials (HF = Helicopter Facility). The small number badge and border color show its player. Yellow = resource; brown = obstacle.</div>
+        <ul class="placement-point-list"></ul>
+        <p class="hint" style="margin:6px 0 0;">Numbered markers show every player's Home Base; small reference markers show resources, obstacles, troops, buildings, turrets, and launchers already placed. Click the map to add a resource point; unsafe overlaps and turret/launcher firing areas are blocked. Use Remove below to delete a point.</p>
       </div>
     </div>`;
 }
@@ -1332,7 +1592,7 @@ function placementWidgetHTML(resourceKey, placement) {
 // wirePlacementWidget today is Gold, an Additional Resource, or an
 // Obstacle).
 function widgetKindAndLabel(widget) {
-  if (widget.id === 'goldPlacementWidget') return { kind: 'resource', label: 'Gold' };
+  if (widget.id === 'goldPlacementWidget') return { kind: 'resource', label: document.getElementById('resourceName').value.trim() || 'Gold' };
   const obstacleRow = widget.closest('.obstacle-row');
   if (obstacleRow) {
     const name = obstacleRow.querySelector('.obstacle-name');
@@ -1345,6 +1605,26 @@ function widgetKindAndLabel(widget) {
   }
   return { kind: 'resource', label: 'Placement' };
 }
+function placementInitials(name) {
+  const words = String(name || '').match(/[\p{L}\p{N}]+/gu) || [];
+  if (!words.length) return '?';
+  const letters = words.length === 1 ? Array.from(words[0]).slice(0, 2).join('')
+    : words.slice(0, 3).map((word) => Array.from(word)[0]).join('');
+  return letters.toLocaleUpperCase();
+}
+function setOwnedMarkerLabel(marker, name, ownerIndex) {
+  const initials = document.createElement('span');
+  initials.className = 'marker-initials';
+  initials.textContent = placementInitials(name);
+  const owner = document.createElement('span');
+  owner.className = 'marker-owner';
+  owner.textContent = ownerIndex < 0 ? '?' : String(ownerIndex + 1);
+  owner.setAttribute('aria-label', ownerIndex < 0 ? 'Removed player' : `Player ${ownerIndex + 1}`);
+  marker.append(initials, owner);
+}
+// The troop/structure editors initialize below the resource widgets. Keep
+// their reference source empty until those editors have been set up.
+let placedFeatureReferenceProvider = () => [];
 // Every OTHER placement-widget's own already-placed points, drawn as
 // small non-interactive reference dots on THIS widget's map - so placing
 // Gold (say) shows exactly where every obstacle and every other resource
@@ -1355,7 +1635,7 @@ function widgetKindAndLabel(widget) {
 // Reads every other widget's live DOM state fresh each call rather than
 // tracking it separately - same reasoning as everything else in this
 // file (see readPlacement/collectExtraResources).
-function renderReferenceMarkers(root, wrap) {
+function renderReferenceMarkers(root, wrap, excludeKinds = []) {
   wrap.querySelectorAll('.placement-reference-marker').forEach((el) => el.remove());
   document.querySelectorAll('.placement-widget').forEach((widget) => {
     if (widget === root) return;
@@ -1365,13 +1645,79 @@ function renderReferenceMarkers(root, wrap) {
     if (!points.length) return;
     const { kind, label } = widgetKindAndLabel(widget);
     points.forEach((p) => {
+      if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return;
       const marker = document.createElement('div');
       marker.className = `placement-reference-marker ref-${kind}`;
       marker.style.left = (p.x * 100) + '%';
       marker.style.top = (p.y * 100) + '%';
+      marker.textContent = placementInitials(label);
       marker.title = label;
       wrap.appendChild(marker);
     });
+  });
+  placedFeatureReferenceProvider().forEach((feature) => {
+    if (excludeKinds.includes(feature.kind)) return;
+    const marker = document.createElement('div');
+    marker.className = `placement-reference-marker ref-${feature.kind}`;
+    marker.style.left = `${feature.x * 100}%`;
+    marker.style.top = `${feature.y * 100}%`;
+    marker.style.setProperty('--player-color', feature.color);
+    setOwnedMarkerLabel(marker, feature.name, feature.ownerIndex);
+    marker.title = feature.label;
+    marker.setAttribute('aria-label', feature.label);
+    wrap.appendChild(marker);
+  });
+}
+// Match play.html's faction circle and square world bounds exactly. Map
+// placement points use fractions of that same world, so these markers
+// line up with Home Bases in the finished game at every map size.
+function placementHomeBases() {
+  const sizes = { tiny: 1, small: 3, medium: 6, large: 12 };
+  const multiplier = sizes[document.getElementById('mapSize').value] || sizes.medium;
+  const radius = 420 * multiplier;
+  const worldSize = 2 * (radius + 400);
+  const computerRows = Array.from(document.querySelectorAll('#computerPlayersList .computer-row'));
+  return playerChoices().map((player, index, players) => {
+    const angle = (index / players.length) * Math.PI * 2 - Math.PI / 2;
+    return {
+      index, name: player.name, worldSize,
+      x: 0.5 + Math.cos(angle) * radius / worldSize,
+      y: 0.5 + Math.sin(angle) * radius / worldSize,
+      color: index ? computerRows[index - 1].querySelector('.c-color').value : document.getElementById('goodColor').value,
+      visualScale: sizeForSlot(index ? computerRows[index - 1].dataset.computerId : 'goodBaseImage'),
+    };
+  });
+}
+// Keep these offsets aligned with play.html's GATED_BUILDINGS.
+const RESOURCE_STRUCTURE_SITES = [
+  ['airBaseImage', 110, 60, 'Air Base'], ['warFactoryImage', -110, 60, 'War Factory'],
+  ['infantryPostImage', 110, -60, 'Infantry Post'], ['helicopterFacilityImage', -110, -60, 'Helicopter Facility'],
+  ['navyHarborImage', 220, 0, 'Navy Harbor'], ['fieldHospitalImage', -220, 0, 'Field Hospital'],
+  ['researchFacilityImage', 0, 140, 'Research Facility'], ['missileSiloImage', 0, -140, 'Missile Silo'],
+  ['missileBatteryImage', 330, 0, 'Missile Battery'], ['religiousInstitutionImage', -330, 0, 'Religious Institution'],
+];
+function renderHomeBaseMarkers(wrap, legend) {
+  wrap.querySelectorAll('.placement-home-base').forEach((el) => el.remove());
+  legend.replaceChildren();
+  placementHomeBases().forEach((base) => {
+    const marker = document.createElement('div');
+    marker.className = 'placement-home-base';
+    marker.style.left = (base.x * 100) + '%';
+    marker.style.top = (base.y * 100) + '%';
+    marker.style.setProperty('--base-color', base.color);
+    const previewWidth = wrap.getBoundingClientRect().width;
+    const diameter = Math.max(42, 90 * base.visualScale / base.worldSize * previewWidth);
+    marker.style.width = `${diameter}px`;
+    marker.style.height = `${diameter}px`;
+    marker.textContent = String(base.index + 1);
+    marker.setAttribute('aria-label', `Player ${base.index + 1} Home Base position: ${base.name}`);
+    marker.title = `Player ${base.index + 1} Home Base position: ${base.name}`;
+    wrap.appendChild(marker);
+    const item = document.createElement('span');
+    item.style.setProperty('--base-color', base.color);
+    const swatch = document.createElement('i');
+    item.append(swatch, document.createTextNode(`Player ${base.index + 1}: ${base.name}`));
+    legend.appendChild(item);
   });
 }
 function wirePlacementWidget(root) {
@@ -1381,29 +1727,84 @@ function wirePlacementWidget(root) {
   const radios = root.querySelectorAll('input[type=radio]');
   const countEl = root.querySelector('.placement-count');
   const clearBtn = root.querySelector('.placement-clear');
+  const legend = document.createElement('div');
+  legend.className = 'placement-base-legend';
+  wrap.after(legend);
+  const warning = document.createElement('p');
+  warning.className = 'placement-warning';
+  warning.setAttribute('role', 'status');
+  warning.hidden = true;
+  root.querySelector('.placement-footer').after(warning);
 
   function getPoints() {
     try { return JSON.parse(root.dataset.points || '[]'); } catch { return []; }
   }
   function setPoints(points) { root.dataset.points = JSON.stringify(points); }
+  function blockedPlacement(x, y, rect, ignorePointIndex = -1) {
+    const obstacleRow = root.closest('.obstacle-row');
+    const placedRadius = obstacleRow ? Math.max(10, Number(obstacleRow.querySelector('.obstacle-size').value) / 2 || 60) : 28;
+    for (const base of placementHomeBases()) {
+      const px = (x - base.x) * base.worldSize, py = (y - base.y) * base.worldSize;
+      if (Math.hypot(px, py) < 45 * base.visualScale + placedRadius + 20 ||
+          (rect.width && rect.height && Math.hypot((x - base.x) * rect.width, (y - base.y) * rect.height) < 26)) {
+        return `Player ${base.index + 1}'s Home Base`;
+      }
+      if (obstacleRow) continue;
+      for (const [slot, dx, dy, label] of RESOURCE_STRUCTURE_SITES) {
+        if (Math.hypot(px - dx, py - dy) < 28 * sizeForSlot(slot) + placedRadius + 30) {
+          return `Player ${base.index + 1}'s ${label} site`;
+        }
+      }
+    }
+    const worldSize = placementHomeBases()[0]?.worldSize || 5840;
+    for (const widget of document.querySelectorAll('.placement-widget')) {
+      if (widget === root) continue;
+      const placement = readPlacement(widget);
+      if (placement.mode !== 'map') continue;
+      const obstacle = widget.closest('.obstacle-row');
+      const otherRadius = obstacle ? Math.max(10, Number(obstacle.querySelector('.obstacle-size')?.value) / 2 || 60) : 28;
+      if (placement.points.some((point) => Math.hypot((x - point.x) * worldSize, (y - point.y) * worldSize) <
+          placedRadius + otherRadius + 10)) return widgetKindAndLabel(widget).label;
+    }
+    for (const feature of placedFeatureReferenceProvider()) {
+      const minimum = !obstacleRow && (feature.kind === 'turret' || feature.kind === 'launcher')
+        ? feature.weaponRange + 180 : feature.diameter / 2 + placedRadius + 10;
+      if (Math.hypot((x - feature.x) * worldSize, (y - feature.y) * worldSize) < minimum) return feature.label;
+    }
+    if (getPoints().some((point, index) => index !== ignorePointIndex &&
+        Math.hypot((x - point.x) * worldSize, (y - point.y) * worldSize) < placedRadius * 2 + 8)) {
+      return 'another point in this layer';
+    }
+    return null;
+  }
 
   function renderMarkers() {
     const points = getPoints();
+    const featureName = widgetKindAndLabel(root).label;
     wrap.querySelectorAll('.placement-marker').forEach((el) => el.remove());
+    const list = mapSection.querySelector('.placement-point-list');
+    list.replaceChildren();
     points.forEach((p, idx) => {
       const marker = document.createElement('div');
       marker.className = 'placement-marker';
       marker.style.left = (p.x * 100) + '%';
       marker.style.top = (p.y * 100) + '%';
-      marker.title = 'Click to remove this point';
-      marker.addEventListener('click', (e) => {
-        e.stopPropagation(); // a click on a marker removes it - it must not also count as "add a new point" on the wrap underneath
+      marker.textContent = placementInitials(featureName);
+      marker.title = `${featureName} point ${idx + 1}; use Remove below to delete it`;
+      wrap.appendChild(marker);
+      const item = document.createElement('li');
+      const label = document.createElement('span');
+      label.textContent = `Point ${idx + 1} · ${(p.x * 100).toFixed(1)}%, ${(p.y * 100).toFixed(1)}%`;
+      const remove = document.createElement('button');
+      remove.type = 'button'; remove.className = 'btn-secondary'; remove.textContent = 'Remove';
+      remove.addEventListener('click', () => {
         const pts = getPoints();
         pts.splice(idx, 1);
         setPoints(pts);
         refreshAllPlacementPreviews();
       });
-      wrap.appendChild(marker);
+      item.append(label, remove);
+      list.appendChild(item);
     });
     countEl.textContent = points.length
       ? `${points.length} point${points.length === 1 ? '' : 's'} placed`
@@ -1416,9 +1817,13 @@ function wirePlacementWidget(root) {
     mapSection.hidden = mode !== 'map';
     if (mode !== 'map') return;
     const url = currentBackgroundPreviewUrl();
-    wrap.style.backgroundImage = url ? `url(${url})` : 'none';
+    wrap.style.backgroundImage = url ? `url(${url})` : mapGradientCss();
     renderMarkers();
     renderReferenceMarkers(root, wrap);
+    renderHomeBaseMarkers(wrap, legend);
+    const blockedPoint = getPoints().map((point, index) => blockedPlacement(point.x, point.y, wrap.getBoundingClientRect(), index)).find(Boolean);
+    warning.hidden = !blockedPoint;
+    if (blockedPoint) warning.textContent = `A saved point overlaps ${blockedPoint}. Click that point to remove it.`;
     // Obstacles are the one placement type that silently falls back to a
     // generic mountain marker in-game when a row has no art (see play.html's
     // drawObstacle) - flag that right here instead of it only showing up
@@ -1445,10 +1850,17 @@ function wirePlacementWidget(root) {
     refreshAllPlacementPreviews();
   }));
   wrap.addEventListener('click', (e) => {
-    if (e.target !== wrap) return; // a marker's own click handler (above) already handled removing itself
     const rect = wrap.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
     const x = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
     const y = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height));
+    const blockedSite = blockedPlacement(x, y, rect);
+    if (blockedSite) {
+      warning.textContent = `Too close to ${blockedSite}. Choose another spot.`;
+      warning.hidden = false;
+      return;
+    }
+    warning.hidden = true;
     const pts = getPoints();
     pts.push({ x: Number(x.toFixed(4)), y: Number(y.toFixed(4)) });
     setPoints(pts);
@@ -1457,8 +1869,18 @@ function wirePlacementWidget(root) {
   clearBtn.addEventListener('click', () => { setPoints([]); refreshAllPlacementPreviews(); });
 
   placementRefreshFns.push(syncUI);
+  root._syncPlacementPreview = syncUI;
   syncUI();
   return syncUI;
+}
+
+function clearPlacementRows(containerId) {
+  const container = document.getElementById(containerId);
+  container.querySelectorAll('.placement-widget').forEach((widget) => {
+    const index = placementRefreshFns.indexOf(widget._syncPlacementPreview);
+    if (index >= 0) placementRefreshFns.splice(index, 1);
+  });
+  container.replaceChildren();
 }
 
 function readPlacement(root) {
@@ -1555,6 +1977,7 @@ const CATEGORY_LABELS = {
   'sounds/music': 'Background Music',
   'sounds/intro': 'Intro Music',
   'sounds/attack': 'Attack',
+  'sounds/weapons': 'Unit Weapon & Ability Effects',
   'sounds/building_destroyed': 'Building Destroyed',
   'sounds/home_under_attack': 'Home Base Under Attack',
   'sounds/endgame': 'Game Over',
@@ -1564,7 +1987,7 @@ const CATEGORY_ORDER = [
   'characters/space_ships', 'characters/navy_ships', 'characters/jets', 'characters/helicopters', 'characters/infantry', 'characters/artillery', 'characters/missiles', 'characters/tanks', 'characters/field_medics', 'characters/clerics', 'characters/mining_ships', 'characters/missile_battery',
   'worlds', 'bases', 'resources', 'terrain',
   'structures/war_factory', 'structures/airport', 'structures/infantry_post', 'structures/helicopter_facility', 'structures/research_facility', 'structures/gun_turret', 'structures/missile_silo', 'structures/missile_battery', 'structures/navy_harbor', 'structures/field_hospital', 'structures/religious_institution',
-  'sounds/music', 'sounds/intro', 'sounds/attack', 'sounds/building_destroyed', 'sounds/home_under_attack', 'sounds/endgame',
+  'sounds/music', 'sounds/intro', 'sounds/attack', 'sounds/weapons', 'sounds/building_destroyed', 'sounds/home_under_attack', 'sounds/endgame',
 ];
 
 // Per-category cache (Firestore query results, not the whole library) so
@@ -1587,10 +2010,20 @@ function isAudioCategory(cat) { return cat === 'sounds' || cat.startsWith('sound
 // under the "wrong" category by mistake.
 async function loadLibraryCategory(cat) {
   if (libraryCategoryCache[cat]) return libraryCategoryCache[cat];
-  const snap = await getDocs(query(collection(db, 'libraryItems'), where('category', '==', cat)));
-  const items = snap.docs.map((d) => d.data());
+  const items = await fetchLibraryCategoryItems('libraryItems', cat);
   libraryCategoryCache[cat] = items;
   return items;
+}
+async function fetchLibraryCategoryItems(collectionName, cat) {
+  const source = collection(db, collectionName);
+  const [primary, shared] = await Promise.all([
+    getDocs(query(source, where('category', '==', cat))),
+    cat.startsWith('characters/')
+      ? getDocs(query(source, where('availableCategories', 'array-contains', cat)))
+      : Promise.resolve(null),
+  ]);
+  return [...new Map([...primary.docs, ...(shared?.docs || [])]
+    .map((d) => [d.id, { id: d.id, ...d.data() }])).values()];
 }
 
 // ---------------------------------------------------------------------
@@ -1610,8 +2043,7 @@ async function loadLibraryCategory(cat) {
 const premiumCategoryCache = {};
 async function loadPremiumLibraryCategory(cat) {
   if (premiumCategoryCache[cat]) return premiumCategoryCache[cat];
-  const snap = await getDocs(query(collection(db, 'premiumLibraryItems'), where('category', '==', cat)));
-  const items = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const items = await fetchLibraryCategoryItems('premiumLibraryItems', cat);
   premiumCategoryCache[cat] = items;
   return items;
 }
@@ -1675,6 +2107,7 @@ const SLOT_CATEGORY_HINTS = {
   soundEndgame: 'sounds/endgame',
 };
 const SLOT_PREFIX_CATEGORY_HINTS = [
+  [/^(?:unit|airunit|warunit|infunit|heliunit|navyunit|turret|missile|missilebattery|medic|cleric|wildunit)_\d+_weapon_sound$/, 'sounds/weapons'],
   [/^resource_/, 'resources'],
   [/^computer_/, 'bases'],
   [/^airunit_/, 'characters/jets'],
@@ -1743,6 +2176,20 @@ function showImagePreview(url, anchorEl) {
   libraryImagePreviewEl.style.display = 'block';
 }
 function hideImagePreview() { libraryImagePreviewEl.style.display = 'none'; }
+function drawLibrarySpriteThumb(canvas, item) {
+  const image = new Image();
+  image.onload = () => {
+    const rows = item.spriteSheet.directions.split(',');
+    const row = Math.max(0, rows.indexOf('down'));
+    const frameW = image.naturalWidth / item.spriteSheet.columns;
+    const frameH = image.naturalHeight / rows.length;
+    const scale = Math.min(canvas.width / frameW, canvas.height / frameH);
+    const width = frameW * scale, height = frameH * scale;
+    canvas.getContext('2d').drawImage(image, 0, row * frameH, frameW, frameH,
+      (canvas.width - width) / 2, (canvas.height - height) / 2, width, height);
+  };
+  image.src = item.url;
+}
 
 // Sound preview - lets someone listen to a library sound (free or
 // Premium, locked or unlocked - see the audio branch of renderCategory
@@ -1854,7 +2301,7 @@ async function renderCategory(cat, mediaType, isInitialLanding = false) {
       isPremium ? loadPremiumLibraryCategory(cat) : loadLibraryCategory(cat),
       isPremium ? loadUnlockedPremiumIds() : Promise.resolve(null),
     ]);
-    catItems = items.filter((it) => it.type === mediaType);
+    catItems = items.filter((it) => it.type === mediaType && !it.spriteSheet);
     unlockedIds = unlocked;
   } catch (err) {
     console.error('Could not load this library category:', err);
@@ -1876,7 +2323,7 @@ async function renderCategory(cat, mediaType, isInitialLanding = false) {
   if (catItems.length === 0 && isInitialLanding && !isPremium && cat.startsWith('maps/')) {
     for (const fallbackCat of MAP_SIZE_FALLBACK_ORDER) {
       if (fallbackCat === cat) continue;
-      const fallbackItems = (await loadLibraryCategory(fallbackCat)).filter((it) => it.type === mediaType);
+      const fallbackItems = (await loadLibraryCategory(fallbackCat)).filter((it) => it.type === mediaType && !it.spriteSheet);
       if (myToken !== libraryRequestToken) return;
       if (fallbackItems.length > 0) { renderCategory(fallbackCat, mediaType); return; }
     }
@@ -1914,7 +2361,8 @@ async function renderCategory(cat, mediaType, isInitialLanding = false) {
       // screen readers - never shown on screen) - browsing the
       // library is by thumbnail now, not by whatever the uploaded
       // filename happened to be.
-      el.innerHTML = `<img src="${it.url}" loading="lazy" alt="${it.name}">${locked ? '<span class="lock-badge">🔒 1 credit</span>' : ''}`;
+      el.innerHTML = `${it.spriteSheet ? `<canvas class="sprite-thumb" width="160" height="80" role="img" aria-label="${it.name}"></canvas>` : `<img src="${it.url}" loading="lazy" alt="${it.name}">`}${it.spriteSheet ? '<span class="sprite-mark" title="Moving sprite-sheet character">S</span>' : ''}${isLibraryGif(it) ? '<span class="gif-mark" title="Animated GIF" aria-label="Animated GIF">G</span>' : ''}${locked ? '<span class="lock-badge">🔒 1 credit</span>' : ''}`;
+      if (it.spriteSheet) drawLibrarySpriteThumb(el.querySelector('canvas'), it);
       el.addEventListener('click', () => (locked ? handlePremiumItemClick(it, unlockedIds, () => renderCategory(cat, mediaType)) : selectLibraryAsset(it)));
       el.addEventListener('mouseenter', () => showImagePreview(it.url, el));
       el.addEventListener('mouseleave', hideImagePreview);
@@ -1958,6 +2406,7 @@ async function renderCategory(cat, mediaType, isInitialLanding = false) {
 // grid reflects the new unlocked state if the map-maker opens this same
 // picker again without reloading the page.
 async function handlePremiumItemClick(item, unlockedIds, onUnlocked) {
+  if (item.spriteSheet) return;
   if (currentUser?.email === ADMIN_EMAIL) { selectLibraryAsset(item); return; }
   const label = item.name || 'this item';
   if (!confirm(`Unlock "${label}" for 1 credit?\n\nThis is permanent - once unlocked, you can use it in any map from now on.`)) return;
@@ -1980,8 +2429,10 @@ async function handlePremiumItemClick(item, unlockedIds, onUnlocked) {
 }
 
 function selectLibraryAsset(item) {
+  if (item.spriteSheet) return;
   const slotKey = libraryActiveSlotKey;
   const slot = document.querySelector(`.upload-slot[data-slot="${slotKey}"]`);
+  existingAssetUrls[slotKey] = item.url;
   if (slot) {
     const input = slot.querySelector('input[type=file]');
     input.value = ''; // an existing library URL takes priority; no file to upload
@@ -1989,13 +2440,14 @@ function selectLibraryAsset(item) {
     slot.querySelector('.status').textContent = 'from library ✓ (' + item.name + ')';
     const thumb = slot.querySelector('.thumb');
     if (item.type === 'image') {
+      thumb.replaceChildren();
       thumb.style.backgroundImage = `url(${item.url})`;
       thumb.textContent = '';
+      setSpriteSettingsForSlot(slotKey, null);
     } else {
       thumb.textContent = 'audio';
     }
   }
-  existingAssetUrls[slotKey] = item.url;
   refreshAllPlacementPreviews();
   stopAudioPreview();
   hideImagePreview();
@@ -2035,13 +2487,32 @@ let uploadProgress = null; // { doneCount, totalCount }
 
 function renderUploadProgress() {
   if (!uploadProgress || uploadProgress.totalCount === 0) return;
-  setSaveStatus(`Uploading (5 at a time)… ${uploadProgress.doneCount}/${uploadProgress.totalCount} files done. Keep this tab open.`);
+  setSaveStatus(`Uploading (${MAX_CONCURRENT_UPLOADS} at a time)… ${uploadProgress.doneCount}/${uploadProgress.totalCount} files done. Keep this tab open.`);
 }
 
-// If a single file's upload+getDownloadURL round trip goes this long
-// without finishing, treat the connection as dead and fail it loudly
-// instead of leaving it (and the whole save) hanging silently forever.
-const UPLOAD_TIMEOUT_MS = 90000;
+// Match storage.rules (the limit is strictly less than 15 MiB).
+const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
+function isGifFile(file) {
+  return file.type === 'image/gif' || /\.gif$/i.test(file.name);
+}
+function allowedImageFile(file) {
+  return /\.(png|jpe?g)$/i.test(file.name) &&
+    (!file.type || file.type === 'image/png' || file.type === 'image/jpeg') &&
+    !isGifFile(file);
+}
+async function validateImageBytes(file) {
+  if (!allowedImageFile(file)) throw new Error(`"${file.name}" must be a PNG or JPEG image. Choose a GIF from the library instead.`);
+  const bytes = new Uint8Array(await file.slice(0, 12).arrayBuffer());
+  const png = bytes.length >= 8 && [137,80,78,71,13,10,26,10].every((value, i) => bytes[i] === value);
+  const jpeg = bytes.length >= 3 && bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255;
+  if (!(/\.png$/i.test(file.name) ? png : jpeg)) {
+    throw new Error(`"${file.name}" is not a valid PNG or JPEG image.`);
+  }
+}
+function isLibraryGif(item) {
+  return item.mimeType === 'image/gif' || /\.gif$/i.test(item.fileName || '') ||
+    /\.gif(?:\?|$)/i.test(decodeURIComponent((item.path || item.url || '').split('?')[0]));
+}
 
 // Sprites/homeworld art/etc. never need to be bigger than this on screen,
 // but a phone photo picked for "homeworld art" easily comes in at 3000px+
@@ -2050,20 +2521,23 @@ const UPLOAD_TIMEOUT_MS = 90000;
 // regardless of how slow or fast the connection is - a 2.4MB photo here
 // commonly comes back under 200KB, roughly a 10x reduction.
 const MAX_IMAGE_DIMENSION = 768;
+const MAX_SPRITE_SHEET_DIMENSION = 3072;
 const IMAGE_QUALITY = 0.85;
 
-async function compressImageFile(file) {
-  if (!file.type.startsWith('image/') || file.type === 'image/gif') return file; // don't touch animated gifs
+async function compressImageFile(file, sheet = null) {
+  if (!file.type.startsWith('image/') || isGifFile(file)) return file; // GIF uploads are rejected before this point; audio passes through unchanged
   try {
     const bitmap = await createImageBitmap(file);
-    const scale = Math.min(1, MAX_IMAGE_DIMENSION / Math.max(bitmap.width, bitmap.height));
-    const w = Math.round(bitmap.width * scale);
-    const h = Math.round(bitmap.height * scale);
+    const scale = Math.min(1, (sheet ? MAX_SPRITE_SHEET_DIMENSION : MAX_IMAGE_DIMENSION) / Math.max(bitmap.width, bitmap.height));
+    const w = sheet ? Math.max(sheet.columns, Math.round(bitmap.width * scale / sheet.columns) * sheet.columns) : Math.round(bitmap.width * scale);
+    const rows = sheet?.directions.split(',').length || 1;
+    const h = sheet ? Math.max(rows, Math.round(bitmap.height * scale / rows) * rows) : Math.round(bitmap.height * scale);
     const canvas = document.createElement('canvas');
     canvas.width = w;
     canvas.height = h;
     const ctx = canvas.getContext('2d');
     ctx.drawImage(bitmap, 0, 0, w, h);
+    bitmap.close();
     // WebP still supports transparency (unlike JPEG) and compresses far
     // smaller than PNG at the same quality - this is what actually cuts
     // upload time, more than the resize alone (a same-size 1024x1024 PNG
@@ -2087,9 +2561,26 @@ async function uploadSlotIfChanged(slotKey) {
   const input = slot.querySelector('input[type=file]');
   let file = input.files[0];
   if (!file) return existingAssetUrls[slotKey] || null;
+  if (!input.accept.startsWith('audio')) await validateImageBytes(file);
+  const selectedFile = file;
+  const previousUrl = existingAssetUrls[slotKey];
+  const sheet = spriteSettingsForSlot(slotKey);
+  if (sheet) {
+    if (isGifFile(file)) throw new Error('Use a PNG or WebP file for a directional sprite sheet, not an animated GIF.');
+    const bitmap = await createImageBitmap(file);
+    const rows = sheet.directions.split(',').length;
+    const valid = bitmap.width % sheet.columns === 0 && bitmap.height % rows === 0;
+    bitmap.close();
+    if (!valid) throw new Error(`Sprite sheet "${file.name}" must have a width divisible by ${sheet.columns} columns and a height divisible by ${rows} direction rows.`);
+  }
   const originalSize = file.size;
   slot.querySelector('.status').textContent = 'compressing…';
-  file = await compressImageFile(file);
+  file = await compressImageFile(file, sheet);
+  if (file.size >= MAX_UPLOAD_BYTES) {
+    const message = `"${file.name}" is ${(file.size / 1024 / 1024).toFixed(1)} MB. Each uploaded file must be smaller than 15 MB. Choose a smaller file and save again.`;
+    slot.querySelector('.status').textContent = message;
+    throw new Error(message);
+  }
   if (file.size < originalSize) {
     slot.querySelector('.status').textContent = `uploading… (shrunk ${Math.round(originalSize / 1024)}KB → ${Math.round(file.size / 1024)}KB)`;
   } else {
@@ -2098,23 +2589,27 @@ async function uploadSlotIfChanged(slotKey) {
   const path = `maps/${currentUser.uid}/${currentMapId}/${slotKey}_${Date.now()}_${file.name}`;
   const ref = storageRef(storage, path);
 
-  const url = await Promise.race([
-    (async () => {
-      // Every upload path includes Date.now(), so nothing ever gets
-      // overwritten at the same URL - a re-upload just creates a new
-      // path and the map doc points at that instead. That makes a
-      // year-long, "never needs to revalidate" cache safe: Storage's own
-      // default (no cacheControl set at all) was `private, max-age=0`,
-      // meaning every browser re-fetched every image/sound on every
-      // single play or edit session, from every visitor, forever.
-      await uploadBytes(ref, file, { cacheControl: 'public, max-age=31536000, immutable' });
-      return getDownloadURL(ref);
-    })(),
-    new Promise((_, reject) => setTimeout(
-      () => reject(new Error(`"${file.name}" didn't finish within ${UPLOAD_TIMEOUT_MS / 1000}s — your connection may be too slow or unstable right now. Try again, or use a smaller file.`)),
-      UPLOAD_TIMEOUT_MS
-    )),
-  ]);
+  // Let Firebase own request retries and timeouts. Racing its non-cancellable
+  // upload against 90 seconds abandoned healthy large transfers and left
+  // them running behind subsequent saves. Unique paths make immutable caching safe.
+  let url;
+  try {
+    await uploadBytes(ref, file, {
+      cacheControl: 'public, max-age=31536000, immutable',
+      ...(!file.type && !input.accept.startsWith('audio') ?
+        { contentType: /\.png$/i.test(file.name) ? 'image/png' : 'image/jpeg' } : {}),
+    });
+    url = await getDownloadURL(ref);
+  } catch (err) {
+    const message = `"${file.name}" could not upload: ${err.message}`;
+    slot.querySelector('.status').textContent = message;
+    throw new Error(message);
+  }
+  // A replacement selected during a slow transfer must not be cleared or
+  // overwritten by the old transfer's completion.
+  if (input.files[0] !== selectedFile || existingAssetUrls[slotKey] !== previousUrl) {
+    throw new Error(`The selection for "${selectedFile.name}" changed while saving. Save again to include the new selection.`);
+  }
 
   existingAssetUrls[slotKey] = url;
   // Clear the input so a later save (e.g. Finish & Save right after Save
@@ -2129,7 +2624,7 @@ async function uploadSlotIfChanged(slotKey) {
 // with several units/sounds take minutes to save. This runs at most
 // MAX_CONCURRENT_UPLOADS at once instead of either "all in one go" (which
 // can trip Storage rate limits on a slow connection) or fully sequential.
-const MAX_CONCURRENT_UPLOADS = 5;
+const MAX_CONCURRENT_UPLOADS = 2;
 
 async function uploadSlotsWithLimit(slotKeys) {
   // Only count slots that actually have a pending file - most calls here
@@ -2144,15 +2639,21 @@ async function uploadSlotsWithLimit(slotKeys) {
 
   const results = {};
   let nextIndex = 0;
+  let failure = null;
   async function worker() {
-    while (nextIndex < slotKeys.length) {
+    while (!failure && nextIndex < slotKeys.length) {
       const key = slotKeys[nextIndex++];
-      results[key] = await uploadSlotIfChanged(key);
+      try {
+        results[key] = await uploadSlotIfChanged(key);
+      } catch (err) {
+        failure ||= err;
+      }
     }
   }
   const workerCount = Math.min(MAX_CONCURRENT_UPLOADS, slotKeys.length);
   try {
     await Promise.all(Array.from({ length: workerCount }, worker));
+    if (failure) throw failure;
   } finally {
     uploadProgress = null;
   }
@@ -2190,6 +2691,7 @@ const turretCounterState = { n: 0 };
 const missileUnitCounterState = { n: 0 };
 const missileBatteryUnitCounterState = { n: 0 };
 const clericUnitCounterState = { n: 0 };
+const mapOnlyUnitCounterState = { n: 0 };
 
 // Weapon effect a unit's attack draws in play.html - purely cosmetic
 // (damage/range/etc. are unaffected), so it's just a dropdown here and a
@@ -2218,15 +2720,90 @@ function weaponOptionsHtml(selected) {
   return WEAPON_OPTIONS.map(([v, label]) => `<option value="${v}" ${(selected || 'laser') === v ? 'selected' : ''}>${label}</option>`).join('');
 }
 
+// Unit availability follows the visible player order in saved maps. In the
+// editor, stable row keys preserve choices when a computer player is removed
+// or the remaining players are renumbered.
+function playerChoices() {
+  return [
+    { key: 'player', name: document.getElementById('goodName').value.trim() || 'Your faction' },
+    ...Array.from(document.querySelectorAll('#computerPlayersList .computer-row')).map((row) => ({
+      key: row.dataset.computerId,
+      name: row.querySelector('.c-name').value.trim() || 'Computer player',
+    })),
+  ];
+}
+function renderUnitAvailability(row, savedAllowed, title = 'Players who can produce this unit', reset = false) {
+  let section = row.querySelector('.unit-availability');
+  if (!section) {
+    section = document.createElement('div');
+    section.className = 'unit-availability';
+    section.innerHTML = '<strong></strong><div class="unit-availability-options"></div>';
+    row.appendChild(section);
+  }
+  section.querySelector('strong').textContent = title;
+  const options = section.querySelector('.unit-availability-options');
+  const previous = reset ? new Map() : new Map(Array.from(options.querySelectorAll('input')).map((input) => [input.dataset.playerKey, input.checked]));
+  options.replaceChildren();
+  playerChoices().forEach((player, index) => {
+    const label = document.createElement('label');
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.dataset.playerKey = player.key;
+    input.checked = previous.has(player.key) ? previous.get(player.key)
+      : (Array.isArray(savedAllowed) ? savedAllowed.includes(index) : true);
+    label.append(input, document.createTextNode(`Player ${index + 1}: ${player.name}`));
+    options.appendChild(label);
+  });
+}
+function refreshAllUnitAvailability() {
+  document.querySelectorAll('.unit-row').forEach((row) => renderUnitAvailability(row));
+  document.querySelectorAll('.structure-availability').forEach((row) => renderUnitAvailability(row, undefined, 'Players who can build this structure'));
+}
+function allowedFactionsFromRow(row) {
+  return Array.from(row.querySelector('.unit-availability-options').querySelectorAll('input'))
+    .flatMap((input, index) => input.checked ? [index] : []);
+}
+document.getElementById('goodName').addEventListener('input', refreshAllUnitAvailability);
+document.getElementById('goodName').addEventListener('input', refreshAllPlacementPreviews);
+document.getElementById('goodColor').addEventListener('input', refreshAllPlacementPreviews);
+document.getElementById('mapSize').addEventListener('change', refreshAllPlacementPreviews);
+
+const STRUCTURE_SECTIONS = {
+  airBase: 'airBaseBody', warFactory: 'warFactoryBody', infantryPost: 'infantryPostBody',
+  heliFacility: 'heliFacilityBody', navyHarbor: 'navyHarborBody', fieldHospital: 'fieldHospitalBody',
+  missileSilo: 'missileSiloBody',
+  missileBattery: 'missileBatteryBody', religiousInstitution: 'religiousInstitutionBody',
+};
+for (const [key, id] of Object.entries(STRUCTURE_SECTIONS)) {
+  const container = document.getElementById(id);
+  const host = document.createElement('div');
+  host.className = 'structure-availability';
+  host.dataset.structureKey = key;
+  const artField = container.querySelector('.upload-slot').closest('.field');
+  artField.after(host);
+  renderUnitAvailability(host, undefined, 'Players who can build this structure');
+}
+function structureAllowedFactions(key) {
+  return allowedFactionsFromRow(document.querySelector(`.structure-availability[data-structure-key="${key}"]`));
+}
+function restoreStructureAvailability(map) {
+  document.querySelectorAll('.structure-availability').forEach((host) => {
+    renderUnitAvailability(host, map[host.dataset.structureKey]?.allowedFactions,
+      'Players who can build this structure', true);
+  });
+}
+
 // gated: true for Air Base/War Factory units only - adds the per-unit
 // Production time field (10-100s, play.html queues these instead of
 // spawning them instantly). Regular Combat Units stay instant-build, so
 // they never get this field at all.
+function newDefenderPlacementId() { return `def_${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`; }
 function makeUnitRow(list, idPrefix, counterState, data = {}, gated = false) {
   const id = idPrefix + '_' + (counterState.n++);
   const row = document.createElement('div');
   row.className = 'unit-row';
   row.dataset.unitId = id;
+  row.dataset.placementId = data.placementId || newDefenderPlacementId();
   row.innerHTML = `
     <button type="button" class="remove-unit" title="Remove unit">&times;</button>
     <div class="row">
@@ -2235,7 +2812,7 @@ function makeUnitRow(list, idPrefix, counterState, data = {}, gated = false) {
     <div class="upload-slot" data-slot="${id}">
       <div class="thumb">none</div>
       <div class="meta"><div class="name">No file chosen</div><div class="status">unit sprite - transparent PNG works best</div></div>
-      <input type="file" accept="image/*" style="width:auto">
+      <input type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" style="width:auto">
     </div>
     <div class="row" style="margin-top:10px;">
       <div class="field narrow"><label>HP</label><input type="number" class="u-hp" value="${data.hp ?? 300}" min="1"></div>
@@ -2270,7 +2847,29 @@ function makeUnitRow(list, idPrefix, counterState, data = {}, gated = false) {
   });
   wireUploadSlot(row.querySelector('.upload-slot'));
   list.appendChild(row);
+  renderUnitAvailability(row, data.allowedFactions);
   if (data.imageUrl) showExistingAsset(id, data.imageUrl);
+  if (data.weaponSound) showExistingAsset(`${id}_weapon_sound`, data.weaponSound);
+  setSizeForSlot(id, data.visualScale);
+  setSpriteSettingsForSlot(id, data.spriteSheet);
+  if (data.transport && (idPrefix === 'airunit' || idPrefix === 'navyunit')) {
+    const kind = idPrefix === 'navyunit' ? 'Carrier' : 'Mothership';
+    row.dataset.transportKind = kind;
+    const heading = document.createElement('h4');
+    heading.textContent = kind;
+    row.prepend(heading);
+    const hold = document.createElement('div');
+    hold.className = 'transport-editor';
+    hold.style.cssText = 'margin-top:14px;padding:12px;border:1px solid var(--border);border-radius:8px';
+    hold.innerHTML = `<label>Vessel capacity (1–10)</label>
+      <input type="number" class="transport-capacity" min="1" max="10" step="1" value="${Math.max(1, Math.min(10, Math.round(Number(data.transport.capacity) || 1)))}">
+      <p class="hint">Starts with this many vessels aboard. Select the ${kind.toLowerCase()} in the game and press Release vessels to deploy them. Select a friendly mobile unit and click this transport to board it when space is available.</p>
+      <h4>Carried vessel</h4><div class="transport-vessel-list"></div>`;
+    row.appendChild(hold);
+    const vessel = makeUnitRow(hold.querySelector('.transport-vessel-list'), idPrefix, counterState,
+      { ...(data.transport.vessel || {}), transport: null }, true);
+    vessel.querySelector('.remove-unit').hidden = true;
+  }
   return row;
 }
 function addUnitRow(data = {}) { return makeUnitRow(unitList, 'unit', unitCounterState, data, false); }
@@ -2287,6 +2886,7 @@ function addNavyUnitRow(data = {}) { return makeUnitRow(navyUnitList, 'navyunit'
 // loadExistingMap to call when opening an old map that still has units.
 
 document.getElementById('addAirUnitBtn').addEventListener('click', () => addAirUnitRow());
+document.getElementById('addMothershipBtn').addEventListener('click', () => addAirUnitRow({name: 'Mothership', transport: {capacity: 1}}));
 // All start empty on purpose - Air Base/War Factory/Infantry Post/
 // Helicopter Facility are all opt-in (see checklistGaps: none of these
 // buildings or their units are ever required to Finish & Save unless
@@ -2295,6 +2895,7 @@ document.getElementById('addWarUnitBtn').addEventListener('click', () => addWarU
 document.getElementById('addInfantryUnitBtn').addEventListener('click', () => addInfantryUnitRow());
 document.getElementById('addHeliUnitBtn').addEventListener('click', () => addHeliUnitRow());
 document.getElementById('addNavyUnitBtn').addEventListener('click', () => addNavyUnitRow());
+document.getElementById('addCarrierBtn').addEventListener('click', () => addNavyUnitRow({name: 'Carrier', transport: {capacity: 1}}));
 
 // ---------------------------------------------------------------------
 // "🗑 Remove this building" - a map-maker who only wants, say, 2 of the
@@ -2347,6 +2948,7 @@ function addTurretRow(data = {}) {
   const row = document.createElement('div');
   row.className = 'unit-row';
   row.dataset.unitId = id;
+  row.dataset.placementId = data.placementId || newDefenderPlacementId();
   row.innerHTML = `
     <button type="button" class="remove-unit" title="Remove turret">&times;</button>
     <div class="row">
@@ -2355,7 +2957,7 @@ function addTurretRow(data = {}) {
     <div class="upload-slot" data-slot="${id}">
       <div class="thumb">none</div>
       <div class="meta"><div class="name">No file chosen</div><div class="status">turret sprite - transparent PNG works best</div></div>
-      <input type="file" accept="image/*" style="width:auto">
+      <input type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" style="width:auto">
     </div>
     <div class="row" style="margin-top:10px;">
       <div class="field narrow"><label>HP</label><input type="number" class="u-hp" value="${data.hp ?? 300}" min="1"></div>
@@ -2379,7 +2981,10 @@ function addTurretRow(data = {}) {
   });
   wireUploadSlot(row.querySelector('.upload-slot'));
   turretList.appendChild(row);
+  renderUnitAvailability(row, data.allowedFactions);
   if (data.imageUrl) showExistingAsset(id, data.imageUrl);
+  if (data.weaponSound) showExistingAsset(`${id}_weapon_sound`, data.weaponSound);
+  setSizeForSlot(id, data.visualScale);
   return row;
 }
 document.getElementById('addTurretBtn').addEventListener('click', () => addTurretRow());
@@ -2398,6 +3003,7 @@ function addMissileUnitRow(data = {}) {
   const row = document.createElement('div');
   row.className = 'unit-row';
   row.dataset.unitId = id;
+  row.dataset.placementId = data.placementId || newDefenderPlacementId();
   row.innerHTML = `
     <button type="button" class="remove-unit" title="Remove launcher">&times;</button>
     <div class="row">
@@ -2406,7 +3012,7 @@ function addMissileUnitRow(data = {}) {
     <div class="upload-slot" data-slot="${id}">
       <div class="thumb">none</div>
       <div class="meta"><div class="name">No file chosen</div><div class="status">launcher sprite - transparent PNG works best</div></div>
-      <input type="file" accept="image/*" style="width:auto">
+      <input type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" style="width:auto">
     </div>
     <div class="row" style="margin-top:10px;">
       <div class="field narrow"><label>HP</label><input type="number" class="u-hp" value="${data.hp ?? 400}" min="1"></div>
@@ -2422,7 +3028,7 @@ function addMissileUnitRow(data = {}) {
       <div class="upload-slot" data-slot="${id}_missile">
         <div class="thumb">none</div>
         <div class="meta"><div class="name">No file chosen</div><div class="status">missile sprite - transparent PNG works best</div></div>
-        <input type="file" accept="image/*" style="width:auto">
+        <input type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" style="width:auto">
       </div>
       <label style="display:flex; align-items:center; gap:6px; font-weight:normal; margin:8px 0 0;">
         <input type="checkbox" class="u-missile-rotate" ${data.missileRotateToFace !== false ? 'checked' : ''} style="width:auto;">
@@ -2442,8 +3048,12 @@ function addMissileUnitRow(data = {}) {
   });
   row.querySelectorAll('.upload-slot').forEach(wireUploadSlot);
   missileUnitList.appendChild(row);
+  renderUnitAvailability(row, data.allowedFactions);
   if (data.imageUrl) showExistingAsset(id, data.imageUrl);
+  if (data.weaponSound) showExistingAsset(`${id}_weapon_sound`, data.weaponSound);
   if (data.missileImageUrl) showExistingAsset(`${id}_missile`, data.missileImageUrl);
+  setSizeForSlot(id, data.visualScale);
+  setSizeForSlot(`${id}_missile`, data.missileVisualScale);
   return row;
 }
 document.getElementById('addMissileUnitBtn').addEventListener('click', () => addMissileUnitRow());
@@ -2466,6 +3076,7 @@ function addMissileBatteryUnitRow(data = {}) {
   const row = document.createElement('div');
   row.className = 'unit-row';
   row.dataset.unitId = id;
+  row.dataset.placementId = data.placementId || newDefenderPlacementId();
   row.innerHTML = `
     <button type="button" class="remove-unit" title="Remove unit">&times;</button>
     <div class="row">
@@ -2474,7 +3085,7 @@ function addMissileBatteryUnitRow(data = {}) {
     <div class="upload-slot" data-slot="${id}">
       <div class="thumb">none</div>
       <div class="meta"><div class="name">No file chosen</div><div class="status">unit sprite - transparent PNG works best</div></div>
-      <input type="file" accept="image/*" style="width:auto">
+      <input type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" style="width:auto">
     </div>
     <div class="row" style="margin-top:10px;">
       <div class="field narrow"><label>HP</label><input type="number" class="u-hp" value="${data.hp ?? 150}" min="1"></div>
@@ -2492,7 +3103,7 @@ function addMissileBatteryUnitRow(data = {}) {
       <div class="upload-slot" data-slot="${id}_missile">
         <div class="thumb">none</div>
         <div class="meta"><div class="name">No file chosen</div><div class="status">missile sprite - transparent PNG works best</div></div>
-        <input type="file" accept="image/*" style="width:auto">
+        <input type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" style="width:auto">
       </div>
       <div class="row" style="margin-top:8px;">
         <div class="field narrow"><label>Missile speed</label><input type="number" class="u-missile-speed" value="${data.missileSpeed ?? 4}" min="0.1" step="0.1"></div>
@@ -2520,8 +3131,13 @@ function addMissileBatteryUnitRow(data = {}) {
   });
   row.querySelectorAll('.upload-slot').forEach(wireUploadSlot);
   missileBatteryUnitList.appendChild(row);
+  renderUnitAvailability(row, data.allowedFactions);
   if (data.imageUrl) showExistingAsset(id, data.imageUrl);
+  if (data.weaponSound) showExistingAsset(`${id}_weapon_sound`, data.weaponSound);
   if (data.missileImageUrl) showExistingAsset(`${id}_missile`, data.missileImageUrl);
+  setSizeForSlot(id, data.visualScale);
+  setSpriteSettingsForSlot(id, data.spriteSheet);
+  setSizeForSlot(`${id}_missile`, data.missileVisualScale);
   return row;
 }
 document.getElementById('addMissileBatteryUnitBtn').addEventListener('click', () => addMissileBatteryUnitRow());
@@ -2540,6 +3156,7 @@ function addFieldHospitalUnitRow(data = {}) {
   const row = document.createElement('div');
   row.className = 'unit-row';
   row.dataset.unitId = id;
+  row.dataset.placementId = data.placementId || newDefenderPlacementId();
   row.innerHTML = `
     <button type="button" class="remove-unit" title="Remove medic">&times;</button>
     <div class="row">
@@ -2548,7 +3165,7 @@ function addFieldHospitalUnitRow(data = {}) {
     <div class="upload-slot" data-slot="${id}">
       <div class="thumb">none</div>
       <div class="meta"><div class="name">No file chosen</div><div class="status">medic sprite - transparent PNG works best</div></div>
-      <input type="file" accept="image/*" style="width:auto">
+      <input type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" style="width:auto">
     </div>
     <label style="display:flex; align-items:center; gap:6px; font-weight:normal; margin:8px 0 0;">
       <input type="checkbox" class="u-rotate" ${data.rotateToFace !== false ? 'checked' : ''} style="width:auto;">
@@ -2573,7 +3190,11 @@ function addFieldHospitalUnitRow(data = {}) {
   });
   wireUploadSlot(row.querySelector('.upload-slot'));
   fieldHospitalUnitList.appendChild(row);
+  renderUnitAvailability(row, data.allowedFactions);
   if (data.imageUrl) showExistingAsset(id, data.imageUrl);
+  if (data.weaponSound) showExistingAsset(`${id}_weapon_sound`, data.weaponSound);
+  setSizeForSlot(id, data.visualScale);
+  setSpriteSettingsForSlot(id, data.spriteSheet);
   return row;
 }
 document.getElementById('addFieldHospitalUnitBtn').addEventListener('click', () => addFieldHospitalUnitRow());
@@ -2593,6 +3214,7 @@ function addClericUnitRow(data = {}) {
   const row = document.createElement('div');
   row.className = 'unit-row';
   row.dataset.unitId = id;
+  row.dataset.placementId = data.placementId || newDefenderPlacementId();
   row.innerHTML = `
     <button type="button" class="remove-unit" title="Remove Cleric">&times;</button>
     <div class="row">
@@ -2601,7 +3223,7 @@ function addClericUnitRow(data = {}) {
     <div class="upload-slot" data-slot="${id}">
       <div class="thumb">none</div>
       <div class="meta"><div class="name">No file chosen</div><div class="status">Cleric sprite - transparent PNG works best</div></div>
-      <input type="file" accept="image/*" style="width:auto">
+      <input type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" style="width:auto">
     </div>
     <label style="display:flex; align-items:center; gap:6px; font-weight:normal; margin:8px 0 0;">
       <input type="checkbox" class="u-rotate" ${data.rotateToFace !== false ? 'checked' : ''} style="width:auto;">
@@ -2625,10 +3247,63 @@ function addClericUnitRow(data = {}) {
   });
   wireUploadSlot(row.querySelector('.upload-slot'));
   clericUnitList.appendChild(row);
+  renderUnitAvailability(row, data.allowedFactions);
   if (data.imageUrl) showExistingAsset(id, data.imageUrl);
+  if (data.weaponSound) showExistingAsset(`${id}_weapon_sound`, data.weaponSound);
+  setSizeForSlot(id, data.visualScale);
+  setSpriteSettingsForSlot(id, data.spriteSheet);
   return row;
 }
 document.getElementById('addClericUnitBtn').addEventListener('click', () => addClericUnitRow());
+
+const objectivesList = document.getElementById('objectivesList');
+const addObjectiveBtn = document.getElementById('addObjectiveBtn');
+function updateObjectiveControls() {
+  const rows = objectivesList.querySelectorAll('.objective-row');
+  rows.forEach((row, index) => {
+    row.querySelector('.objective-number').textContent = `Objective ${index + 1}`;
+    row.querySelector('.objective-remove').setAttribute('aria-label', `Remove objective ${index + 1}`);
+  });
+  const atLimit = rows.length >= 7;
+  addObjectiveBtn.disabled = atLimit;
+  document.getElementById('objectiveLimitNotice').hidden = !atLimit;
+}
+function addObjectiveRow(value = '') {
+  if (objectivesList.children.length >= 7) return;
+  const row = document.createElement('div');
+  row.className = 'objective-row';
+  const field = document.createElement('div');
+  field.className = 'field';
+  const label = document.createElement('label');
+  const number = document.createElement('span');
+  number.className = 'objective-number';
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'objective-text';
+  input.maxLength = 120;
+  input.placeholder = 'e.g. Capture the northern base';
+  input.value = value;
+  label.append(number, input);
+  field.appendChild(label);
+  const remove = document.createElement('button');
+  remove.type = 'button';
+  remove.className = 'btn-secondary objective-remove';
+  remove.textContent = 'Remove';
+  remove.addEventListener('click', () => { row.remove(); updateObjectiveControls(); });
+  row.append(field, remove);
+  objectivesList.appendChild(row);
+  updateObjectiveControls();
+  return input;
+}
+function renderObjectives(values) {
+  objectivesList.replaceChildren();
+  if (Array.isArray(values)) values.filter((value) => typeof value === 'string').slice(0, 7).forEach(addObjectiveRow);
+  updateObjectiveControls();
+}
+function collectObjectives() {
+  return Array.from(objectivesList.querySelectorAll('.objective-text'), (input) => input.value.trim()).filter(Boolean);
+}
+addObjectiveBtn.addEventListener('click', () => addObjectiveRow()?.focus());
 
 // ---------------------------------------------------------------------
 // Game style: Real-Time (default, unchanged) vs Turn-Based hot-seat.
@@ -2684,7 +3359,7 @@ function addExtraResourceRow(r) {
     <div class="upload-slot" data-slot="${r.id}">
       <div class="thumb">none</div>
       <div class="meta"><div class="name">No file chosen</div><div class="status">deposit art shown near each home base (optional)</div></div>
-      <input type="file" accept="image/*" style="width:auto">
+      <input type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" style="width:auto">
     </div>
     ${placementWidgetHTML(r.id, r.placement)}
   `;
@@ -2699,6 +3374,7 @@ function addExtraResourceRow(r) {
     if (idx !== -1) placementRefreshFns.splice(idx, 1);
     row.remove();
     refreshAllCostUI();
+    refreshAllPlacementPreviews();
   });
   wireUploadSlot(row.querySelector('.upload-slot'));
   row.querySelector('.upload-slot input[type=file]').addEventListener('change', refreshAllPlacementPreviews);
@@ -2755,7 +3431,9 @@ function obstaclePlacementWidgetHTML(obstacleId, placement) {
           <span class="placement-count"></span>
           <button type="button" class="btn-secondary placement-clear">Clear all</button>
         </div>
-        <p class="hint" style="margin:6px 0 0;">Click the map to place one of these obstacles there. Click a placed one to remove just that one. Upload map background art above (Map Basics) to see it here.</p>
+        <div class="placement-feature-legend">Markers show item initials (HF = Helicopter Facility). The small number badge and border color show its player. Yellow = resource; brown = obstacle.</div>
+        <ul class="placement-point-list"></ul>
+        <p class="hint" style="margin:6px 0 0;">Numbered markers show every player's Home Base; small reference markers show other placed map features. Click the map to place an obstacle; overlaps with bases, troops, and structures are blocked. Use Remove below to delete a point.</p>
       </div>
     </div>`;
 }
@@ -2773,7 +3451,7 @@ function addObstacleRow(o) {
     <div class="upload-slot" data-slot="${o.id}">
       <div class="thumb">none</div>
       <div class="meta"><div class="name">No file chosen</div><div class="status">optional - shows a generic mountain marker if left blank</div></div>
-      <input type="file" accept="image/*" style="width:auto">
+      <input type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" style="width:auto">
     </div>
     <p class="hint obstacle-art-warning" style="display:none; color:var(--warn);">⚠️ This row has points placed on the map below but no image uploaded - those points will show as a generic mountain marker in the game, not your own art. Upload or pick an image above, or remove the points if you didn't mean to place them.</p>
     ${obstaclePlacementWidgetHTML(o.id, o.placement)}
@@ -2784,6 +3462,7 @@ function addObstacleRow(o) {
     const idx = placementRefreshFns.indexOf(syncPlacement);
     if (idx !== -1) placementRefreshFns.splice(idx, 1);
     row.remove();
+    refreshAllPlacementPreviews();
   });
   wireUploadSlot(row.querySelector('.upload-slot'));
   row.querySelector('.upload-slot input[type=file]').addEventListener('change', refreshAllPlacementPreviews);
@@ -2851,7 +3530,7 @@ renderResourceGrants({});
 // because a new resource got added.
 function currentCostsFromRow(row) {
   const out = {};
-  row.querySelectorAll('.u-costs .cost-item').forEach((item) => {
+  row.querySelector('.u-costs').querySelectorAll('.cost-item').forEach((item) => {
     if (item.querySelector('.cost-check').checked) {
       out[item.dataset.resourceId] = Number(item.querySelector('.cost-amount').value) || 0;
     }
@@ -2880,22 +3559,31 @@ function refreshAllCostUI() {
 }
 
 // ---------------------------------------------------------------------
-// Computer players: 1-10 factions (AI by default; Turn-Based mode can
+// Computer players: 1-5 factions (AI by default; Turn-Based mode can
 // flag any of them "Human (hot-seat)" instead). At play time, the human
-// picks which of these join their team (e.g. 5v6 out of 10) - see
+// picks which of these join their team - see
 // play.html's team-select screen, whose TEAM_LETTERS is generated from
 // however many factions actually exist so this never needed a matching
 // bump there. Reuses the same upload-slot pattern as combat units above.
 // ---------------------------------------------------------------------
-const MAX_COMPUTER_PLAYERS = 10;
+const MAX_COMPUTER_PLAYERS = 5;
 const computerList = document.getElementById('computerPlayersList');
 const addComputerBtn = document.getElementById('addComputerBtn');
+const computerLimitNotice = document.getElementById('computerLimitNotice');
 let computerCounter = 0;
 const COMPUTER_COLORS = ['#ff5f6d', '#ff9d4f', '#c084fc', '#60a5fa', '#f472b6', '#facc15', '#34d399', '#38bdf8', '#fb923c', '#a3e635'];
 
-function addComputerRow(data = {}) {
+function updateComputerLimitUI() {
+  const count = computerList.querySelectorAll('.computer-row').length;
+  addComputerBtn.disabled = count >= MAX_COMPUTER_PLAYERS;
+  computerLimitNotice.hidden = count <= MAX_COMPUTER_PLAYERS;
+  if (count > MAX_COMPUTER_PLAYERS) {
+    computerLimitNotice.textContent = `This older map has ${count + 1} players. Remove ${count - MAX_COMPUTER_PLAYERS} computer player${count - MAX_COMPUTER_PLAYERS === 1 ? '' : 's'} before saving (6 players maximum).`;
+  }
+}
+function addComputerRow(data = {}, allowLegacy = false) {
   const rows = computerList.querySelectorAll('.computer-row');
-  if (rows.length >= MAX_COMPUTER_PLAYERS) return null;
+  if (rows.length >= MAX_COMPUTER_PLAYERS && !allowLegacy) return null;
   const id = 'computer_' + (computerCounter++);
   const idx = rows.length;
   const row = document.createElement('div');
@@ -2930,7 +3618,7 @@ function addComputerRow(data = {}) {
       <div class="upload-slot" data-slot="${id}">
         <div class="thumb">none</div>
         <div class="meta"><div class="name">No file chosen</div><div class="status">required to finish</div></div>
-        <input type="file" accept="image/*" style="width:auto">
+        <input type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg" style="width:auto">
       </div>
     </div>
   `;
@@ -2938,10 +3626,18 @@ function addComputerRow(data = {}) {
     delete existingAssetUrls[id];
     row.remove();
     renumberComputerRows();
-    addComputerBtn.disabled = false;
+    refreshAllUnitAvailability();
+    refreshAllPlacementPreviews();
+    updateComputerLimitUI();
   });
+  row.querySelector('.c-name').addEventListener('input', () => { refreshAllUnitAvailability(); refreshAllPlacementPreviews(); });
+  row.querySelector('.c-color').addEventListener('input', refreshAllPlacementPreviews);
+  row.querySelector('.upload-slot input[type=file]').addEventListener('change', refreshAllPlacementPreviews);
   wireUploadSlot(row.querySelector('.upload-slot'));
   computerList.appendChild(row);
+  setSizeForSlot(id, data.visualScale);
+  refreshAllUnitAvailability();
+  refreshAllPlacementPreviews();
   // Saved as .baseImage (see collectComputers/buildMapDoc, and the
   // player's own goodBaseImage - same field name there too), not
   // .imageUrl (that's what unit rows elsewhere in this file use). This
@@ -2951,7 +3647,7 @@ function addComputerRow(data = {}) {
   // page" while name/color/HP/difficulty (all read from their own
   // fields correctly above) stayed put.
   if (data.baseImage) showExistingAsset(id, data.baseImage);
-  if (computerList.querySelectorAll('.computer-row').length >= MAX_COMPUTER_PLAYERS) addComputerBtn.disabled = true;
+  updateComputerLimitUI();
   return row;
 }
 function renumberComputerRows() {
@@ -3076,6 +3772,7 @@ function collectComputers(uploadResults) {
       color: row.querySelector('.c-color').value,
       hp: clampHomeworldHp(row.querySelector('.c-hp').value),
       baseImage: uploadResults[id] || null,
+      visualScale: sizeForSlot(id),
       // Only meaningful in Turn-Based mode - see play.html's faction
       // setup. Stored regardless of current gameStyle so switching a
       // saved map from Real-Time to Turn-Based later doesn't lose it.
@@ -3088,21 +3785,26 @@ function collectComputers(uploadResults) {
 }
 
 function collectUnitRows(list, uploadResults) {
-  const rows = Array.from(list.querySelectorAll('.unit-row'));
+  const rows = Array.from(list.querySelectorAll(':scope > .unit-row'));
   return rows.map((row) => {
     const id = row.dataset.unitId;
     const prodEl = row.querySelector('.u-prodtime');
     const base = {
+      placementId: row.dataset.placementId,
       name: row.querySelector('.u-name').value.trim() || 'Unnamed Unit',
       imageUrl: uploadResults[id] || null,
+      visualScale: sizeForSlot(id),
+      spriteSheet: spriteSettingsForSlot(id),
       hp: Number(row.querySelector('.u-hp').value) || 0,
       attack: Number(row.querySelector('.u-attack').value) || 0,
       range: Number(row.querySelector('.u-range').value) || 0,
       speed: Number(row.querySelector('.u-speed').value) || 0,
       costs: currentCostsFromRow(row),
       weapon: row.querySelector('.u-weapon').value || 'laser',
+      weaponSound: uploadResults[`${id}_weapon_sound`] || null,
       rotateToFace: row.querySelector('.u-rotate').checked,
       autoAttack: row.querySelector('.u-auto-attack').checked,
+      allowedFactions: allowedFactionsFromRow(row),
     };
     // Only gated-building rows have the production-time field at all
     // (see makeUnitRow's `gated` flag) - clamp it the same way
@@ -3110,6 +3812,12 @@ function collectUnitRows(list, uploadResults) {
     // can't silently produce a unit that builds faster/slower than the
     // 10s-120min (7200s) the field promises.
     if (prodEl) base.prodTime = Math.max(10, Math.min(7200, Number(prodEl.value) || 30));
+    if (row.dataset.transportKind) {
+      base.transport = {
+        capacity: Math.max(1, Math.min(10, Math.round(Number(row.querySelector('.transport-capacity').value) || 1))),
+        vessel: collectUnitRows(row.querySelector('.transport-vessel-list'), uploadResults)[0],
+      };
+    }
     return base;
   });
 }
@@ -3127,14 +3835,18 @@ function collectTurrets(uploadResults) {
   return rows.map((row) => {
     const id = row.dataset.unitId;
     return {
+      placementId: row.dataset.placementId,
       name: row.querySelector('.u-name').value.trim() || 'Unnamed Turret',
       imageUrl: uploadResults[id] || null,
+      visualScale: sizeForSlot(id),
       hp: Number(row.querySelector('.u-hp').value) || 0,
       attack: Number(row.querySelector('.u-attack').value) || 0,
       range: Number(row.querySelector('.u-range').value) || 0,
       costs: currentCostsFromRow(row),
       weapon: row.querySelector('.u-weapon').value || 'laser',
+      weaponSound: uploadResults[`${id}_weapon_sound`] || null,
       autoAttack: row.querySelector('.u-auto-attack').checked,
+      allowedFactions: allowedFactionsFromRow(row),
     };
   });
 }
@@ -3147,15 +3859,20 @@ function collectMissileUnits(uploadResults) {
   return rows.map((row) => {
     const id = row.dataset.unitId;
     return {
+      placementId: row.dataset.placementId,
       name: row.querySelector('.u-name').value.trim() || 'Missile Launcher',
       imageUrl: uploadResults[id] || null,
+      visualScale: sizeForSlot(id),
       hp: Number(row.querySelector('.u-hp').value) || 0,
       attack: Number(row.querySelector('.u-attack').value) || 0,
       missileSpeed: Number(row.querySelector('.u-missile-speed').value) || 4,
       missileImageUrl: uploadResults[`${id}_missile`] || null,
+      missileVisualScale: sizeForSlot(`${id}_missile`),
       missileRotateToFace: row.querySelector('.u-missile-rotate').checked,
+      weaponSound: uploadResults[`${id}_weapon_sound`] || null,
       autoAttack: row.querySelector('.u-auto-attack').checked,
       costs: currentCostsFromRow(row),
+      allowedFactions: allowedFactionsFromRow(row),
     };
   });
 }
@@ -3171,8 +3888,11 @@ function collectMissileBatteryUnits(uploadResults) {
   return rows.map((row) => {
     const id = row.dataset.unitId;
     return {
+      placementId: row.dataset.placementId,
       name: row.querySelector('.u-name').value.trim() || 'Unnamed Unit',
       imageUrl: uploadResults[id] || null,
+      visualScale: sizeForSlot(id),
+      spriteSheet: spriteSettingsForSlot(id),
       hp: Number(row.querySelector('.u-hp').value) || 0,
       attack: Number(row.querySelector('.u-attack').value) || 0,
       range: Number(row.querySelector('.u-range').value) || 0,
@@ -3181,10 +3901,13 @@ function collectMissileBatteryUnits(uploadResults) {
       rotateToFace: row.querySelector('.u-rotate').checked,
       missileSpeed: Number(row.querySelector('.u-missile-speed').value) || 4,
       missileImageUrl: uploadResults[`${id}_missile`] || null,
+      missileVisualScale: sizeForSlot(`${id}_missile`),
       missileRotateToFace: row.querySelector('.u-missile-rotate').checked,
+      weaponSound: uploadResults[`${id}_weapon_sound`] || null,
       autoAttack: row.querySelector('.u-auto-attack').checked,
       costs: currentCostsFromRow(row),
       isMissileUnit: true,
+      allowedFactions: allowedFactionsFromRow(row),
     };
   });
 }
@@ -3201,8 +3924,11 @@ function collectFieldHospitalUnits(uploadResults) {
   return rows.map((row) => {
     const id = row.dataset.unitId;
     return {
+      placementId: row.dataset.placementId,
       name: row.querySelector('.u-name').value.trim() || 'Field Medic',
       imageUrl: uploadResults[id] || null,
+      visualScale: sizeForSlot(id),
+      spriteSheet: spriteSettingsForSlot(id),
       hp: Number(row.querySelector('.u-hp').value) || 0,
       range: Number(row.querySelector('.u-range').value) || 0,
       speed: Number(row.querySelector('.u-speed').value) || 0,
@@ -3213,6 +3939,8 @@ function collectFieldHospitalUnits(uploadResults) {
       weapon: 'laser',
       rotateToFace: row.querySelector('.u-rotate').checked,
       isMedic: true,
+      weaponSound: uploadResults[`${id}_weapon_sound`] || null,
+      allowedFactions: allowedFactionsFromRow(row),
     };
   });
 }
@@ -3226,8 +3954,11 @@ function collectClericUnits(uploadResults) {
   return rows.map((row) => {
     const id = row.dataset.unitId;
     return {
+      placementId: row.dataset.placementId,
       name: row.querySelector('.u-name').value.trim() || 'Cleric',
       imageUrl: uploadResults[id] || null,
+      visualScale: sizeForSlot(id),
+      spriteSheet: spriteSettingsForSlot(id),
       hp: Number(row.querySelector('.u-hp').value) || 0,
       range: Number(row.querySelector('.u-range').value) || 0,
       speed: Number(row.querySelector('.u-speed').value) || 0,
@@ -3237,30 +3968,473 @@ function collectClericUnits(uploadResults) {
       weapon: 'laser',
       rotateToFace: row.querySelector('.u-rotate').checked,
       isCleric: true,
+      weaponSound: uploadResults[`${id}_weapon_sound`] || null,
+      allowedFactions: allowedFactionsFromRow(row),
     };
   });
 }
 
+// Area defenders reuse the troop definitions above. Stable placementId values
+// keep map points attached to their troop even when other rows are removed.
+const defenderPlacements = [];
+let selectedDefenderPlayerKey = null;
+const defenderMap = document.getElementById('defenderPlacementMap');
+const defenderTypeSelect = document.getElementById('defenderUnitType');
+const defenderRangeInput = document.getElementById('defenderRange');
+const defenderWarning = document.getElementById('defenderWarning');
+const mapOnlyFactionList = document.getElementById('mapOnlyFactionList');
+function mapOnlyFactionRows() { return Array.from(mapOnlyFactionList.querySelectorAll('.map-only-faction')); }
+function addMapOnlyFaction(data = {}) {
+  const row = document.createElement('div');
+  row.className = 'map-only-faction';
+  row.dataset.factionKey = data.key || `map_only_${newDefenderPlacementId()}`;
+  row.style.cssText = 'border:1px solid var(--border);border-radius:8px;padding:14px;margin:12px 0;';
+  row.innerHTML = `<button type="button" class="btn-danger remove-map-only-faction" style="float:right">Remove faction</button>
+    <div class="row">
+      <div class="field"><label>Faction name</label><input class="map-only-name" type="text" value="${escapeAttr(data.name || '')}" placeholder="e.g. Forest Guardians"></div>
+      <div class="field narrow"><label>Faction color</label><input class="map-only-color" type="color" value="${/^#[0-9a-f]{6}$/i.test(data.color || '') ? data.color : '#b474d9'}"></div>
+    </div>
+    <p class="hint">Select this faction as the owner above to place existing troops or units created here. These units cannot be produced from a base. Their build cost and Auto Attack setting do not affect map-placed guards; guards defend their assigned area automatically.</p>
+    <div class="map-only-unit-list"></div>
+    <button type="button" class="btn-add add-map-only-unit">+ Create a unit for this faction</button>`;
+  mapOnlyFactionList.appendChild(row);
+  const addUnit = (unit = {}) => {
+    const unitRow = makeUnitRow(row.querySelector('.map-only-unit-list'), 'wildunit', mapOnlyUnitCounterState,
+      { ...unit, allowedFactions: [] }, false);
+    unitRow.querySelector('.unit-availability').hidden = true;
+    return unitRow;
+  };
+  (data.units || []).forEach(addUnit);
+  row.querySelector('.add-map-only-unit').addEventListener('click', () => { addUnit(); refreshAllPlacementPreviews(); });
+  row.querySelector('.remove-map-only-faction').addEventListener('click', () => {
+    defenderPlacements.splice(0, defenderPlacements.length,
+      ...defenderPlacements.filter((point) => point.playerKey !== row.dataset.factionKey));
+    if (selectedDefenderPlayerKey === row.dataset.factionKey) selectedDefenderPlayerKey = null;
+    row.remove(); refreshAllPlacementPreviews();
+  });
+  row.querySelectorAll('.map-only-name, .map-only-color').forEach((input) => input.addEventListener('input', refreshAllPlacementPreviews));
+  refreshAllPlacementPreviews();
+  return row;
+}
+document.getElementById('addMapOnlyFactionBtn').addEventListener('click', () => addMapOnlyFaction());
+function defenderOwnerChoices() {
+  return [
+    ...playerChoices().map((player, index) => ({ ...player, color: index === 0
+      ? document.getElementById('goodColor').value
+      : document.querySelectorAll('#computerPlayersList .computer-row')[index - 1]?.querySelector('.c-color')?.value || '#888' })),
+    ...mapOnlyFactionRows().map((row) => ({ key: row.dataset.factionKey,
+      name: row.querySelector('.map-only-name').value.trim() || 'Unnamed enemy faction',
+      color: row.querySelector('.map-only-color').value, mapOnly: true })),
+  ];
+}
+const DEFENDER_LISTS = [
+  [unitList, 'Combat Units'], [airUnitList, 'Air Base'], [warUnitList, 'War Factory'],
+  [infantryUnitList, 'Infantry Post'], [heliUnitList, 'Helicopter Facility'],
+  [navyUnitList, 'Navy Harbor'], [fieldHospitalUnitList, 'Field Hospital'],
+  [missileBatteryUnitList, 'Missile Battery'], [clericUnitList, 'Religious Institution'],
+];
+function defenderTroopChoices() {
+  const existing = DEFENDER_LISTS.flatMap(([list, group]) => Array.from(list.querySelectorAll('.unit-row')).map((row) => ({
+    id: row.dataset.placementId,
+    name: row.querySelector('.u-name')?.value.trim() || 'Unnamed troop',
+    group: row.closest('.transport-vessel-list') ? `${group} vessel` : group,
+  })));
+  const custom = mapOnlyFactionRows().flatMap((faction) => Array.from(faction.querySelectorAll('.map-only-unit-list > .unit-row')).map((row) => ({
+    id: row.dataset.placementId, name: row.querySelector('.u-name')?.value.trim() || 'Unnamed troop',
+    group: faction.querySelector('.map-only-name').value.trim() || 'Base-free faction',
+    ownerKey: faction.dataset.factionKey,
+  })));
+  return existing.concat(custom);
+}
+function defenderRange(value) { return Math.max(100, Math.min(1000, Math.round(Number(value) || 300))); }
+function defenderBlockedSite(x, y) {
+  const bases = placementHomeBases();
+  const worldSize = bases[0]?.worldSize || 5840;
+  for (const base of bases) {
+    const dx = (x - base.x) * worldSize, dy = (y - base.y) * worldSize;
+    if (Math.hypot(dx, dy) < 45 * base.visualScale + 30) return `Player ${base.index + 1}'s Home Base`;
+    for (const [slot, sx, sy, label] of RESOURCE_STRUCTURE_SITES) {
+      if (Math.hypot(dx - sx, dy - sy) < 28 * sizeForSlot(slot) + 30) return `Player ${base.index + 1}'s ${label} site`;
+    }
+  }
+  for (const row of document.querySelectorAll('#obstaclesList .obstacle-row')) {
+    const placement = readPlacement(row.querySelector('.placement-widget'));
+    if (placement.mode !== 'map') continue;
+    const radius = Math.max(10, Number(row.querySelector('.obstacle-size')?.value) / 2 || 60) + 25;
+    if (placement.points.some((p) => Math.hypot((x - p.x) * worldSize, (y - p.y) * worldSize) < radius)) return 'an obstacle';
+  }
+  if (mapStructures.some((point) => Math.hypot((x - point.x) * worldSize, (y - point.y) * worldSize) <
+      (34 + structurePlacementDiameter(point)) / 2 + 6)) return 'a placed structure';
+  if (defenderPlacements.some((point) => Math.hypot((x - point.x) * worldSize, (y - point.y) * worldSize) < 40)) {
+    return 'another placed troop';
+  }
+  for (const widget of document.querySelectorAll('#goldPlacementWidget, #extraResourcesList .resource-row .placement-widget')) {
+    const placement = readPlacement(widget);
+    if (placement.mode === 'map' && placement.points.some((point) =>
+        Math.hypot((x - point.x) * worldSize, (y - point.y) * worldSize) < 55)) return 'a mining deposit';
+  }
+  return null;
+}
+function renderDefenderEditor() {
+  const players = defenderOwnerChoices();
+  if (!players.some((p) => p.key === selectedDefenderPlayerKey)) selectedDefenderPlayerKey = null;
+  const allTroops = defenderTroopChoices();
+  const troops = allTroops.filter((troop) => !troop.ownerKey || troop.ownerKey === selectedDefenderPlayerKey);
+  const currentType = defenderTypeSelect.value;
+  defenderTypeSelect.replaceChildren();
+  for (const troop of troops) defenderTypeSelect.add(new Option(`${troop.group}: ${troop.name}`, troop.id));
+  if (troops.some((troop) => troop.id === currentType)) defenderTypeSelect.value = currentType;
+  const playerButtons = document.getElementById('defenderPlayers');
+  playerButtons.replaceChildren();
+  players.forEach((player, index) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'defender-player';
+    button.textContent = player.mapOnly ? `${player.name} (no base)` : `Player ${index + 1}: ${player.name}`;
+    button.setAttribute('aria-pressed', String(selectedDefenderPlayerKey === player.key));
+    button.addEventListener('click', () => {
+      selectedDefenderPlayerKey = selectedDefenderPlayerKey === player.key ? null : player.key;
+      renderDefenderEditor();
+    });
+    playerButtons.appendChild(button);
+  });
+  const url = currentBackgroundPreviewUrl();
+  defenderMap.style.backgroundImage = url ? `url(${url})` : mapGradientCss();
+  defenderMap.querySelectorAll('.defender-marker, .placement-home-base').forEach((el) => el.remove());
+  renderReferenceMarkers(null, defenderMap, ['defender']);
+  renderHomeBaseMarkers(defenderMap, document.getElementById('defenderBaseLegend'));
+  const list = document.getElementById('defenderList');
+  list.replaceChildren();
+  defenderPlacements.forEach((point, index) => {
+    const ownerIndex = players.findIndex((p) => p.key === point.playerKey);
+    const owner = players[ownerIndex];
+    const troop = allTroops.find((t) => t.id === point.placementId);
+    const color = owner?.color || '#888';
+    const marker = document.createElement('div');
+    marker.className = 'defender-marker';
+    marker.style.left = `${point.x * 100}%`;
+    marker.style.top = `${point.y * 100}%`;
+    marker.style.setProperty('--player-color', color);
+    setOwnedMarkerLabel(marker, troop?.name || 'Removed troop', ownerIndex);
+    marker.title = `${troop?.name || 'Removed troop'} — ${owner?.name || 'Removed player'} — ${point.range} patrol range. Use Remove below to delete.`;
+    defenderMap.appendChild(marker);
+    const item = document.createElement('li');
+    const label = document.createElement('span');
+    label.textContent = `${ownerIndex < 0 ? 'Removed faction' : owner.mapOnly ? `${owner.name} (no base)` : `Player ${ownerIndex + 1}: ${owner.name}`} · ${troop?.name || 'Removed troop'} · ${point.range} range`;
+    const remove = document.createElement('button');
+    remove.type = 'button'; remove.className = 'btn-secondary'; remove.textContent = 'Remove';
+    remove.addEventListener('click', () => { defenderPlacements.splice(index, 1); refreshAllPlacementPreviews(); });
+    item.append(label, remove);
+    list.appendChild(item);
+  });
+  document.getElementById('defenderCount').textContent = `${defenderPlacements.length} defender${defenderPlacements.length === 1 ? '' : 's'} placed`;
+  const invalid = defenderPlacements.some((p) => !allTroops.some((t) => t.id === p.placementId && (!t.ownerKey || t.ownerKey === p.playerKey)) || !players.some((player) => player.key === p.playerKey));
+  defenderWarning.hidden = !invalid;
+  if (invalid) defenderWarning.textContent = 'A placed defender refers to a removed troop or player. Remove it before saving.';
+}
+defenderMap.addEventListener('click', (event) => {
+  const rect = defenderMap.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
+  const troop = defenderTroopChoices().find((choice) => choice.id === defenderTypeSelect.value &&
+    (!choice.ownerKey || choice.ownerKey === selectedDefenderPlayerKey));
+  if (!troop || !selectedDefenderPlayerKey) {
+    defenderWarning.textContent = 'Choose a troop and click a player before placing it.';
+    defenderWarning.hidden = false;
+    return;
+  }
+  const x = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+  const y = Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height));
+  const blocked = defenderBlockedSite(x, y);
+  if (blocked) {
+    defenderWarning.textContent = `Too close to ${blocked}. Choose another spot.`;
+    defenderWarning.hidden = false;
+    return;
+  }
+  defenderPlacements.push({ placementId: troop.id, playerKey: selectedDefenderPlayerKey,
+    range: defenderRange(defenderRangeInput.value), x: Number(x.toFixed(4)), y: Number(y.toFixed(4)) });
+  refreshAllPlacementPreviews();
+});
+defenderRangeInput.addEventListener('change', () => { defenderRangeInput.value = defenderRange(defenderRangeInput.value); });
+document.getElementById('clearDefenders').addEventListener('click', () => { defenderPlacements.length = 0; refreshAllPlacementPreviews(); });
+document.addEventListener('input', (event) => {
+  if (event.target.matches('.u-name, .c-name, .resource-name, .obstacle-name, #goodName, #resourceName, .c-color, #goodColor, [id$="Name"]')) refreshAllPlacementPreviews();
+});
+document.addEventListener('click', (event) => {
+  if (event.target.matches('.btn-add, .remove-unit, #addComputerBtn')) queueMicrotask(refreshAllPlacementPreviews);
+});
+placementRefreshFns.push(renderDefenderEditor);
+window.addEventListener('resize', renderDefenderEditor);
+renderDefenderEditor();
+function collectDefenderPlacements() {
+  const players = defenderOwnerChoices();
+  const troops = defenderTroopChoices();
+  if (defenderPlacements.some((p) => !troops.some((t) => t.id === p.placementId && (!t.ownerKey || t.ownerKey === p.playerKey)) || !players.some((player) => player.key === p.playerKey))) {
+    throw new Error('Remove area defenders assigned to a removed troop or player.');
+  }
+  return defenderPlacements.map((p) => ({ placementId: p.placementId,
+    factionId: players.findIndex((player) => player.key === p.playerKey),
+    range: defenderRange(p.range), x: p.x, y: p.y }));
+}
+function collectMapOnlyFactions(uploadResults) {
+  return mapOnlyFactionRows().map((row) => {
+    const name = row.querySelector('.map-only-name').value.trim();
+    if (!name) throw new Error('Give every base-free enemy faction a name before saving.');
+    return { key: row.dataset.factionKey, name, color: row.querySelector('.map-only-color').value,
+      units: collectUnitRows(row.querySelector('.map-only-unit-list'), uploadResults)
+        .map((unit) => ({ ...unit, allowedFactions: [], mapOnlyOnly: true })) };
+  });
+}
+
+const mapStructures = [];
+let selectedStructurePlayerKey = null;
+const structureMap = document.getElementById('structurePlacementMap');
+const structureTypeSelect = document.getElementById('structureType');
+const structureWarning = document.getElementById('structureWarning');
+const STRUCTURE_PLACEMENT_KEYS = [
+  'airBase', 'warFactory', 'infantryPost', 'helicopterFacility', 'navyHarbor',
+  'fieldHospital', 'researchFacility', 'missileSilo', 'missileBattery', 'religiousInstitution',
+];
+function placedBuildingSlot(key) {
+  return `${key === 'helicopterFacility' ? 'heliFacility' : key}Image`;
+}
+function hasPlacedBuildingArt(key) {
+  const slotKey = placedBuildingSlot(key);
+  const file = document.querySelector(`.upload-slot[data-slot="${slotKey}"] input[type=file]`)?.files[0];
+  return !!(existingAssetUrls[slotKey] || file);
+}
+function placementMissingArt(point) {
+  return point.kind === 'building' && STRUCTURE_PLACEMENT_KEYS.includes(point.buildingKey) && !hasPlacedBuildingArt(point.buildingKey);
+}
+function structurePlacementName(point, choice) {
+  if (choice) return choice.name;
+  if (!placementMissingArt(point)) return 'Removed structure';
+  const nameKey = point.buildingKey === 'helicopterFacility' ? 'heliFacility' : point.buildingKey;
+  return `${document.getElementById(`${nameKey}Name`)?.value.trim() || point.buildingKey} (no art)`;
+}
+STRUCTURE_PLACEMENT_KEYS.forEach((key) => {
+  document.querySelector(`.upload-slot[data-slot="${placedBuildingSlot(key)}"] input[type=file]`)
+    ?.addEventListener('change', refreshAllPlacementPreviews);
+});
+function structurePlacementChoices() {
+  return [
+    ...STRUCTURE_PLACEMENT_KEYS.filter(hasPlacedBuildingArt).map((key) => ({ kind: 'building', key, id: `building:${key}`,
+      name: document.getElementById(`${key === 'helicopterFacility' ? 'heliFacility' : key}Name`)?.value.trim() || key })),
+    ...Array.from(turretList.querySelectorAll('.unit-row')).map((row) => ({ kind: 'turret',
+      placementId: row.dataset.placementId, id: `turret:${row.dataset.placementId}`,
+      name: row.querySelector('.u-name')?.value.trim() || 'Unnamed gun turret' })),
+    ...Array.from(missileUnitList.querySelectorAll('.unit-row')).map((row) => ({ kind: 'launcher',
+      placementId: row.dataset.placementId, id: `launcher:${row.dataset.placementId}`,
+      name: row.querySelector('.u-name')?.value.trim() || 'Unnamed missile launcher' })),
+  ];
+}
+function structurePlacementChoice(point, choices = structurePlacementChoices()) {
+  return choices.find((choice) => choice.kind === point.kind &&
+    (choice.kind === 'building' ? choice.key === point.buildingKey : choice.placementId === point.placementId));
+}
+function structurePlacementDiameter(point) {
+  if (point.kind === 'building') {
+    const slot = `${point.buildingKey === 'helicopterFacility' ? 'heliFacility' : point.buildingKey}Image`;
+    return 56 * sizeForSlot(slot);
+  }
+  const list = point.kind === 'turret' ? turretList : missileUnitList;
+  const row = Array.from(list.querySelectorAll('.unit-row')).find((candidate) => candidate.dataset.placementId === point.placementId);
+  return 34 * (row ? sizeForSlot(row.dataset.unitId) : 1);
+}
+function placementWeaponRange(point) {
+  if (point.kind === 'building') return 0;
+  const topic = point.kind === 'launcher' ? 'missileRange' : 'vision';
+  const bonus = Math.max(0, ...Array.from(document.querySelectorAll(`.research-pct[data-topic="${topic}"]`))
+    .map((input) => Number(input.value) || 0));
+  if (point.kind === 'launcher') return 500 * (1 + bonus / 100);
+  const row = Array.from(turretList.querySelectorAll('.unit-row')).find((candidate) => candidate.dataset.placementId === point.placementId);
+  return (Number(row?.querySelector('.u-range')?.value) || 0) * (1 + bonus / 100);
+}
+placedFeatureReferenceProvider = () => {
+  const players = playerChoices();
+  const defenderOwners = defenderOwnerChoices();
+  const troops = defenderTroopChoices();
+  const choices = structurePlacementChoices();
+  const colorFor = (index) => index === 0 ? document.getElementById('goodColor').value
+    : document.querySelectorAll('#computerPlayersList .computer-row')[index - 1]?.querySelector('.c-color')?.value || '#888';
+  return [
+    ...defenderPlacements.map((point) => {
+      const ownerIndex = defenderOwners.findIndex((player) => player.key === point.playerKey);
+      const owner = defenderOwners[ownerIndex];
+      const troop = troops.find((item) => item.id === point.placementId);
+      return { kind: 'defender', name: troop?.name || 'Removed troop', x: point.x, y: point.y, ownerIndex,
+        color: owner?.color || '#888', diameter: 34, weaponRange: 0,
+        label: `${owner ? (owner.mapOnly ? `${owner.name} (no base)` : `Player ${ownerIndex + 1}: ${owner.name}`) : 'Removed faction'}: ${troop?.name || 'Removed troop'} · patrol ${point.range} world units` };
+    }),
+    ...mapStructures.map((point) => {
+      const ownerIndex = players.findIndex((player) => player.key === point.playerKey);
+      const choice = structurePlacementChoice(point, choices);
+      const name = structurePlacementName(point, choice);
+      return { kind: point.kind, name, x: point.x, y: point.y, ownerIndex,
+        color: colorFor(ownerIndex), diameter: structurePlacementDiameter(point),
+        weaponRange: placementWeaponRange(point),
+        label: `Player ${ownerIndex < 0 ? '?' : ownerIndex + 1}: ${name}` };
+    }),
+  ];
+};
+function structurePlacementConflict(point, others = mapStructures) {
+  const players = playerChoices();
+  const ownerIndex = players.findIndex((player) => player.key === point.playerKey);
+  const worldSize = placementHomeBases()[0]?.worldSize || 5840;
+  if (ownerIndex < 0) return 'Choose an existing player';
+  const weaponRange = placementWeaponRange(point);
+  for (const base of placementHomeBases()) {
+    const distance = Math.hypot((point.x - base.x) * worldSize, (point.y - base.y) * worldSize);
+    if (base.index !== ownerIndex && distance < 500) return `Player ${base.index + 1}'s Home Base (500 minimum)`;
+    if (base.index === ownerIndex && distance < 80 * base.visualScale) return 'your Home Base';
+  }
+  for (const other of others) {
+    if (other === point) continue;
+    const distance = Math.hypot((point.x - other.x) * worldSize, (point.y - other.y) * worldSize);
+    if (other.playerKey !== point.playerKey && distance < 500) return 'an enemy structure, silo, turret, or launcher (500 minimum)';
+    if (distance < (structurePlacementDiameter(point) + structurePlacementDiameter(other)) / 2 + 8) return 'another placed structure';
+  }
+  for (const defender of defenderPlacements) {
+    if (Math.hypot((point.x - defender.x) * worldSize, (point.y - defender.y) * worldSize) <
+        (structurePlacementDiameter(point) + 34) / 2 + 6) return 'a placed troop';
+  }
+  for (const row of document.querySelectorAll('#obstaclesList .obstacle-row')) {
+    const placement = readPlacement(row.querySelector('.placement-widget'));
+    if (placement.mode !== 'map') continue;
+    const radius = Math.max(10, Number(row.querySelector('.obstacle-size')?.value) / 2 || 60) + 35;
+    if (placement.points.some((p) => Math.hypot((point.x - p.x) * worldSize, (point.y - p.y) * worldSize) < radius)) return 'an obstacle';
+  }
+  for (const widget of document.querySelectorAll('#goldPlacementWidget, #extraResourcesList .resource-row .placement-widget')) {
+    const placement = readPlacement(widget);
+    if (placement.mode !== 'map') continue;
+    const minimum = point.kind === 'building' ? 90 : weaponRange + 180;
+    if (placement.points.some((p) => Math.hypot((point.x - p.x) * worldSize, (point.y - p.y) * worldSize) < minimum)) {
+      return point.kind === 'building' ? 'a mining deposit' : 'a mining deposit (weapon range + 180 minimum)';
+    }
+  }
+  return null;
+}
+function renderStructureEditor() {
+  const choices = structurePlacementChoices();
+  const current = structureTypeSelect.value;
+  structureTypeSelect.replaceChildren();
+  choices.forEach((choice) => structureTypeSelect.add(new Option(`${choice.kind === 'building' ? 'Building' : choice.kind === 'turret' ? 'Gun turret' : 'Missile launcher'}: ${choice.name}`, choice.id)));
+  if (choices.some((choice) => choice.id === current)) structureTypeSelect.value = current;
+  const players = playerChoices();
+  if (!players.some((player) => player.key === selectedStructurePlayerKey)) selectedStructurePlayerKey = null;
+  const playerButtons = document.getElementById('structurePlayers');
+  playerButtons.replaceChildren();
+  players.forEach((player, index) => {
+    const button = document.createElement('button');
+    button.type = 'button'; button.className = 'defender-player';
+    button.textContent = `Player ${index + 1}: ${player.name}`;
+    button.setAttribute('aria-pressed', String(selectedStructurePlayerKey === player.key));
+    button.addEventListener('click', () => {
+      selectedStructurePlayerKey = selectedStructurePlayerKey === player.key ? null : player.key;
+      renderStructureEditor();
+    });
+    playerButtons.appendChild(button);
+  });
+  const url = currentBackgroundPreviewUrl();
+  structureMap.style.backgroundImage = url ? `url(${url})` : mapGradientCss();
+  structureMap.querySelectorAll('.structure-marker, .placement-home-base').forEach((el) => el.remove());
+  renderReferenceMarkers(null, structureMap, ['building', 'turret', 'launcher']);
+  renderHomeBaseMarkers(structureMap, document.getElementById('structureBaseLegend'));
+  const list = document.getElementById('structureList');
+  list.replaceChildren();
+  mapStructures.forEach((point, index) => {
+    const ownerIndex = players.findIndex((player) => player.key === point.playerKey);
+    const choice = structurePlacementChoice(point, choices);
+    const name = structurePlacementName(point, choice);
+    const color = ownerIndex === 0 ? document.getElementById('goodColor').value
+      : document.querySelectorAll('#computerPlayersList .computer-row')[ownerIndex - 1]?.querySelector('.c-color')?.value || '#888';
+    const marker = document.createElement('div');
+    marker.className = `defender-marker structure-marker kind-${point.kind}`;
+    marker.style.left = `${point.x * 100}%`; marker.style.top = `${point.y * 100}%`;
+    marker.style.setProperty('--player-color', color);
+    setOwnedMarkerLabel(marker, name, ownerIndex);
+    marker.title = `${name} - Player ${ownerIndex + 1}. Use Remove below to delete.`;
+    structureMap.appendChild(marker);
+    const item = document.createElement('li');
+    const label = document.createElement('span');
+    label.textContent = `${ownerIndex < 0 ? 'Removed player' : `Player ${ownerIndex + 1}: ${players[ownerIndex].name}`} · ${name}`;
+    const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'btn-secondary'; remove.textContent = 'Remove';
+    remove.addEventListener('click', () => { mapStructures.splice(index, 1); refreshAllPlacementPreviews(); });
+    item.append(label, remove); list.appendChild(item);
+  });
+  document.getElementById('structureCount').textContent = `${mapStructures.length} structure${mapStructures.length === 1 ? '' : 's'} placed`;
+  const missingArt = mapStructures.find(placementMissingArt);
+  const removeMissingArtBtn = document.getElementById('removeUnconfiguredStructures');
+  removeMissingArtBtn.hidden = !missingArt;
+  if (missingArt) removeMissingArtBtn.textContent = `Remove ${mapStructures.filter(placementMissingArt).length} placement(s) without art`;
+  const invalid = mapStructures.find((point) => !structurePlacementChoice(point, choices) || structurePlacementConflict(point));
+  structureWarning.hidden = !invalid;
+  if (missingArt) structureWarning.textContent = 'A placed building has no art. Choose art for it or remove its placements before saving.';
+  else if (invalid) structureWarning.textContent = 'A placed structure has a removed type/player or violates placement spacing. Remove or correct it before saving.';
+}
+structureMap.addEventListener('click', (event) => {
+  const rect = structureMap.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
+  const choice = structurePlacementChoices().find((item) => item.id === structureTypeSelect.value);
+  if (!choice || !selectedStructurePlayerKey) {
+    structureWarning.textContent = 'Choose a structure and click a player before placing it.';
+    structureWarning.hidden = false; return;
+  }
+  const point = { kind: choice.kind, buildingKey: choice.key || null, placementId: choice.placementId || null,
+    playerKey: selectedStructurePlayerKey,
+    x: Number(Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width)).toFixed(4)),
+    y: Number(Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height)).toFixed(4)) };
+  const conflict = structurePlacementConflict(point);
+  if (conflict) { structureWarning.textContent = `Too close to ${conflict}. Choose another spot.`; structureWarning.hidden = false; return; }
+  mapStructures.push(point);
+  refreshAllPlacementPreviews();
+});
+document.getElementById('clearStructures').addEventListener('click', () => { mapStructures.length = 0; refreshAllPlacementPreviews(); });
+document.getElementById('removeUnconfiguredStructures').addEventListener('click', () => {
+  mapStructures.splice(0, mapStructures.length, ...mapStructures.filter((point) => !placementMissingArt(point)));
+  refreshAllPlacementPreviews();
+});
+placementRefreshFns.push(renderStructureEditor);
+window.addEventListener('resize', renderStructureEditor);
+refreshAllPlacementPreviews();
+function collectMapStructures() {
+  const players = playerChoices();
+  const choices = structurePlacementChoices();
+  for (const point of mapStructures) {
+    if (placementMissingArt(point)) throw new Error('A placed building has no art. Choose its art or use Remove placements without art.');
+    if (!structurePlacementChoice(point, choices) || structurePlacementConflict(point)) {
+      throw new Error('Remove or correct structures assigned to removed types/players or placed too close to enemies.');
+    }
+  }
+  return mapStructures.map((point) => ({ kind: point.kind, buildingKey: point.buildingKey,
+    placementId: point.placementId, factionId: players.findIndex((player) => player.key === point.playerKey),
+    x: point.x, y: point.y }));
+}
+
 async function buildMapDoc(status) {
-  const unitSlots = Array.from(unitList.querySelectorAll('.unit-row')).map((row) => row.dataset.unitId);
-  const airUnitSlots = Array.from(airUnitList.querySelectorAll('.unit-row')).map((row) => row.dataset.unitId);
-  const warUnitSlots = Array.from(warUnitList.querySelectorAll('.unit-row')).map((row) => row.dataset.unitId);
-  const infantryUnitSlots = Array.from(infantryUnitList.querySelectorAll('.unit-row')).map((row) => row.dataset.unitId);
-  const heliUnitSlots = Array.from(heliUnitList.querySelectorAll('.unit-row')).map((row) => row.dataset.unitId);
-  const navyUnitSlots = Array.from(navyUnitList.querySelectorAll('.unit-row')).map((row) => row.dataset.unitId);
-  const fieldHospitalUnitSlots = Array.from(fieldHospitalUnitList.querySelectorAll('.unit-row')).map((row) => row.dataset.unitId);
-  const turretSlots = Array.from(turretList.querySelectorAll('.unit-row')).map((row) => row.dataset.unitId);
+  const areaDefenders = collectDefenderPlacements();
+  const placedStructures = collectMapStructures();
+  const withWeaponSound = (rows) => rows.flatMap((row) => [row.dataset.unitId, `${row.dataset.unitId}_weapon_sound`]);
+  const unitSlots = withWeaponSound(Array.from(unitList.querySelectorAll('.unit-row')));
+  const airUnitSlots = withWeaponSound(Array.from(airUnitList.querySelectorAll('.unit-row')));
+  const warUnitSlots = withWeaponSound(Array.from(warUnitList.querySelectorAll('.unit-row')));
+  const infantryUnitSlots = withWeaponSound(Array.from(infantryUnitList.querySelectorAll('.unit-row')));
+  const heliUnitSlots = withWeaponSound(Array.from(heliUnitList.querySelectorAll('.unit-row')));
+  const navyUnitSlots = withWeaponSound(Array.from(navyUnitList.querySelectorAll('.unit-row')));
+  const fieldHospitalUnitSlots = withWeaponSound(Array.from(fieldHospitalUnitList.querySelectorAll('.unit-row')));
+  const turretSlots = withWeaponSound(Array.from(turretList.querySelectorAll('.unit-row')));
   // Two upload-slot ids per row (launcher + missile art) - see
   // addMissileUnitRow/collectMissileUnits.
-  const missileUnitSlots = Array.from(missileUnitList.querySelectorAll('.unit-row')).flatMap((row) => [row.dataset.unitId, `${row.dataset.unitId}_missile`]);
+  const missileUnitSlots = Array.from(missileUnitList.querySelectorAll('.unit-row')).flatMap((row) => [row.dataset.unitId, `${row.dataset.unitId}_weapon_sound`, `${row.dataset.unitId}_missile`]);
   // Same two-slots-per-row shape as missileUnitSlots above - see
   // addMissileBatteryUnitRow/collectMissileBatteryUnits.
-  const missileBatteryUnitSlots = Array.from(missileBatteryUnitList.querySelectorAll('.unit-row')).flatMap((row) => [row.dataset.unitId, `${row.dataset.unitId}_missile`]);
-  const clericUnitSlots = Array.from(clericUnitList.querySelectorAll('.unit-row')).map((row) => row.dataset.unitId);
+  const missileBatteryUnitSlots = Array.from(missileBatteryUnitList.querySelectorAll('.unit-row')).flatMap((row) => [row.dataset.unitId, `${row.dataset.unitId}_weapon_sound`, `${row.dataset.unitId}_missile`]);
+  const clericUnitSlots = withWeaponSound(Array.from(clericUnitList.querySelectorAll('.unit-row')));
+  const mapOnlyUnitSlots = withWeaponSound(mapOnlyFactionRows().flatMap((row) =>
+    Array.from(row.querySelectorAll('.map-only-unit-list > .unit-row'))));
   const computerSlots = Array.from(computerList.querySelectorAll('.computer-row')).map((row) => row.dataset.computerId);
   const resourceSlots = Array.from(document.querySelectorAll('#extraResourcesList .resource-row')).map((row) => row.dataset.resourceId);
   const obstacleSlots = Array.from(document.querySelectorAll('#obstaclesList .obstacle-row')).map((row) => row.dataset.obstacleId);
-  const uploadResults = await uploadSlotsWithLimit([...FIXED_UPLOAD_SLOTS, ...unitSlots, ...airUnitSlots, ...warUnitSlots, ...infantryUnitSlots, ...heliUnitSlots, ...navyUnitSlots, ...fieldHospitalUnitSlots, ...turretSlots, ...missileUnitSlots, ...missileBatteryUnitSlots, ...clericUnitSlots, ...computerSlots, ...resourceSlots, ...obstacleSlots]);
+  const uploadResults = await uploadSlotsWithLimit([...FIXED_UPLOAD_SLOTS, ...unitSlots, ...airUnitSlots, ...warUnitSlots, ...infantryUnitSlots, ...heliUnitSlots, ...navyUnitSlots, ...fieldHospitalUnitSlots, ...turretSlots, ...missileUnitSlots, ...missileBatteryUnitSlots, ...clericUnitSlots, ...mapOnlyUnitSlots, ...computerSlots, ...resourceSlots, ...obstacleSlots]);
   const units = collectUnits(uploadResults);
   const airUnits = collectAirUnits(uploadResults);
   const warUnits = collectWarUnits(uploadResults);
@@ -3272,11 +4446,13 @@ async function buildMapDoc(status) {
   const missileUnits = collectMissileUnits(uploadResults);
   const missileBatteryUnits = collectMissileBatteryUnits(uploadResults);
   const clericUnits = collectClericUnits(uploadResults);
+  const mapOnlyFactions = collectMapOnlyFactions(uploadResults);
   const computers = collectComputers(uploadResults);
   return {
     ownerId: currentUser.uid,
     status, // 'draft' | 'complete'
     name: document.getElementById('mapName').value.trim() || 'Untitled Map',
+    objectives: collectObjectives(),
     baseLabel: document.getElementById('baseLabel').value.trim() || 'Home Base',
     mapSize: document.getElementById('mapSize').value || 'medium',
     gameStyle: document.getElementById('gameStyle').value || 'realtime',
@@ -3285,6 +4461,7 @@ async function buildMapDoc(status) {
     // can flip on/off once playing (see play.html's fogOn, now seeded
     // from this instead of a topbar button).
     fogOfWar: document.getElementById('fogOfWarEnabled').checked,
+    mapMotion: document.getElementById('mapMotion').value,
     // Defaults true (checked) so a map saved before this checkbox
     // existed keeps the exact bobbing behavior play.html already always
     // had unconditionally - see that page's own drawUnit().
@@ -3302,16 +4479,21 @@ async function buildMapDoc(status) {
     // Terrain Obstacles (3c) - impassable scenery, not a resource. See
     // collectObstacles/play.html's own obstacles/steerAroundObstacles.
     obstacles: collectObstacles(uploadResults),
+    areaDefenders,
+    mapOnlyFactions,
+    placedStructures,
     // Research Tree (item 3b) - percentage per level, per topic. See
     // play.html's TECH_TREE/researchPercent() for how a level's percent
     // actually gets applied once a faction researches it.
     research: collectResearch(),
     backgroundImage: uploadResults.backgroundImage,
+    mapGradient: mapGradientColors(),
     player: {
       name: document.getElementById('goodName').value.trim() || 'Allied Forces',
       color: document.getElementById('goodColor').value,
       hp: clampHomeworldHp(document.getElementById('goodHp').value),
       baseImage: uploadResults.goodBaseImage,
+      visualScale: sizeForSlot('goodBaseImage'),
     },
     computers,
     resource: {
@@ -3331,6 +4513,9 @@ async function buildMapDoc(status) {
       ratePerHour: Number(document.getElementById('miningRate').value) || 600,
       hp: Math.max(1, Number(document.getElementById('miningUnitHp').value) || 40),
       image: uploadResults.miningUnitImage,
+      visualScale: sizeForSlot('miningUnitImage'),
+      spriteSheet: spriteSettingsForSlot('miningUnitImage'),
+      rotateToFace: document.getElementById('miningUnitRotate').checked,
     },
     units,
     // Both optional - see their section hints. play.html only shows a
@@ -3342,6 +4527,8 @@ async function buildMapDoc(status) {
       hp: clampHomeworldHp(document.getElementById('airBaseHp').value),
       cost: Number(document.getElementById('airBaseCost').value) || 150,
       image: uploadResults.airBaseImage,
+      visualScale: sizeForSlot('airBaseImage'),
+      allowedFactions: structureAllowedFactions('airBase'),
     },
     airUnits,
     warFactory: {
@@ -3349,6 +4536,8 @@ async function buildMapDoc(status) {
       hp: clampHomeworldHp(document.getElementById('warFactoryHp').value),
       cost: Number(document.getElementById('warFactoryCost').value) || 150,
       image: uploadResults.warFactoryImage,
+      visualScale: sizeForSlot('warFactoryImage'),
+      allowedFactions: structureAllowedFactions('warFactory'),
     },
     warUnits,
     infantryPost: {
@@ -3356,6 +4545,8 @@ async function buildMapDoc(status) {
       hp: clampHomeworldHp(document.getElementById('infantryPostHp').value),
       cost: Number(document.getElementById('infantryPostCost').value) || 150,
       image: uploadResults.infantryPostImage,
+      visualScale: sizeForSlot('infantryPostImage'),
+      allowedFactions: structureAllowedFactions('infantryPost'),
     },
     infantryUnits,
     heliFacility: {
@@ -3363,6 +4554,8 @@ async function buildMapDoc(status) {
       hp: clampHomeworldHp(document.getElementById('heliFacilityHp').value),
       cost: Number(document.getElementById('heliFacilityCost').value) || 150,
       image: uploadResults.heliFacilityImage,
+      visualScale: sizeForSlot('heliFacilityImage'),
+      allowedFactions: structureAllowedFactions('heliFacility'),
     },
     heliUnits,
     navyHarbor: {
@@ -3370,6 +4563,8 @@ async function buildMapDoc(status) {
       hp: clampHomeworldHp(document.getElementById('navyHarborHp').value),
       cost: Number(document.getElementById('navyHarborCost').value) || 150,
       image: uploadResults.navyHarborImage,
+      visualScale: sizeForSlot('navyHarborImage'),
+      allowedFactions: structureAllowedFactions('navyHarbor'),
     },
     navyUnits,
     fieldHospital: {
@@ -3377,6 +4572,8 @@ async function buildMapDoc(status) {
       hp: clampHomeworldHp(document.getElementById('fieldHospitalHp').value),
       cost: Number(document.getElementById('fieldHospitalCost').value) || 150,
       image: uploadResults.fieldHospitalImage,
+      visualScale: sizeForSlot('fieldHospitalImage'),
+      allowedFactions: structureAllowedFactions('fieldHospital'),
     },
     fieldHospitalUnits,
     // NOT optional - see its section hint. Research is a built-in
@@ -3390,6 +4587,7 @@ async function buildMapDoc(status) {
       hp: clampHomeworldHp(document.getElementById('researchFacilityHp').value),
       cost: Number(document.getElementById('researchFacilityCost').value) || 150,
       image: uploadResults.researchFacilityImage,
+      visualScale: sizeForSlot('researchFacilityImage'),
     },
     // Optional, and structured differently from the buildings above -
     // no gating building of its own, no production timer, just a flat
@@ -3405,6 +4603,8 @@ async function buildMapDoc(status) {
       hp: clampHomeworldHp(document.getElementById('missileSiloHp').value),
       cost: Number(document.getElementById('missileSiloCost').value) || 150,
       image: uploadResults.missileSiloImage,
+      visualScale: sizeForSlot('missileSiloImage'),
+      allowedFactions: structureAllowedFactions('missileSilo'),
     },
     missileUnits,
     // Optional, gated like Air Base/War Factory/etc (its own building has
@@ -3416,6 +4616,8 @@ async function buildMapDoc(status) {
       hp: clampHomeworldHp(document.getElementById('missileBatteryHp').value),
       cost: Number(document.getElementById('missileBatteryCost').value) || 150,
       image: uploadResults.missileBatteryImage,
+      visualScale: sizeForSlot('missileBatteryImage'),
+      allowedFactions: structureAllowedFactions('missileBattery'),
     },
     missileBatteryUnits,
     // Optional, gated like Air Base/War Factory/etc (its own building has
@@ -3428,6 +4630,8 @@ async function buildMapDoc(status) {
       hp: clampHomeworldHp(document.getElementById('religiousInstitutionHp').value),
       cost: Number(document.getElementById('religiousInstitutionCost').value) || 150,
       image: uploadResults.religiousInstitutionImage,
+      visualScale: sizeForSlot('religiousInstitutionImage'),
+      allowedFactions: structureAllowedFactions('religiousInstitution'),
       // Whether a Cleric can convert a stationary structure - a Gun
       // Turret, a Missile Silo launcher, or any gated building (Air
       // Base/Research Facility/etc, but never a faction's actual Home
@@ -3456,7 +4660,8 @@ function checklistGaps(mapDoc) {
   const gaps = [];
   if (!mapDoc.name || mapDoc.name === 'Untitled Map') gaps.push('map name');
   if (!mapDoc.player.baseImage) gaps.push('your faction’s home base art');
-  if (mapDoc.computers.length === 0) gaps.push('at least one computer player');
+  const hasBaseFreeEnemy = mapDoc.areaDefenders.some((point) => point.factionId >= 1 + mapDoc.computers.length);
+  if (mapDoc.computers.length === 0 && !hasBaseFreeEnemy) gaps.push('at least one computer player or placed base-free enemy');
   mapDoc.computers.forEach((c, i) => { if (!c.baseImage) gaps.push(`computer player #${i + 1} (${c.name}) home base art`); });
   if (!mapDoc.resource.image) gaps.push('resource deposit art');
   if (!mapDoc.miningUnit.image) gaps.push('mining unit art');
@@ -3470,6 +4675,11 @@ function checklistGaps(mapDoc) {
     gaps.push('at least one unit (Air Base / War Factory / Infantry Post / Helicopter Facility / Navy Harbor / Missile Battery - Combat Units is no longer used)');
   }
   mapDoc.units.forEach((u, i) => { if (!u.imageUrl) gaps.push(`unit #${i + 1} (${u.name}) art`); });
+  mapDoc.mapOnlyFactions.forEach((faction) => {
+    faction.units.forEach((unit, index) => {
+      if (!unit.imageUrl) gaps.push(`${faction.name} unit #${index + 1} (${unit.name}) art`);
+    });
+  });
   // Same pattern for each gated building below: its own art (and each of its
   // units' art) is only required if that building's unit list actually
   // has something in it - an empty list means the whole feature is
@@ -3485,9 +4695,16 @@ function checklistGaps(mapDoc) {
     const building = mapDoc[buildingKey];
     if (!building.image) gaps.push(`${building.name} art`);
     units.forEach((u, i) => { if (!u.imageUrl) gaps.push(`${building.name} unit #${i + 1} (${u.name}) art`); });
+    units.forEach((u) => { if (u.transport && !u.transport.vessel?.imageUrl) gaps.push(`${u.name} carried vessel art`); });
   });
   // Research Facility is never optional - see buildMapDoc's comment.
   if (!mapDoc.researchFacility.image) gaps.push(`${mapDoc.researchFacility.name} art`);
+  const placedBuildingKeys = new Set(mapDoc.placedStructures
+    .filter((point) => point.kind === 'building').map((point) => point.buildingKey));
+  placedBuildingKeys.forEach((key) => {
+    const mapKey = key === 'helicopterFacility' ? 'heliFacility' : key;
+    if (!mapDoc[mapKey]?.image) gaps.push(`${mapDoc[mapKey]?.name || key} art for placed structure`);
+  });
   // Gun Turrets: optional, but each turret type still needs its own art
   // once it exists, same reasoning as the gated-building units above.
   mapDoc.gunTurrets.forEach((t, i) => { if (!t.imageUrl) gaps.push(`turret #${i + 1} (${t.name}) art`); });
@@ -3522,6 +4739,10 @@ const saveFinalBtn = document.getElementById('saveFinalBtn');
 
 async function saveMap(status) {
   if (!currentUser) { setSaveStatus('Still connecting to Firebase — try again in a second.', 'warn'); return; }
+  if (computerList.querySelectorAll('.computer-row').length > MAX_COMPUTER_PLAYERS) {
+    setSaveStatus('This map exceeds 6 players. Remove extra computer players before saving.', 'warn');
+    return;
+  }
   // Without this guard, clicking Save again while an earlier save is still
   // uploading starts a second, fully independent upload pass over every
   // still-populated slot - silently re-uploading files that were already
@@ -3533,7 +4754,7 @@ async function saveMap(status) {
   saveInProgress = true;
   saveDraftBtn.disabled = true;
   saveFinalBtn.disabled = true;
-  setSaveStatus('Uploading files (5 at a time) and saving… this can take a while, please keep this tab open.');
+  setSaveStatus(`Uploading files (${MAX_CONCURRENT_UPLOADS} at a time) and saving… this can take a while, please keep this tab open.`);
   try {
     const mapDoc = await buildMapDoc(status);
     if (status === 'complete') {
@@ -3638,9 +4859,15 @@ async function inlineUrlsAsDataUris(value, onProgress) {
   collectUrls(value);
   const urls = [...cache.keys()];
   let done = 0;
+  let failed = 0;
   await Promise.all(urls.map(async (url) => {
     try {
-      const blob = await fetch(url).then((r) => r.blob());
+      // A thumbnail may have cached a response without CORS headers. Fetch
+      // a fresh readable response before promising an offline download.
+      const response = await fetch(url, { cache: 'reload' });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const blob = await response.blob();
+      if (!blob.size) throw new Error('The downloaded asset is empty.');
       const dataUri = await new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result);
@@ -3649,12 +4876,13 @@ async function inlineUrlsAsDataUris(value, onProgress) {
       });
       cache.set(url, dataUri);
     } catch (err) {
-      console.error('Could not inline for offline play (kept as a live URL, so it still needs internet to load):', url, err);
-      cache.set(url, url);
+      console.error('Could not embed an asset for offline play:', err);
+      failed++;
     }
     done++;
     if (onProgress) onProgress(done, urls.length);
   }));
+  if (failed) throw new Error(`${failed} game asset(s) could not be downloaded. No download credit was used. Check your connection and try again; if this continues, the asset server must allow downloads from this builder address.`);
   function replace(v) {
     if (typeof v === 'string') return cache.has(v) ? cache.get(v) : v;
     if (Array.isArray(v)) return v.map(replace);
@@ -3681,7 +4909,9 @@ async function downloadStandaloneGame(mapId, btn) {
     const snap = await getDoc(doc(db, 'maps', mapId));
     if (!snap.exists()) throw new Error('This map no longer exists.');
     const mapCfg = snap.data();
-    const html = await fetch('play.html').then((r) => r.text());
+    const gameResponse = await fetch('play.html', { cache: 'reload' });
+    if (!gameResponse.ok) throw new Error('Could not load the game template. Please try again.');
+    const html = await gameResponse.text();
     const offlineCfg = await inlineUrlsAsDataUris(mapCfg, (done, total) => {
       btn.textContent = total ? `⬇ Preparing… ${done}/${total}` : '⬇ Preparing…';
     });
@@ -3711,11 +4941,16 @@ async function loadExistingMap() {
   if (!snap.exists()) return;
   const m = snap.data();
   document.getElementById('mapName').value = m.name || '';
+  renderObjectives(m.objectives);
   document.getElementById('baseLabel').value = m.baseLabel || 'Home Base';
   document.getElementById('mapSize').value = m.mapSize || 'medium';
+  document.getElementById('mapGradientStart').value = /^#[0-9a-f]{6}$/i.test(m.mapGradient?.start || '') ? m.mapGradient.start : MAP_GRADIENT_DEFAULTS.start;
+  document.getElementById('mapGradientEnd').value = /^#[0-9a-f]{6}$/i.test(m.mapGradient?.end || '') ? m.mapGradient.end : MAP_GRADIENT_DEFAULTS.end;
+  refreshMapGradientPreview();
   document.getElementById('gameStyle').value = m.gameStyle || 'realtime';
   document.getElementById('turnTimerSeconds').value = m.turnTimerSeconds || 30;
   document.getElementById('fogOfWarEnabled').checked = !!m.fogOfWar;
+  document.getElementById('mapMotion').value = ['ocean', 'rain', 'snow'].includes(m.mapMotion) ? m.mapMotion : 'none';
   // A map saved before this checkbox existed has no m.unitBobbing field
   // at all - defaults to checked (true) either way, matching the
   // unconditional bobbing play.html already had before this setting
@@ -3734,7 +4969,7 @@ async function loadExistingMap() {
     const match = /^resource_(\d+)$/.exec(r.id);
     return match ? Math.max(max, Number(match[1]) + 1) : max;
   }, 0);
-  document.getElementById('extraResourcesList').innerHTML = '';
+  clearPlacementRows('extraResourcesList');
   if (Array.isArray(m.resources)) m.resources.forEach((r) => addExtraResourceRow(r));
   // Terrain Obstacles (3c) - same restore shape as Additional Resources
   // just above (id-counter picks up past the highest existing obstacle_N
@@ -3744,7 +4979,7 @@ async function loadExistingMap() {
     const match = /^obstacle_(\d+)$/.exec(o.id);
     return match ? Math.max(max, Number(match[1]) + 1) : max;
   }, 0);
-  document.getElementById('obstaclesList').innerHTML = '';
+  clearPlacementRows('obstaclesList');
   if (Array.isArray(m.obstacles)) m.obstacles.forEach((o) => addObstacleRow(o));
   // m.resourceGrants is the current shape; m.goldPerRound is a fallback
   // for a map saved before this was generalized to multiple resources
@@ -3762,13 +4997,18 @@ async function loadExistingMap() {
     document.getElementById('goodColor').value = m.player.color || '#4fdc8f';
     document.getElementById('goodHp').value = m.player.hp || 2000;
     if (m.player.baseImage) showExistingAsset('goodBaseImage', m.player.baseImage);
+    setSizeForSlot('goodBaseImage', m.player.visualScale);
   }
-  if (Array.isArray(m.computers) && m.computers.length) {
+  if (Array.isArray(m.computers)) {
     computerList.innerHTML = '';
     addComputerBtn.disabled = false;
-    m.computers.forEach((c) => addComputerRow(c));
+    m.computers.forEach((c) => addComputerRow(c, true));
   }
   updateGameStyleUI();
+  restoreStructureAvailability(m);
+  for (const key of [...Object.keys(STRUCTURE_SECTIONS), 'researchFacility']) {
+    setSizeForSlot(`${key}Image`, m[key]?.visualScale);
+  }
 
   if (m.resource) {
     document.getElementById('resourceName').value = m.resource.name || 'Gold Mine';
@@ -3785,11 +5025,14 @@ async function loadExistingMap() {
   // at the moment its row was added above, which was before backgroundImage
   // was restored just above.
   refreshAllPlacementPreviews();
+  document.getElementById('miningUnitRotate').checked = m.miningUnit?.rotateToFace !== false;
   if (m.miningUnit) {
     document.getElementById('miningUnitName').value = m.miningUnit.name || 'Mining Ship';
     document.getElementById('miningRate').value = m.miningUnit.ratePerHour || 600;
     document.getElementById('miningUnitHp').value = m.miningUnit.hp || 40;
     if (m.miningUnit.image) showExistingAsset('miningUnitImage', m.miningUnit.image);
+    setSizeForSlot('miningUnitImage', m.miningUnit.visualScale);
+    setSpriteSettingsForSlot('miningUnitImage', m.miningUnit.spriteSheet);
   }
 
   if (Array.isArray(m.units) && m.units.length) {
@@ -3912,7 +5155,37 @@ async function loadExistingMap() {
     if (m.sounds.endgame) showExistingAsset('soundEndgame', m.sounds.endgame);
   }
 
-  setSaveStatus('Loaded "' + (m.name || 'Untitled Map') + '" (' + m.status + ').', m.status === 'complete' ? 'ok' : 'warn');
+  mapOnlyFactionList.replaceChildren();
+  if (Array.isArray(m.mapOnlyFactions)) m.mapOnlyFactions.forEach(addMapOnlyFaction);
+  defenderPlacements.length = 0;
+  if (Array.isArray(m.areaDefenders)) {
+    const players = defenderOwnerChoices();
+    for (const point of m.areaDefenders) {
+      if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) continue;
+      defenderPlacements.push({ placementId: point.placementId,
+        playerKey: players[point.factionId]?.key || null,
+        range: defenderRange(point.range), x: Math.min(1, Math.max(0, point.x)),
+        y: Math.min(1, Math.max(0, point.y)) });
+    }
+  }
+  renderDefenderEditor();
+
+  mapStructures.length = 0;
+  if (Array.isArray(m.placedStructures)) {
+    const players = playerChoices();
+    for (const point of m.placedStructures) {
+      if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) continue;
+      mapStructures.push({ kind: point.kind, buildingKey: point.buildingKey || null,
+        placementId: point.placementId || null, playerKey: players[point.factionId]?.key || null,
+        x: Math.min(1, Math.max(0, point.x)), y: Math.min(1, Math.max(0, point.y)) });
+    }
+  }
+  refreshAllPlacementPreviews();
+
+  const tooManyPlayers = computerList.querySelectorAll('.computer-row').length > MAX_COMPUTER_PLAYERS;
+  setSaveStatus('Loaded "' + (m.name || 'Untitled Map') + '" (' + m.status + ').' +
+    (tooManyPlayers ? ' Remove extra computer players before saving this older map (6 players maximum).' : ''),
+    tooManyPlayers ? 'warn' : (m.status === 'complete' ? 'ok' : 'warn'));
 }
 
 onAuthStateChanged(auth, (user) => {

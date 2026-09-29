@@ -46,8 +46,13 @@ line. Only this page has the logo/title/footer treatment so far -
    background art holds up better on bigger maps. Character/unit/building
    art isn't affected by map size at all, since those always render at a
    fixed pixel size regardless of world scale.
+   The optional map image can be replaced by a two-color gradient. The
+   builder saves both colors, previews them on resource/obstacle placement
+   maps, and fills the selected map's full world bounds in the downloaded
+   game. Uploaded art takes priority; "Remove map image and use gradient"
+   clears a previously selected image. Older maps use the default colors.
 2. **Your faction & computer players** — you're always the human player;
-   add 1-10 computer-controlled opponents, each with its own name, color,
+   add 1-5 computer-controlled opponents (6 players total), each with its own name, color,
    home base art, **Home Base HP** (1000-5000, per faction - not one
    fixed value shared by every home base on the map), and **AI
    Difficulty** (Easy/Medium/Hard/Super Hard, per computer player - see
@@ -61,9 +66,12 @@ line. Only this page has the logo/title/footer treatment so far -
    takes an affordable
    building/turret/extra-miner opportunity instead of skipping it
    (`buildingChance`/`turretChance`/`minerChance`). Ignored for a
-   Turn-Based hot-seat "Human"-controlled computer player.
+   Turn-Based hot-seat "Human"-controlled computer player. Older maps with
+   more than five opponents still load with every row intact and remain
+   playable; the builder warns and requires removing extras before saving
+   either a draft or a finished map.
 2a. **Game style** — ⏱️ Real-Time (default, unchanged) or 🔄 Turn-Based
-   (hot-seat: 2-11 people share this device, a timer of 10-60s per turn).
+   (hot-seat: 2-6 people share this device on a new map, with a timer of 10-60s per turn).
    Turn-Based adds a **turn timer** field and, per computer player, a
    "Controlled by: 🤖 AI / 🧑 Human (hot-seat)" toggle - a human-flagged
    one takes a real turn instead of thinking on its own. Real-Time mode
@@ -85,9 +93,25 @@ line. Only this page has the logo/title/footer treatment so far -
    unit's real x/y, its facing rotation, and everything else about
    movement are unaffected either way. Defaults checked so a map saved
    before this existed keeps the exact bobbing it already always had.
+2d. **Per-item art size**: every Home Base, mining vessel, combat unit,
+   medic, Cleric, turret, silo launcher, building, and missile projectile
+   has its own 1x-10x selector beside its art upload. The selection saves
+   with that item and scales its existing draw size in the downloaded
+   game; older maps default to 1x. Unit and base click targets follow
+   the displayed size, while HP, attack range, speed, and collision rules
+   stay unchanged. Placement previews also grow Home Base markers and
+   block resources and obstacles near their larger artwork.
+2e. **Character art**: upload a PNG or JPEG, or select an admin-provided animated GIF from the Standard/Premium Library.
+   Sprite-sheet import and adjustment controls have been removed. Image
+   dimensions cannot establish frame boundaries, character selection, actions,
+   or direction order reliably. Existing sheet entries are excluded from both
+   builder libraries; admins can still view and delete them. Saved maps keep
+   their existing animation metadata and playback. Replacing their art clears
+   that metadata. A sheet uploaded as ordinary art displays as one whole image.
 3. **Resource & mining** — the deposit every home base gets nearby (name,
    size, art - a real "mine" image, separate from the vessel that works
-   it) and the mining unit that drains it (name, income/hour, art).
+   it) and the mining unit that drains it (name, income/hour, art, and a
+   "Rotate to face movement direction" checkbox that defaults on).
    Below that, **Additional resources** (optional) — a **+ Add resource**
    button adds another named resource beyond Gold (e.g. Oil, Wood), each
    with its own **deposit amount** and its own **deposit art** (shown
@@ -213,6 +237,25 @@ line. Only this page has the logo/title/footer treatment so far -
    long wall across the middle of a real map made computer-controlled
    troops look stuck compared to the player's own, before pathfinding
    was extended to cover AI movement too.
+   Resource and obstacle placement maps also show every player's numbered
+   Home Base at its real game position, with faction names and colors in a
+   legend. A click too close to a Home Base is rejected so a new resource
+   or obstacle cannot cover it. Existing points that overlap a Home Base
+   are flagged for removal. The markers update when players or map size
+   change.
+   Every unit row below, including medics, Clerics, Gun Turrets, and Missile
+   Silo launchers, has a player checklist. A checked player can produce that
+   unit; an unchecked player cannot. The Mining Ship is available to all.
+   Choices follow player order in the saved map, update when players are
+   added or removed, and default to all players for older maps.
+   Nine optional buildable structures also have player checklists, with all
+   players checked by default. Unchecking a structure removes it and
+   its units from that player's build options, even if individual unit
+   checkboxes remain checked. Gun Turrets and Missile Silo launchers have
+   their own type checklists. Clerics cannot convert a unit or structure
+   to a player who is excluded from owning that type. Every player must
+   have a Home Base and build the Research Facility; neither can be
+   unchecked in the builder.
 4. **Air Base** (optional) — a building for planes/jets/spaceships/etc.
    Give it a name (defaults to "Air Base"), its own **art**, **HP**
    (1000-5000, same range/field as Home Base's), and a build cost, then
@@ -457,6 +500,17 @@ line. Only this page has the logo/title/footer treatment so far -
    art/sound URL it references, fetch `play.html`'s own source, inject
    the result via `window.GM_INLINE_CONFIG`) someone else can play with
    zero further Firebase cost, however many times, however many people.
+   Admin-library animated GIF map and sprite art is kept as GIF when saved and
+   inlined unchanged in the download. The game decodes frames for canvas
+   playback using the bundled gifuct-js decoder, including offline downloads.
+   GIF animation does not require the browser's ImageDecoder API. Frames are
+   prepared once during loading with transparency, disposal and timing preserved.
+   Gameplay shares cached frames across units, with character frames capped at
+   512 pixels on their longest side (backgrounds: 2048), 32 MiB of cached pixels
+   per GIF and 128 MiB across GIFs. Frame size is reduced further when needed
+   to fit the cache. The old 240-frame cutoff has been removed. Images above 16 megapixels report a
+   loading error instead of silently becoming still. A GIF repeats its own
+   artwork; it does not generate direction or attack animations.
    This was `play.html`'s own in-game "⬇ Download as index.html" button
    originally - removed from there (it served no purpose once nothing
    in this app links to a live, playable `play.html` at all any more, so
@@ -772,7 +826,7 @@ entirely by one map's saved data:
     clears every unit's lock the same way, Gun Turrets included, since
     they share this exact mechanism now too (see the Gun Turrets bullet
     further down).
-  - **Turn-Based (hot-seat)** - 2-11 people share this device. Only the
+  - **Turn-Based (hot-seat)** - 2-6 people share this device on a new map. Only the
     active faction's units can act at all (move/attack/build/research
     via the panel) - everyone else, AI factions included, is completely
     frozen until their own turn comes back around. A per-faction timer
@@ -807,10 +861,10 @@ entirely by one map's saved data:
     happens.
 - **Team select** - shown before every match, for every player. You're
   always Team A; every other faction gets a real team-letter picker (one
-  letter per faction that exists, up to 11 with 10 computer players -
-  Team A through Team K), not a fixed two-side A/B toggle. Two factions
+  letter per faction that exists, up to 6 with 5 computer players -
+  Team A through Team F), not a fixed two-side A/B toggle. Two factions
   sharing a letter fight together; any other letter is its own
-  independent side - so 10 computer players can genuinely be Teams A-J,
+  independent side - so 5 computer players can genuinely be Teams A-F,
   a real free-for-all, not always forced into exactly two sides (which
   used to mean a multi-faction Turn-Based match could only ever be
   lopsided team-vs-team, never a true free-for-all). Real-Time defaults
@@ -906,8 +960,8 @@ entirely by one map's saved data:
   manual rerouting). Selecting one and giving a move/attack order works
   exactly like any other unit from here.
 - **Resource placement** (index.html's Resource & Mining section, item
-  3a): every resource defaults to a deposit/marker next to each faction's
-  own home base, same as always. A resource placed "on the map" instead
+  3a): every resource defaults to a deposit/marker on a clear site outside
+  each faction's Home Base and planned structures. A resource placed "on the map" instead
   can have **any number of locations** for the whole match, each stored
   as a fraction of the map's background art and converted here into a
   real world position once this match's actual home-base layout (and so
@@ -919,10 +973,19 @@ entirely by one map's saved data:
   actually flows for a miner parked within range of *any* placed deposit,
   not just the one it was first sent to (the income loop checks
   `deposits.some(...)` instead of a single entry once Gold is placed this
-  way). An Additional Resource placed with several points just draws one
-  shared marker per point instead of one per faction - it was never
-  anything but a visual marker either way, so more points there are
-  purely decorative.
+  way). An Additional Resource placed with several points creates one
+  shared mineable marker per point; a Mining Ship within 80 units of any
+  such marker earns that resource.
+  Map placement now blocks points that overlap a Home Base or planned
+  structure. Older saved points that overlap a base, structure site or
+  terrain are shifted to a nearby clear site when a match starts. Human
+  and AI Gun Turrets and Missile Silo launchers cannot be placed close
+  enough to fire on hostile or shared mining zones: the required gap is
+  weapon range + the 80-unit mining radius + 100 units. A faction's own
+  turrets can defend its deposits but cannot overlap them. This protects mining
+  sites from newly placed stationary defenses; mobile combat units and
+  stationary defenses already present in an older saved match can still
+  threaten a miner. Run `npm run test:resources` for placement checks.
 - Every attack draws a **weapon effect** picked per unit (a **Weapon**
   dropdown on each unit/turret row in `index.html`, 26 options - defaults
   to Laser, so any map saved before this field existed keeps its
@@ -980,16 +1043,15 @@ entirely by one map's saved data:
   as an automatic burst).
 - Units rotate to face their actual direction of travel - per-unit now,
   via a "Rotate to face movement direction" checkbox on every combat
-  unit row in `index.html` (on by default, so existing maps look
+  unit row and the Mining Ship in `index.html` (on by default, so existing maps look
   unchanged). Turning it off for a given unit skips the rotation at
   draw time only - it still tracks a real facing angle underneath, the
   sprite just never turns to match - for art drawn facing one fixed way
   (infantry/army-men sprites) that otherwise looks like it's flying
   sideways instead of walking once rotated toward diagonal movement.
-  Only combat units (the legacy list and all four gated-building unit
-  lists) got this checkbox - turrets (which rotate to face whatever
-  they're aiming at, not movement, since they never move) and the
-  Mining Ship weren't part of what was reported and still always rotate.
+  Combat units (the legacy list and all four gated-building unit lists)
+  and the Mining Ship have this checkbox. Turrets do not move and keep
+  their existing aiming behavior.
   A faction's home base art itself slowly spins in place, but only when
   the map's
   `baseLabel` field (checklist item 1's "Home Base is called a...")
@@ -999,12 +1061,32 @@ entirely by one map's saved data:
   cursor) over a world sized by the map's chosen size, and a minimap that
   both jumps the camera there on click AND, if units are selected, issues
   them a move order to that point. Also: sound on/off, pause (freezes the
-  whole simulation), Save/Load to a JSON file. **Fog of war** (minimap-only
-  reveal radius around a faction's own units and Home Base) is set once
+  whole simulation), Save/Load to a JSON file. **Fog of war** is set once
   on the map itself now (`index.html`'s Fog of War checkbox, Map Basics -
   off by default) instead of a topbar button a player could flip on/off
   mid-match - it's a fixed property of the map, the same as Game Style or
-  Map Size, not something to toggle while playing. The camera can't pan past
+  Map Size, not something to toggle while playing. When enabled, the main map
+  and minimap begin unexplored. Each living unit and friendly Home Base
+  reveals terrain within 100 world units; allied players share sight. Terrain
+  already explored stays dimly visible, while enemy units, structures, and
+  bases appear only in current sight. Each player keeps separate exploration
+  in turn-based games, and Save/Load preserves it. `npm run test:fog` checks
+  world, minimap, enemy interaction, team separation, and save/load behavior.
+  Map Basics also has a Map motion setting: Still background (default), Ocean
+  Waves, Rain, or Snow. The selected effect animates the
+  scenery behind gameplay objects on uploaded images or gradient maps; unit,
+  structure, resource, and collision positions do not move. Existing maps
+  without this setting remain still. `npm run test:map-motion` verifies the
+  animation choices and builder save/load.
+  At the bottom of the Area Defenders and Structures section, map makers can
+  add named, base-free enemy factions. Each has a color and may place existing
+  troop types or custom units with the normal HP, attack, weapon range, speed,
+  art, weapon effect, and attack sound controls. Their guards use the same
+  100–1000 defense radius, pursue intruders, and return to their posts. These
+  factions have no base, resource production, or player turn, but surviving
+  guards count as enemies for victory. One can be the map's only opponent.
+  `npm run test:base-free` covers builder save/load and live combat.
+  The camera can't pan past
   the world's own edges any more - it used to be unclamped everywhere
   (right-drag, the minimap-click jump, scroll-zoom's cursor-pivot), so
   drifting past where the background image actually covers (see below)
@@ -2169,6 +2251,58 @@ overflow anywhere on the page.
 
 ## Hosting
 
+Sprite-sheet upload has been removed from Standard and Premium library
+administration and the builder's adjustment controls have been removed.
+Automatic character creation from an arbitrary sheet is not supported.
+Use single-character PNG/JPEG uploads or admin-library animated GIFs. Previously imported sheet items
+remain visible to administrators for cleanup but cannot be selected in either
+builder library. Existing saved maps retain their animation settings.
+
+Every weapon-capable unit row also has an optional **Weapon fire sound** slot
+with both local upload and Standard/Premium Library buttons. Medics and
+Clerics receive an **Ability sound** slot. The selected URL is saved with the
+unit definition and embedded into standalone exports. The game plays custom
+weapon/ability sounds for the local player's units only; opponent units still
+fire visually but do not fill the local player's audio with their sounds.
+
+## Local working copy and next workload
+
+The authoritative working folder is:
+
+`C:\Users\adona\Downloads\Codex\Game Maker`
+
+Make and verify edits in this folder. Do not edit or push the GitHub
+repository unless the owner explicitly asks for that. The local test server
+is normally available at `http://localhost:8765/`; use `index.html` for the
+builder, `admin.html` for the Standard/Premium libraries, and `play.html` for
+the game. `V-2-9-26` is a local code-only backup, refreshed when the owner
+requests it. Firebase Google sign-in requires the exact local OAuth origin
+`http://localhost:8765` in Google Cloud's Authorized JavaScript origins.
+
+Completed in the current work session:
+
+- Removed unreliable sprite-sheet import and manual sprite adjustments;
+  excluded legacy sheet items from both builder libraries while preserving
+  existing saved-map animation metadata and playback.
+- Per-unit weapon or ability sound slots with local upload and library
+  selection. Sounds are saved, embedded in standalone exports, and custom
+  effects play for Player 1's units only.
+- Weapon/ability library category: `sounds/weapons`.
+
+Workload for the next session:
+
+1. Test the weapon-sound controls in the local browser with a
+   real infantry unit, turret, missile unit, medic, and cleric.
+2. Confirm that saved maps restore every sound slot and that standalone
+   exports play embedded sounds offline.
+3. Test opponent silence in both Real-Time and Turn-Based games, including
+   turrets and missile impacts.
+4. Verify legacy saved-map animations when reopening and exporting older maps.
+5. Review Firebase Storage/Firestore rules and indexes for the new
+   `availableCategories` library query and the additional audio uploads.
+6. Check mobile layout for the extra sound controls and library tabs.
+7. Review the remaining local diff, then push only if explicitly requested.
+
 Static site on GitHub Pages (source = `main`, path `/`). No build step.
 
 ## License
@@ -2180,3 +2314,296 @@ map/game created with it (including a downloaded standalone HTML file),
 both require the LICENSE file's terms - in short, personal/educational/
 evaluation use only unless Titan Business Pros LLC grants a commercial
 license in writing.
+
+## GIF playback maintenance
+
+Storage CORS in `cors.json` permits the live site and the local builder at
+`http://localhost:8765` and `http://127.0.0.1:8765`. This configuration is also
+applied to the Firebase Storage bucket. Exports must embed every asset before
+using a download credit: HTTP errors, CORS failures and empty responses stop
+the export. The game imports Firebase only when loading an online map, so a
+standalone map with embedded assets starts without network access.
+Run `npm run test:export` to check cross-origin embedding and failure handling.
+
+`src/gif-player.js` contains GIF frame composition. Run `npm install` and
+`npm run build:gif` after editing it. The generated decoder is embedded in
+`play.html` so standalone exports do not need an external script or CDN.
+Run `npm run test:gif` for browser pixel tests (install Playwright Chromium
+with `npx playwright install chromium`, or set `GIF_TEST_BROWSER` to a local
+Chrome/Edge executable). Decoder licenses are in `third-party/`.
+Use `node tests/gif-performance.cjs "path/to/downloaded-game.html"` to measure
+the full game with one and 100 instances of that map's actual GIF character.
+This reports game-loop work, animation lookup time, and browser frame intervals.
+Run `npm run test:browsers -- "path/to/downloaded-game.html"` for Chrome,
+Edge, Playwright Firefox and WebKit, plus Chromium/WebKit phone emulation.
+Install the additional engines using `npx playwright install firefox webkit`.
+Results and exact browser versions are saved in `tests/browser-results.json`.
+Phone emulation tests layout and touch settings on the host computer; it does
+not measure physical phone performance or replace testing Apple Safari itself.
+
+## Movement and rendering regression checks
+
+Use `npm run test:movement`, `npm run test:render`, and
+`npm run test:structures` after changing troop movement or map rendering.
+The gradient background is cached at viewport size and refreshed on camera,
+zoom, or canvas-size changes. Do not repaint the full world gradient every
+frame: profiling Middle East Showdown showed browser compositing taking
+roughly 28 ms per frame even though the JavaScript render call was fast.
+Interface text and button states also skip unchanged DOM writes.
+
+`node tests/movement-performance.cjs "path/to/downloaded-game.html"` profiles
+the current engine using the downloaded map's embedded artwork with 1 and
+100 moving troops. Add `--trace` for browser rendering timings. On the tested
+Chromium desktop run, the gradient/interface fix reduced frame intervals
+from about 35–42 ms to 16.7 ms, with animated troop art enabled.
+These measurements are specific to the test machine, not a device-wide FPS
+guarantee. Local testing must use `http://localhost:8765/` for Google sign-in.
+
+### Investigation: troops briefly pausing during movement (2026-09-26)
+
+The owner reports that brief movement stalls began after motherships and
+carriers were added; roughly ten edits earlier, troops moved smoothly. The
+combat route-search cause has a **local fix awaiting owner testing**. The local
+checkout has only one commit, and the older
+`play-test.html` copy already contains transports, so it cannot establish the
+exact edit sequence or isolate a pre-transport version. The saved Middle East
+Showdown export used below defines one Mothership with capacity 10, no Carrier,
+and no terrain obstacles. The profiler does not record whether a transport
+was active on the frame that stalled. Do not treat the transport link as proven.
+
+Read-only investigation used Chrome 153 via `GIF_TEST_BROWSER` because the
+Playwright-managed Chromium binary is absent. `npm run test:movement` passed
+its direct movement/waypoint checks. Using
+`node tests/movement-performance.cjs .local-previews/Middle-East-Showdown-fixed.html`,
+the 1- and 100-troop travel runs had no frame gaps over 50 ms (maximum gaps
+25.9 ms and 33.3 ms). Adding `--battle` produced one 133.3 ms frame gap in
+about 20 seconds with 32 units; maximum measured simulation work was 47 ms,
+pathfinding 13.5 ms, and rendering 21.4 ms. These are separate maxima, not
+proof that all occurred on the same frame. The animation loop runs update and
+render on the browser's main thread and caps `dt` at 50 ms, so a long blocked
+frame visibly stops all units and does not fully recover the lost travel time.
+
+Previous fixes addressed real but narrower problems: waypoint overshoot and
+unused travel budget; repeated obstacle scans and garbage collection;
+expensive path-graph construction; and world-gradient/interface rendering.
+The direct movement test calls movement helpers outside a full battle. The
+earlier 16.7 ms profile covered simple travel, so neither check established
+that live battle movement stayed smooth. Instrumenting individual frames then
+identified 24 combat route searches on the worst frame: 44.8 ms of its
+57.2 ms update was pathfinding, with zero active transports. This confirms
+that synchronous combat route bursts were one cause independent of whether a
+Mothership or Carrier was present.
+
+Investigate these five candidates in this order, recording per-frame timing
+and whether transports are present before assigning a root cause:
+
+1. Battle simulation spikes, especially AI and other synchronous work in
+   `updateSimulation` (measured update maximum: 47 ms).
+2. Combat route calculations and route invalidation or replanning
+   (`findPathAround` maximum: 13.5 ms).
+3. AI Mothership/Carrier unloading: `releaseVessels` can search many positions
+   and be retried on each frame near an enemy; this is not yet measured.
+4. Transport production bursts and extra cargo units: spawning a transport
+   can create up to ten embarked vessels, adding work and list entries; the
+   impact is not yet measured.
+5. Rendering spikes from artwork and interface drawing (measured render
+   maximum: 21.4 ms); determine whether they coincide with movement pauses.
+
+The 50 ms `dt` cap amplifies a stalled frame's visible effect, but it does not
+cause the main-thread block. Preserve the distinction between a unit's own
+route stopping and every unit freezing because a browser frame was delayed.
+The concise handoff is in [`MEMORY.md`](MEMORY.md).
+
+### Local combat route fix (2026-09-26)
+
+Combat route planning in `play.html` now uses a Web Worker built from the
+existing pathfinder, keeping expensive graph searches off the animation
+thread. While a route is pending, that troop continues moving with local
+obstacle avoidance; the returned route is accepted only if its target and
+obstacles are still current and its remaining legs are clear. Browsers without
+blob-worker support retain a one-search-per-update fallback, where nearby
+troops can share a verified route. Manual move orders still use the existing
+synchronous pathfinder. No remote repository was changed.
+
+On the same 32-unit battle profile, main-thread `findPathAround` time fell to
+0 ms throughout the run and the maximum update fell to 17.7 ms. One 66.7 ms
+frame gap remained immediately after the scenario was initialized; the
+preceding frame had no route search. This is not evidence that every possible
+movement stall is fixed. `npm run test:movement` now also checks that a combat
+route is calculated in the worker and followed around a solid base;
+`npm run test:structures` passes. Run a real match with active Motherships and
+Carriers to check the owner's original report and continue measuring the
+remaining non-route candidates above if pauses persist.
+
+For local sign-in, resource-placement and movement testing, open
+`http://localhost:8765/index.html`. This is the Game Maker login and editor;
+`/admin.html` is only the shared-library manager. Its "Back to Game Maker"
+link returns to the login/editor page. On 2026-09-26 the local server returned
+HTTP 200 for both `/index.html` and `/play.html` and served the current
+resource-placement and 100-unit defense-buffer code. The Firebase Authentication configuration already
+includes `localhost` in its authorized domains, but that does **not** verify
+the separate Google OAuth web client's Authorized JavaScript origins.
+
+The OAuth client used by `index.html` and `admin.html` has ID
+`865333148999-8af54j492sano5befnjl5e3n1evkrmhq.apps.googleusercontent.com`.
+In [Google Auth Platform > Clients](https://console.cloud.google.com/auth/clients?project=game-maker-ed014),
+open that Web application client and verify/add `http://localhost:8765` under
+**Authorized JavaScript origins**, then save. The origin contains no
+`/index.html` or `/admin.html` path. Google's local-development guidance also
+recommends `http://localhost`; add it if absent. The owner reported that the
+login issue was fixed, but the Cloud Console origin list was not independently
+inspected here. Use the designated admin Google account for the library.
+No remote repository or `V-2-9-26` snapshot was changed by the later resource
+safety work.
+
+Current resource-safety checks passed with installed Chrome:
+`npm run test:resources` covers a crowded tiny map, miner access to default deposits,
+the 100-unit clearance for new turret and launcher placement, and relocation
+of an older point overlapping a planned structure. `npm run test:structures`,
+`npm run test:movement`, and `npm run test:uploads` also passed. Newly placed
+stationary defenses are constrained; a turret already present in an older
+saved match is not relocated automatically.
+
+## Local image upload policy (2026-09-26)
+
+Map Builder and Game Producer file pickers now accept PNG/JPEG for ordinary
+image uploads. Save-time file-signature checks reject GIFs renamed as PNG or
+JPEG; sound uploads and saved image URLs still work. The admin's Standard and
+Premium Library upload accepts GIFs. New library items store MIME type and
+filename, and GIF cards in both the admin list and builder picker show a
+circled **G**. Older library GIFs are identified from their Storage path.
+Existing maps using GIFs keep their art and playback. PNG/JPEG uploads may be
+stored as WebP after client-side compression to reduce transfer and storage.
+
+The local `storage.rules` file now rejects `image/gif` uploads to map-owned
+Storage paths, while permitting PNG/JPEG, the builder's compressed WebP, and
+audio; Producer image MIME types are similarly restricted. Shared library
+Storage paths and Firestore documents are already admin-write-only. The rules
+have **not** been deployed to Firebase, so direct requests to the live Storage
+bucket remain governed by the previously deployed rules. Storage rules check
+declared MIME type, not file bytes; the browser's signature check covers normal
+builder use but is not a server-side guarantee against a deliberately
+mislabelled direct upload. GitHub remains unchanged.
+
+The owner requested a refresh of `V-2-9-26` on 2026-09-26. It now contains
+the current local game source, rules, documentation, and source tests, excluding
+standalone image/sound files and generated test artifacts. This was a local
+folder copy; GitHub and Firebase were not updated.
+
+## Area defenders (local working files)
+
+The bottom of the builder now has **Area Defenders**. Select any defined troop
+type (including transport vessels, medics, and Clerics), click a player button,
+choose a 100–1000 world-unit defense radius, and click the map to place a
+defender. Small markers show the troop name's initials and a separate player-number badge; the patrol radius
+is listed below the map and is not drawn as a footprint. Use Remove below to
+delete a troop. The section uses the current
+background and shows Home Base markers. Existing troop HP, attack, weapon,
+speed, and abilities are reused. A medic heals and a Cleric converts rather
+than dealing ordinary attack damage. Removed troop/player references must be
+cleared before saving.
+
+Maps save an `areaDefenders` array of stable troop IDs, faction indexes,
+normalized map positions, and patrol radii. On match start, each included
+player receives its assigned defenders. They acquire targets only inside
+their post's radius, may pursue within it, abandon targets that leave it,
+and return to their post after combat. The normal turn and attack timing
+still applies. Save-game files retain each defender's post so loading a
+match does not create duplicates. Run `npm run test:defenders` for the builder
+and match regression checks. This change is local only; the previous
+`V-2-9-26` backup and GitHub have not been changed by it.
+
+The same bottom section now includes **Structures, Silos & Gun Turrets**. Select
+any production/research building with art assigned, a defined gun turret, or a
+defined missile launcher; click a player button and then the map. Numbered,
+name-initial markers and player-colored number badges show identity and ownership.
+For example, Helicopter Facility is HF. Use Remove below to delete one.
+The 500-unit enemy spacing is enforced on placement without a large circle
+obscuring the map. A different player's Home Base or placed structure, silo, turret,
+or launcher must be at least 500 units away. Same-player structures only need
+physical clearance. Placement also avoids obstacles and map-placed mining
+deposits, with turret/launcher weapon range kept clear of mining space.
+
+Maps save a `placedStructures` array with kind, stable turret/launcher type ID
+or building key, owner faction, and normalized position. On match start,
+included players receive their placed structures. Production buildings and
+Missile Silos start built; a placed producer can make its normal units beside
+its actual map location, even if the player has not yet built a Research
+Facility. Multiple living copies share the existing type queue and take
+turns spawning completed units. A surviving second copy keeps its building
+type and production queue active if one copy is destroyed or converted. Placed turrets and
+launchers use their existing attack settings. Match saves retain placed
+locations and ownership without respawning them on load. Existing maps
+without `placedStructures` continue to work. Run `npm run test:placements`
+for builder and match checks. These changes are in local working files only;
+the `V-2-9-26` backup, GitHub, and Firebase were not changed.
+
+Every placement preview now shows other map-placed resources, obstacles,
+troops, buildings, turrets, and launchers as compact reference markers.
+Name initials identify each troop, building, turret, launcher, resource,
+and obstacle. A small number badge and border color identify the owner
+of troops and structures; hovering shows the full name. Initials update
+when the map maker renames an item. The resource and obstacle previews
+show placed troops and structures too. A marker no longer consumes the
+nearby map as a click target: clicking close to an existing friendly troop
+or turret attempts another placement. Individual resource and obstacle
+points now have Remove buttons beneath their map, like troops and
+structures. The 500-unit enemy-structure rule and physical overlap checks
+still apply. `npm run test:placements` also exercises real mouse clicks
+inside an existing marker, cross-preview references, and point removal.
+
+## Objectives and placement art (local working files, 2026-09-28)
+
+The builder's **Objectives** section accepts up to seven text entries. It
+saves them in the map's `objectives` array and displays them across the top
+of the finished game. They are visual guidance only; they do not affect
+victory rules. Empty entries are omitted, and older maps load with none.
+
+Starting Gold is set in `play.html` by `freshWallet()`: the `gold` entry
+starts at **1,000** for each faction, while additional resources start at
+zero. The builder has no starting-Gold field. Loading an older match with
+a single numeric resource balance also falls back to 1,000 Gold when that
+balance is absent.
+
+The unwanted rocket on Cuba-1 was traced to saved placements, not a library
+image. The 2026-09-28 `Cuba-1 (6).html` export contains 46 placed structures:
+21 Missile Silo buildings without Missile Silo art, 23 turrets, one Air Base,
+and one Infantry Post. The old game drew an artless Missile Silo as a faction
+colored circle with its rocket emoji. Its color could look pink for that
+faction. This generic fallback could affect other artless placed buildings.
+
+The builder now offers a building for placement only after its art is selected
+or uploaded. Existing artless placements remain visible in the editor with
+`(no art)` in their names and a warning. The **Remove placements without art**
+button removes only those points when clicked. Saving is blocked until art is
+assigned or those points are removed; loading a map alone does not alter its
+saved data. Home Bases on placement previews use numbered markers, so their
+art cannot appear as an unexpected preview thumbnail. The game skips artless
+placed buildings at match start and when loading an older match save, rather
+than drawing placeholder emoji circles. Other valid placements remain.
+
+The local proof copy at `.local-previews/Cuba-1-code-fix.html` uses the original
+export's complete embedded map data with the fixed `play.html` code. In Chrome,
+its config still contained all 46 placements and all 21 artless Missile Silos;
+zero Missile Silo placeholders rendered, all 23 turrets rendered, and no page
+errors occurred. The Chrome builder placement, preview, and game placement
+tests passed. The local server serves the builder at
+`http://localhost:8765/index.html` and the proof copy at
+`http://localhost:8765/.local-previews/Cuba-1-code-fix.html`.
+
+The original downloaded export and the cloud map were not edited. Existing
+downloaded HTML files contain the old game code; download a fresh copy from
+the updated builder to get this fix. To remove Cuba-1's 21 saved artless
+points from its cloud map, open it in the local builder, click **Remove 21
+placements without art**, then save. Assigning Missile Silo art is the other
+way to keep those placements. The separately reported PNG on another map was
+not identified from the available exports, so the specific saved asset URL
+for that map has not been verified.
+
+## Local V3-9-27 snapshot
+
+`V3-9-27` contains the current local game source, rules, documentation, and
+source tests, including base-free factions. The snapshot excludes standalone
+image and sound files, generated test artifacts, browser profiles, logs, and
+installed dependencies. Image data embedded in HTML remains in the working
+pages. This is a local copy; GitHub and Firebase were not changed.
