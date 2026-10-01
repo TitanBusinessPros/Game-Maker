@@ -833,12 +833,18 @@ function buildFinalHtml(DATA) {
   }
   #continuePrompt.hidden { display:none; }
   #continuePrompt .box { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:26px 30px; text-align:center; max-width:360px; }
+  #exitPrompt { position:fixed; inset:0; z-index:80; display:flex; align-items:center; justify-content:center; padding:20px; background:rgba(0,0,0,.75); }
+  #exitPrompt.hidden { display:none; }
+  #exitPrompt .box { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:24px; width:min(360px,100%); text-align:center; }
+  #exitPrompt .actions { display:flex; justify-content:center; gap:10px; margin-top:18px; }
+  #exitPrompt .actions button { cursor:pointer; padding:10px 14px; border-radius:7px; border:1px solid var(--border); background:var(--panel); color:var(--text); font-weight:700; }
+  #exitPrompt .actions #confirmExitBtn { background:var(--accent); color:#06121f; }
 </style>
 </head>
 <body>
   <div id="introScreen" class="screen hidden"></div>
   <div id="stageScreen" class="screen hidden"></div>
-  <div id="playScreen" class="screen hidden"><iframe id="stageFrame"></iframe></div>
+  <div id="playScreen" class="screen hidden"></div>
   <div id="outroScreen" class="screen hidden"></div>
   <div id="continuePrompt" class="hidden">
     <div class="box">
@@ -847,9 +853,13 @@ function buildFinalHtml(DATA) {
       <button class="big" id="continueBtn">Continue &#9654;</button>
     </div>
   </div>
+  <div id="exitPrompt" class="hidden" role="dialog" aria-modal="true" aria-labelledby="exitTitle">
+    <div class="box"><h2 id="exitTitle">Exit game?</h2><p>Your current stage will end. Save it first if you want to continue later.</p><div class="actions"><button id="cancelExitBtn">Keep playing</button><button id="confirmExitBtn">Exit game</button></div></div>
+  </div>
 <script>
 const DATA = ${dataJson};
 let current = -1;
+let preparedStage = -1, preparedHtml = null;
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
@@ -864,6 +874,7 @@ function showScreen(id) {
   document.getElementById(id).classList.remove('hidden');
 }
 function renderIntro() {
+  document.getElementById('playScreen').replaceChildren();
   const el = document.getElementById('introScreen');
   el.style.backgroundImage = DATA.introArt ? \`url(\${DATA.introArt})\` : 'none';
   el.innerHTML = \`<div class="titleCard"><h1>\${escapeHtml(DATA.title || 'My Game')}</h1><p>\${DATA.stages.length} stage\${DATA.stages.length === 1 ? '' : 's'}</p></div><button class="big" id="startGameBtn">&#9654; Start Game</button>\`;
@@ -874,14 +885,27 @@ function renderStageCover(i) {
   const s = DATA.stages[i];
   const el = document.getElementById('stageScreen');
   el.style.backgroundImage = s.art ? \`url(\${s.art})\` : 'none';
-  el.innerHTML = \`<div class="badge">Stage \${i + 1} of \${DATA.stages.length}</div><div class="titleCard"><h2>\${escapeHtml(s.name)}</h2></div><button class="big" id="startStageBtn">&#9654; Start Stage</button>\`;
+  el.innerHTML = \`<div class="badge">Stage \${i + 1} of \${DATA.stages.length}</div><div class="titleCard"><h2>\${escapeHtml(s.name)}</h2><p>Mobile: drag to move, hold then drag to select troops, pinch to zoom. Back asks before exiting.</p></div><button class="big" id="startStageBtn">&#9654; Start Stage</button>\`;
   document.getElementById('startStageBtn').onclick = () => playStage(i);
   showScreen('stageScreen');
+  // Decode while the player sees the cover, so Start Stage can display
+  // immediately. Keep only one decoded stage to limit memory use.
+  const prepare = () => {
+    if (current >= i || preparedStage === i) return;
+    preparedHtml = base64ToText(DATA.stages[i].htmlB64);
+    preparedStage = i;
+  };
+  if (window.requestIdleCallback) requestIdleCallback(prepare, { timeout: 1000 });
+  else setTimeout(prepare, 0);
 }
 function playStage(i) {
   current = i;
-  const iframe = document.getElementById('stageFrame');
-  iframe.srcdoc = base64ToText(DATA.stages[i].htmlB64);
+  const iframe = document.createElement('iframe');
+  iframe.id = 'stageFrame';
+  iframe.title = DATA.stages[i].name;
+  iframe.srcdoc = preparedStage === i ? preparedHtml : base64ToText(DATA.stages[i].htmlB64);
+  preparedHtml = null; preparedStage = -1;
+  document.getElementById('playScreen').replaceChildren(iframe);
   showScreen('playScreen');
 }
 function goToStage(i) {
@@ -889,6 +913,7 @@ function goToStage(i) {
   renderStageCover(i);
 }
 function renderOutro() {
+  document.getElementById('playScreen').replaceChildren();
   const el = document.getElementById('outroScreen');
   el.style.backgroundImage = DATA.outroArt ? \`url(\${DATA.outroArt})\` : 'none';
   el.innerHTML = \`<div class="titleCard"><h1>\${escapeHtml(DATA.outroMessage || "🎉 You've completed the game!")}</h1></div><button class="big" id="restartAllBtn">&#8635; Play Again From Start</button>\`;
@@ -897,8 +922,16 @@ function renderOutro() {
 }
 document.getElementById('continueBtn').addEventListener('click', () => {
   document.getElementById('continuePrompt').classList.add('hidden');
+  document.getElementById('playScreen').replaceChildren();
   goToStage(current + 1);
 });
+history.pushState({ gmExitGuard: true }, '');
+window.addEventListener('popstate', () => {
+  history.pushState({ gmExitGuard: true }, '');
+  document.getElementById('exitPrompt').classList.remove('hidden');
+});
+document.getElementById('cancelExitBtn').onclick = () => document.getElementById('exitPrompt').classList.add('hidden');
+document.getElementById('confirmExitBtn').onclick = () => location.replace('about:blank');
 window.addEventListener('message', (ev) => {
   if (ev.data && ev.data.type === 'gm-stage-complete' && current >= 0) {
     document.getElementById('continuePrompt').classList.remove('hidden');

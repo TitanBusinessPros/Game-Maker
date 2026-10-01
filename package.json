@@ -12,6 +12,7 @@
     "test:render": "node tests/render-performance.cjs",
     "test:fog": "node tests/fog-of-war.cjs",
     "test:map-motion": "node tests/map-motion.cjs",
+    "test:mobile": "node tests/mobile-export.cjs",
     "test:uploads": "node tests/builder-uploads.cjs",
     "build:gif": "node scripts/build-gif-player.cjs",
     "test:gif": "node tests/gif-playback.cjs",

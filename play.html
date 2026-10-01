@@ -115,6 +115,13 @@
      this is the standard belt-and-suspenders pairing for a canvas that
      implements its own touch gestures instead of relying on native ones. */
   #canvas { touch-action:none; }
+  #exitConfirm { border:1px solid var(--border); border-radius:12px; background:var(--panel); color:var(--text); max-width:min(360px,90vw); padding:22px; }
+  #exitConfirm::backdrop { background:rgba(0,0,0,.75); }
+  #exitConfirm h2 { margin:0 0 8px; }
+  #exitConfirm p { color:var(--dim); margin:0 0 18px; }
+  #exitConfirm menu { display:flex; gap:10px; margin:0; padding:0; justify-content:flex-end; }
+  #exitConfirm button { padding:10px 14px; border-radius:6px; border:1px solid var(--border); background:var(--panel2); color:var(--text); font-weight:600; }
+  #exitConfirm #confirmExitBtn { background:var(--accent); color:#06121f; }
   #sidePanel {
     position:absolute; top:0; right:0; bottom:0; width:320px; max-width:88vw;
     background:rgba(11,14,20,0.95); border-left:1px solid var(--border); z-index:15;
@@ -405,6 +412,7 @@
 
   <canvas id="canvas"></canvas>
   <div id="dragBox" class="selbox" style="display:none;"></div>
+  <dialog id="exitConfirm" aria-labelledby="exitConfirmTitle"><h2 id="exitConfirmTitle">Exit game?</h2><p>Your current match will end. Save it first if you want to continue later.</p><menu><button type="button" id="cancelExitBtn">Keep playing</button><button type="button" id="confirmExitBtn">Exit game</button></menu></dialog>
 
   <div id="unitInfoBox">
     <div id="unitInfoText"></div>
@@ -422,7 +430,8 @@
     <div class="sideTabContent active" id="tab-build"></div>
     <div class="sideTabContent" id="tab-research"></div>
     <div class="sideTabContent" id="tab-help">
-      <p style="font-size:12px; color:var(--dim); line-height:1.6;">
+      <p style="font-size:12px; color:var(--dim); line-height:1.6;"><strong>On mobile:</strong> Drag one finger to move around the map. Press and hold on the map until a box appears, then drag the box around troops to select them. Tap a troop to select one; double-tap to select all visible troops of that type. Tap a destination or enemy to command selected troops. Pinch with two fingers to zoom. Tap the minimap to jump or send selected troops. Use your device’s Back button to see an exit confirmation.</p>
+      <p style="font-size:12px; color:var(--dim); line-height:1.6;"><strong>On desktop:</strong><br>
         <strong>Left-drag</strong> a box to select multiple units, or click one.<br>
         <strong>Click</strong> empty space to move selected units there.<br>
         <strong>Click</strong> an enemy to attack it.<br>
@@ -586,6 +595,22 @@ const firebaseConfig = {
 const statusEl = document.getElementById('status');
 const appEl = document.getElementById('app');
 
+// Downloaded single-stage games need a Back safeguard. Produced multi-stage
+// games install the same guard in their parent page instead.
+if (window.GM_INLINE_CONFIG && window.top === window) {
+  const exitDialog = document.getElementById('exitConfirm');
+  history.pushState({ gmExitGuard: true }, '');
+  window.addEventListener('popstate', () => {
+    history.pushState({ gmExitGuard: true }, '');
+    if (!exitDialog.open) exitDialog.showModal();
+  });
+  document.getElementById('cancelExitBtn').addEventListener('click', () => exitDialog.close());
+  document.getElementById('confirmExitBtn').addEventListener('click', () => {
+    exitDialog.close();
+    location.replace('about:blank');
+  });
+}
+
 async function loadConfig() {
   if (window.GM_INLINE_CONFIG) return window.GM_INLINE_CONFIG;
   const mapId = new URLSearchParams(location.search).get('map');
@@ -618,6 +643,10 @@ function loadImage(url, options) {
       if (namedGif) throw new Error('A GIF character image could not be loaded. Check its file or upload it again.');
       return null;
     }
+    // Standalone exports embed known image formats as data URLs. Fetching
+    // those multi-megabyte URLs again only to discover they are not GIFs
+    // delays the first frame and doubles the decoding work on phones.
+    if (/^data:image\/(?:png|jpe?g|webp|avif|bmp|svg\+xml)[;,]/i.test(url)) return img;
     let bytes;
     try {
       const response = await fetch(url, { cache: 'reload' });
@@ -852,6 +881,23 @@ async function main() {
     if (canvas.height !== window.innerHeight) canvas.height = window.innerHeight;
   }
   resizeCanvasOnly();
+
+  // Start the independent artwork loads together. The cache retains their
+  // promises for the existing assignments below, preserving their errors.
+  const imageUrls = [cfg.backgroundImage, cfg.resource?.image, cfg.miningUnit?.image,
+    cfg.player?.baseImage, ...(cfg.computers || []).map((c) => c.baseImage),
+    ...['airBase','warFactory','infantryPost','heliFacility','navyHarbor','fieldHospital',
+      'researchFacility','missileSilo','missileBattery','religiousInstitution'].map((key) => cfg[key]?.image),
+    ...(cfg.resources || []).map((r) => r.image)];
+  const imageDefs = [...(cfg.units || []), ...(cfg.gunTurrets || []), ...(cfg.missileUnits || []),
+    ...['airUnits','warUnits','infantryUnits','heliUnits','navyUnits','fieldHospitalUnits',
+      'missileBatteryUnits','clericUnits'].flatMap((key) => cfg[key] || []),
+    ...(cfg.mapOnlyFactions || []).flatMap((f) => f.units || [])];
+  imageUrls.push(...imageDefs.flatMap((def) => [def.imageUrl, def.missileImageUrl,
+    def.transport?.vessel?.imageUrl]));
+  const imageLoads = imageUrls.filter(Boolean).map((url) =>
+    loadImage(url, url === cfg.backgroundImage ? { maxDimension: 2048 } : undefined));
+  Promise.allSettled(imageLoads);
 
   const [bgImg, resourceImg, miningImg] = await Promise.all([
     loadImage(cfg.backgroundImage, { maxDimension: 2048 }), loadImage(cfg.resource?.image), loadImage(cfg.miningUnit?.image),
@@ -5078,40 +5124,40 @@ async function main() {
   canvas.addEventListener('dblclick', (evt) => handleDoubleClickAt(evt.clientX, evt.clientY));
 
   // ---------------------------------------------------------------------
-  // Touch controls (phones/tablets) - mirrors the mouse scheme above as
-  // closely as a single-pointer touchscreen allows: one finger drags a
-  // box-select exactly like a left-drag does (the primary way to command
-  // a group, so it keeps the desktop gesture rather than repurposing it
-  // for panning), a one-finger tap with barely any movement is the same
-  // as a click, and a quick second tap near the first is the same as a
-  // double-click. Panning and zooming both need a SECOND finger (there's
-  // no separate mouse button to borrow) - handled together off the same
-  // two-finger touchmove, like a map app's combined pinch-to-zoom-and-pan
-  // gesture: the pinch midpoint's own movement pans the camera, and the
-  // two fingers' distance apart changing zooms it, centered on that same
-  // midpoint (the same cursor-anchor math the wheel handler above uses).
+  // A moving finger pans; holding still first starts box selection.
+  // Two fingers pan and pinch to zoom. A brief tap retains click behavior.
   // ---------------------------------------------------------------------
-  let touchMode = null; // 'select' | 'pan-zoom' | null
-  let touchStart = null, touchMoved = false, touchLast = null;
+  let touchMode = null; // 'pending' | 'pan' | 'select' | 'pan-zoom' | null
+  let touchStart = null, touchLast = null, selectMoved = false, holdTimer = null;
   let pinchStartDist = 0, pinchLastMid = null;
   let lastTapTime = 0, lastTapPos = null;
+  const HOLD_MS = 400, PAN_THRESHOLD = 10;
   function touchDist(a, b) { return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY); }
   function touchMid(a, b) { return { x: (a.clientX + b.clientX) / 2, y: (a.clientY + b.clientY) / 2 }; }
+  function clearHold() { if (holdTimer) clearTimeout(holdTimer); holdTimer = null; }
+  function resetTouch() {
+    clearHold(); dragBoxEl.style.display = 'none';
+    touchMode = null; touchStart = null; touchLast = null; selectMoved = false;
+  }
   canvas.addEventListener('touchstart', (evt) => {
     if (gameOver || paused || !matchStarted) return;
-    // Same "not your turn" guard every other input path above uses.
-    if (turnMode && !activeFaction.isHuman) return;
     evt.preventDefault();
     if (evt.touches.length === 1) {
-      touchMode = 'select';
+      touchMode = 'pending';
       touchStart = { x: evt.touches[0].clientX, y: evt.touches[0].clientY };
       touchLast = touchStart;
-      touchMoved = false;
+      selectMoved = false;
+      clearHold();
+      if (!turnMode || activeFaction.isHuman) holdTimer = setTimeout(() => {
+        if (touchMode !== 'pending') return;
+        touchMode = 'select';
+        dragBoxEl.style.display = 'block';
+        dragBoxEl.style.left = touchStart.x + 'px';
+        dragBoxEl.style.top = touchStart.y + 'px';
+        dragBoxEl.style.width = '2px'; dragBoxEl.style.height = '2px';
+      }, HOLD_MS);
     } else if (evt.touches.length >= 2) {
-      // A second finger landing mid-drag cancels any in-progress
-      // box-select (dragBox hidden, nothing gets selected from it) and
-      // switches straight to pan/zoom - there's no sensible way to
-      // "finish" a one-finger box-select once a second finger is down.
+      clearHold();
       touchMode = 'pan-zoom';
       dragBoxEl.style.display = 'none';
       pinchStartDist = touchDist(evt.touches[0], evt.touches[1]);
@@ -5121,12 +5167,20 @@ async function main() {
   canvas.addEventListener('touchmove', (evt) => {
     if (!touchMode) return;
     evt.preventDefault();
-    if (touchMode === 'select' && evt.touches.length === 1) {
+    if (evt.touches.length === 1 && touchMode !== 'pan-zoom') {
       const t = evt.touches[0];
+      const previous = touchLast;
       touchLast = { x: t.clientX, y: t.clientY };
       const dx = touchLast.x - touchStart.x, dy = touchLast.y - touchStart.y;
-      if (Math.hypot(dx, dy) > 6) touchMoved = true;
-      if (touchMoved) {
+      if (touchMode === 'pending' && Math.hypot(dx, dy) > PAN_THRESHOLD) {
+        clearHold(); touchMode = 'pan';
+      }
+      if (touchMode === 'pan') {
+        camera.x -= (touchLast.x - previous.x) / camera.zoom;
+        camera.y -= (touchLast.y - previous.y) / camera.zoom;
+        clampCamera();
+      } else if (touchMode === 'select') {
+        if (Math.hypot(dx, dy) > 4) selectMoved = true;
         const x0 = Math.min(touchStart.x, touchLast.x), y0 = Math.min(touchStart.y, touchLast.y);
         const w = Math.abs(dx), h = Math.abs(dy);
         dragBoxEl.style.display = 'block';
@@ -5154,9 +5208,8 @@ async function main() {
   canvas.addEventListener('touchend', (evt) => {
     if (!touchMode) return;
     evt.preventDefault();
-    if (touchMode === 'select') {
-      dragBoxEl.style.display = 'none';
-      if (touchMoved) {
+    if (touchMode === 'select' && (!turnMode || activeFaction.isHuman)) {
+      if (selectMoved) {
         const r = canvas.getBoundingClientRect();
         const x0 = Math.min(touchStart.x, touchLast.x) - r.left, x1 = Math.max(touchStart.x, touchLast.x) - r.left;
         const y0 = Math.min(touchStart.y, touchLast.y) - r.top, y1 = Math.max(touchStart.y, touchLast.y) - r.top;
@@ -5168,26 +5221,22 @@ async function main() {
           showUnitInfo(picked.length === 1 ? picked[0] : null, picked.length);
         }
       } else {
-        // A quick second tap near the first, within the same window a
-        // desktop double-click would need, widens the selection to every
-        // on-screen unit of that same type - there's no separate
-        // "dblclick" touch event, so it's detected by hand here.
-        const now = performance.now();
-        if (lastTapPos && now - lastTapTime < 350 && Math.hypot(touchStart.x - lastTapPos.x, touchStart.y - lastTapPos.y) < 30) {
-          handleDoubleClickAt(touchStart.x, touchStart.y);
-          lastTapTime = 0; lastTapPos = null;
-        } else {
-          handleClick({ clientX: touchStart.x, clientY: touchStart.y });
-          lastTapTime = now; lastTapPos = touchStart;
-        }
+        handleClick({ clientX: touchStart.x, clientY: touchStart.y });
+      }
+    } else if (touchMode === 'pending' && evt.touches.length === 0 && (!turnMode || activeFaction.isHuman)) {
+      // A quick second tap near the first selects matching visible units.
+      const now = performance.now();
+      if (lastTapPos && now - lastTapTime < 350 && Math.hypot(touchStart.x - lastTapPos.x, touchStart.y - lastTapPos.y) < 30) {
+        handleDoubleClickAt(touchStart.x, touchStart.y);
+        lastTapTime = 0; lastTapPos = null;
+      } else {
+        handleClick({ clientX: touchStart.x, clientY: touchStart.y });
+        lastTapTime = now; lastTapPos = touchStart;
       }
     }
-    touchMode = null; touchStart = null; touchLast = null; touchMoved = false;
+    resetTouch();
   }, { passive: false });
-  canvas.addEventListener('touchcancel', () => {
-    touchMode = null; touchStart = null; touchLast = null; touchMoved = false;
-    dragBoxEl.style.display = 'none';
-  });
+  canvas.addEventListener('touchcancel', resetTouch);
 
   function showUnitInfo(u, count) {
     const box = document.getElementById('unitInfoBox');
